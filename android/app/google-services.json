@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "502638141687",
+    "project_id": "cloud-explorer-c3d98",
+    "storage_bucket": "cloud-explorer-c3d98.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:502638141687:android:e29f2daeafe883f87db3f2",
+        "android_client_info": {
+          "package_name": "com.cloudexplorer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPXex6ZNB2to_crrC7_bBxGWDkTxuaGV8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

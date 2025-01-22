@@ -1,4 +1,4 @@
-package com.cloudexplorer
+package com.cloudexplorer;
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

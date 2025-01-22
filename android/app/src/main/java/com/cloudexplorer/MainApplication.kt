@@ -1,4 +1,4 @@
-package com.cloudexplorer
+package com.cloudexplorer;
 
 import android.app.Application
 import com.facebook.react.PackageList
