@@ -129,7 +129,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
         />
 
         <Text style={styles.title}>
-          {isLogin ? 'Welcome Back!' : 'Create an Account'}
+          {isLogin ? 'Your Back Again!!!' : 'Create an Account'}
         </Text>
 
         <TextInput
