@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "502638141687",
+    "firebase_url": "https://cloud-explorer-c3d98-default-rtdb.firebaseio.com",
     "project_id": "cloud-explorer-c3d98",
     "storage_bucket": "cloud-explorer-c3d98.firebasestorage.app"
   },
