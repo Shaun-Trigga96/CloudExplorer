@@ -3,19 +3,20 @@ import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { VictoryBar, VictoryChart, VictoryAxis, VictoryLabel, VictoryContainer } from 'victory-native';
 import Icon from 'react-native-vector-icons/Feather';
 
-type ProgressData = {
+interface ProgressData {
   module: string;
   completed: number;
-};
+}
 
-type Feature = {
+interface Feature {
   icon: string;
   title: string;
   description: string;
   color: string;
-};
+}
 
-const DashboardScreen = () => {
+const DashboardScreen: React.FC = () => {
+  console.log('Loading DashboardScreen module');
   const progressData: ProgressData[] = [
     { module: 'Compute', completed: 85 },
     { module: 'Storage', completed: 70 },
@@ -76,14 +77,14 @@ const DashboardScreen = () => {
             containerComponent={<VictoryContainer />}
           >
             <VictoryAxis
-              tickFormat={(t: string) => t}
+              tickFormat={(t) => `${t}`}
               style={{
                 tickLabels: { angle: -45, fontSize: 8 },
               }}
             />
             <VictoryAxis
               dependentAxis
-              tickFormat={(t: number) => `${t}%`}
+              tickFormat={(t) => `${t}%`}
             />
             <VictoryBar
               data={progressData}
@@ -91,7 +92,7 @@ const DashboardScreen = () => {
               y="completed"
               style={{ data: { fill: '#3b82f6' } }}
               labels={({ datum }) => `${datum.completed}%`}
-              labelComponent={<VictoryLabel />}
+              labelComponent={<VictoryLabel dy={-10} />}
             />
           </VictoryChart>
         </View>

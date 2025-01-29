@@ -1,14 +1,10 @@
-// TabNavigator.tsx
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from 'react-native-paper';
 import { RouteProp } from '@react-navigation/native';
-import DashboardScreen from '../screens/DashboardScreen';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const Tab = createBottomTabNavigator();
-
-
 
 type TabBarIconProps = {
   color: string;
@@ -45,6 +41,9 @@ const TabNavigator = () => {
     return <Icon name={iconName} size={size} color={color} />;
   };
 
+  const DashboardComponent = require('../screens/DashboardScreen').default;
+  console.log('Dashboard Component:', DashboardComponent);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -54,22 +53,23 @@ const TabNavigator = () => {
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '500',
-          marginBottom: 2, // Better spacing for labels
+          marginBottom: 2,
         },
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopWidth: 0,
           elevation: 8,
-          height: 60,  // Optimized for both iOS and Android
+          height: 60,
           paddingTop: 8,
         },
         headerShown: false,
       })}
     >
+      
       <Tab.Screen
         name="Dashboard"
-        component={DashboardScreen}
-        options={{ title: 'Overview' }}  // More descriptive label
+        component={DashboardComponent}
+        options={{ title: 'Overview' }}
       />
       <Tab.Screen
         name="Modules"

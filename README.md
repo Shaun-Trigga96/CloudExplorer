@@ -111,17 +111,16 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
    - **Deploy to Cloud Run**: Deploy the containerized application to Google Cloud Run.
    - **Notifications**: Send notifications on build and deployment status via Google Chat or Slack.
 
-### Example `cloudbuild.yaml` for CI/CD Pipeline
+## Screenshots
 
-```yaml
-steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/frontend:$COMMIT_SHA', '.']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/frontend:$COMMIT_SHA']
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args: ['run', 'deploy', 'cloud-explorer', '--image', 'gcr.io/$PROJECT_ID/frontend:$COMMIT_SHA', '--platform=managed', '--region=us-central1']
-```
+### Register/Login Screen
+
+![Alt](screenshots/Register-Login.png)
+
+### Welcome Page
+
+![Alt](screenshots/Home.png)
+
 
 ## Getting Started
 
@@ -155,14 +154,14 @@ steps:
 4. Start the development server:
 
    ```bash
-   npm start
+   npx react-native start
    ```
 
 5. Run the app on an emulator or physical device:
 
    ```bash
-   npm run android
-   npm run ios
+   npx react-native run-android
+   npx react-native run-aios
    ```
 
 ## Contributing
