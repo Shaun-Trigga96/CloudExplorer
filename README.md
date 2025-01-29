@@ -117,9 +117,29 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
 
 ![Alt](screenshots/Register-Login.png)
 
-### Welcome Page
+### Welcome Screen
 
 ![Alt](screenshots/Home.png)
+
+### Dasboard Screen
+
+![Alt](screenshots/Dashboard.png)
+
+### Modules Screen
+
+![Alt](screenshots/Modules.png)
+
+### Quizzes Screen
+
+![Alt](screenshots/Quizzes.png)
+
+### Exams Screen
+
+![Alt](screenshots/Exams.png)
+
+### Settings Screen
+
+![Alt](screenshots/Settings.png)
 
 
 ## Getting Started
