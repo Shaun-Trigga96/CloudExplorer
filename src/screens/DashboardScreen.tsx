@@ -1,12 +1,7 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Dimensions } from 'react-native';
-import { VictoryBar, VictoryChart, VictoryAxis, VictoryLabel, VictoryContainer } from 'victory-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-
-interface ProgressData {
-  module: string;
-  completed: number;
-}
 
 interface Feature {
   icon: string;
@@ -16,15 +11,6 @@ interface Feature {
 }
 
 const DashboardScreen: React.FC = () => {
-  console.log('Loading DashboardScreen module');
-  const progressData: ProgressData[] = [
-    { module: 'Compute', completed: 85 },
-    { module: 'Storage', completed: 70 },
-    { module: 'Database', completed: 60 },
-    { module: 'Security', completed: 90 },
-    { module: 'Networking', completed: 75 },
-  ];
-
   const features: Feature[] = [
     {
       icon: 'book-open',
@@ -53,59 +39,38 @@ const DashboardScreen: React.FC = () => {
   ];
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Cloud Explorer Features</Text>
-        <View style={styles.featuresGrid}>
-          {features.map((feature, index) => (
-            <View key={index} style={styles.featureCard}>
-              <Icon name={feature.icon} size={32} color={feature.color} />
-              <Text style={styles.featureTitle}>{feature.title}</Text>
-              <Text style={styles.featureDescription}>{feature.description}</Text>
-            </View>
-          ))}
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Cloud Explorer Features</Text>
+          <View style={styles.featuresGrid}>
+            {features.map((feature, index) => (
+              <View key={index} style={styles.featureCard}>
+                <Icon name={feature.icon} size={32} color={feature.color} />
+                <Text style={styles.featureTitle}>{feature.title}</Text>
+                <Text style={styles.featureDescription}>{feature.description}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Learning Progress</Text>
-        <View style={styles.chartContainer}>
-          <VictoryChart
-            width={Dimensions.get('window').width - 40}
-            height={300}
-            domainPadding={20}
-            containerComponent={<VictoryContainer />}
-          >
-            <VictoryAxis
-              tickFormat={(t) => `${t}`}
-              style={{
-                tickLabels: { angle: -45, fontSize: 8 },
-              }}
-            />
-            <VictoryAxis
-              dependentAxis
-              tickFormat={(t) => `${t}%`}
-            />
-            <VictoryBar
-              data={progressData}
-              x="module"
-              y="completed"
-              style={{ data: { fill: '#3b82f6' } }}
-              labels={({ datum }) => `${datum.completed}%`}
-              labelComponent={<VictoryLabel dy={-10} />}
-            />
-          </VictoryChart>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Learning Progress</Text>
+          <Text>Progress chart will be added here</Text>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5',
   },
   card: {
     backgroundColor: 'white',
@@ -150,10 +115,6 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 4,
-  },
-  chartContainer: {
-    marginTop: 16,
-    alignItems: 'center',
   },
 });
 

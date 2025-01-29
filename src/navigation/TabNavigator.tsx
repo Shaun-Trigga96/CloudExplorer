@@ -1,53 +1,45 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from 'react-native-paper';
-import { RouteProp } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+// Import screens directly
+import DashboardScreen from '../screens/DashboardScreen';
+import ModulesScreen from '../screens/ModulesScreen';
+import QuizzesScreen from '../screens/QuizzesScreen';
+import ExamsScreen from '../screens/ExamsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
-
-type TabBarIconProps = {
-  color: string;
-  size: number;
-  route: RouteProp<Record<string, object | undefined>, string>;
-};
 
 const TabNavigator = () => {
   const theme = useTheme();
 
-  const renderTabBarIcon = ({ color, size, route }: TabBarIconProps) => {
-    let iconName: string;
-
-    switch (route.name) {
-      case 'Dashboard':
-        iconName = 'view-dashboard';
-        break;
-      case 'Modules':
-        iconName = 'book-open-variant';
-        break;
-      case 'Quizzes':
-        iconName = 'help-circle';
-        break;
-      case 'Exams':
-        iconName = 'certificate';
-        break;
-      case 'Settings':
-        iconName = 'cog';
-        break;
-      default:
-        iconName = 'alert';
-    }
-
-    return <Icon name={iconName} size={size} color={color} />;
-  };
-
-  const DashboardComponent = require('../screens/DashboardScreen').default;
-  console.log('Dashboard Component:', DashboardComponent);
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => renderTabBarIcon({ color, size, route }),
+        tabBarIcon: ({ color, size }) => {
+          let iconName = 'alert';
+
+          switch (route.name) {
+            case 'Dashboard':
+              iconName = 'view-dashboard';
+              break;
+            case 'Modules':
+              iconName = 'book-open-variant';
+              break;
+            case 'Quizzes':
+              iconName = 'help-circle';
+              break;
+            case 'Exams':
+              iconName = 'certificate';
+              break;
+            case 'Settings':
+              iconName = 'cog';
+              break;
+          }
+
+          return <Icon name={iconName} size={size} color={color} />;
+        },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceDisabled,
         tabBarLabelStyle: {
@@ -65,30 +57,29 @@ const TabNavigator = () => {
         headerShown: false,
       })}
     >
-      
-      <Tab.Screen
-        name="Dashboard"
-        component={DashboardComponent}
+      <Tab.Screen 
+        name="Dashboard" 
+        component={DashboardScreen}
         options={{ title: 'Overview' }}
       />
-      <Tab.Screen
-        name="Modules"
-        component={require('../screens/ModulesScreen').default}
+      <Tab.Screen 
+        name="Modules" 
+        component={ModulesScreen}
         options={{ title: 'Learning' }}
       />
-      <Tab.Screen
-        name="Quizzes"
-        component={require('../screens/QuizzesScreen').default}
+      <Tab.Screen 
+        name="Quizzes" 
+        component={QuizzesScreen}
         options={{ title: 'Practice' }}
       />
       <Tab.Screen 
-        name="Exams"
-        component={require('../screens/ExamsScreen').default}
+        name="Exams" 
+        component={ExamsScreen}
         options={{ title: 'Certify' }}
       />
-      <Tab.Screen
-        name="Settings"
-        component={require('../screens/SettingsScreen').default}
+      <Tab.Screen 
+        name="Settings" 
+        component={SettingsScreen}
         options={{ title: 'Profile' }}
       />
     </Tab.Navigator>

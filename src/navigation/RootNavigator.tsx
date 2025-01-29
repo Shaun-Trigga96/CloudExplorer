@@ -13,7 +13,7 @@ export type RootStackParamList = {
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-export default function RootNavigator() {
+const RootNavigator = () => {
   return (
       <Stack.Navigator
         initialRouteName="Auth"
@@ -26,4 +26,4 @@ export default function RootNavigator() {
       </Stack.Navigator>
   );
 }
-
+export default RootNavigator;
