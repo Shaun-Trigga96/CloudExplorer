@@ -1,0 +1,10 @@
+node_modules
+**/android
+**/ios
+**/__tests__
+**/.gradle
+**/.idea
+**/.vscode
+.git
+.gitignore
+.env

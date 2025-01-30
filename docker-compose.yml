@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "8081:8081"  # Metro bundler
+    environment:
+      - NODE_ENV=development
+    stdin_open: true
+    tty: true
