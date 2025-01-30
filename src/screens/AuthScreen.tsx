@@ -123,13 +123,13 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       style={styles.container}>
       <View style={styles.content}>
         <Image
-          source={require('../../assets/CloudExplorer.png')}
+          source={require('../assets/images/CloudExplorer.png')}
           style={styles.logo}
           resizeMode="contain"
         />
 
         <Text style={styles.title}>
-          {isLogin ? 'Your Back Again!!!' : 'Create an Account'}
+          {isLogin ? 'Log In!!!' : 'Create an Account'}
         </Text>
 
         <TextInput

@@ -1,6 +1,6 @@
 # Cloud Explorer
 
-![Alt](assets/CloudExplorer.png)
+![Alt](src/assets/images/CloudExplorer.png)
 
 ## Introduction
 
@@ -16,7 +16,7 @@ Cloud Explorer is a mobile application built using React Native designed to help
 - **Navigation**: React Navigation for handling navigation within the app.
 - **Authentication**: Firebase Authentication for user login and registration.
 
-![Alt](assets/CloudExplocer-App-Architecture.svg)
+![Alt](src/assets/images/CloudExplocer-App-Architecture.svg)
 
 ### Cloud Architecture
 
@@ -27,7 +27,7 @@ Cloud Explorer is a mobile application built using React Native designed to help
 - **CI/CD**: Google Cloud Build for continuous integration and deployment.
 - **Hosting**: Google Cloud Run for deploying and managing containerized applications.
 
-![Alt](assets/CloudExplorer-Cloud-Architecture.svg)
+![Alt](src/assets/images/CloudExplorer-Cloud-Architecture.svg)
 
 The cloud architecture for the Cloud Explorer application offers several advantages:
 
@@ -115,31 +115,31 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
 
 ### Register/Login Screen
 
-![Alt](screenshots/Register-Login.png)
+![Alt](src/screenshots/Register-Login.png)
 
 ### Welcome Screen
 
-![Alt](screenshots/Home.png)
+![Alt](src/screenshots/Home.png)
 
 ### Dasboard Screen
 
-![Alt](screenshots/Dashboard.png)
+![Alt](src/screenshots/Dashboard.png)
 
 ### Modules Screen
 
-![Alt](screenshots/Modules.png)
+![Alt](src/screenshots/Modules.png)
 
 ### Quizzes Screen
 
-![Alt](screenshots/Quizzes.png)
+![Alt](src/screenshots/Quizzes.png)
 
 ### Exams Screen
 
-![Alt](screenshots/Exams.png)
+![Alt](src/screenshots/Exams.png)
 
 ### Settings Screen
 
-![Alt](screenshots/Settings.png)
+![Alt](src/screenshots/Settings.png)
 
 
 ## Getting Started

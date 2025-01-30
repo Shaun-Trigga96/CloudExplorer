@@ -1,8 +1,6 @@
 import 'react-native-gesture-handler';
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-//import AuthScreen from './src/screens/AuthScreen';
-//import HomeScreen from './src/screens/HomeScreen';
 import RootNavigator from './src/navigation/RootNavigator';
 
 // import firebase from '@react-native-firebase/app';
@@ -29,8 +27,6 @@ import RootNavigator from './src/navigation/RootNavigator';
 export default function App() {
   return (
     <NavigationContainer>
-        {/* <Stack.Screen name="Auth" component={AuthScreen} /> */}
-        {/* <Stack.Screen name="Home" component={HomeScreen} /> */}
         <RootNavigator />
     </NavigationContainer>
   );
