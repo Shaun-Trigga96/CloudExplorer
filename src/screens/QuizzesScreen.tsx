@@ -56,7 +56,7 @@ const QuizzesScreen = () => {
             <Card.Content>
               <View style={styles.headerRow}>
                 <View style={styles.iconContainer}>
-                  <Icon width={24} height={24} {...(Icon as React.SVGProps<SVGSVGElement>)}/>
+                  <Icon width={34} height={34} {...(Icon as React.SVGProps<SVGSVGElement>)}/>
                 </View>
                 <Title style={styles.title}>{quiz.title}</Title>
               </View>

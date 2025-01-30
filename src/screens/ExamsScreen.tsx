@@ -73,8 +73,8 @@ const ExamsScreen = () => {
 
 const styles = StyleSheet.create({
   icon: {
-    width: 32,
-    height: 32,
+    width: 52,
+    height: 52,
     marginRight: 12,
   },
   title: {

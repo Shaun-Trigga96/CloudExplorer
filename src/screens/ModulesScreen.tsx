@@ -55,7 +55,7 @@ const ModulesScreen = () => {
           <Card key={module.id} style={styles.card}>
             <Card.Content>
               <View style={styles.headerRow}>
-                <IconComponent width={24} height={24} style={styles.icon} {...(IconComponent as React.SVGProps<SVGSVGElement>)} />
+                <IconComponent width={34} height={34} style={styles.icon} {...(IconComponent as React.SVGProps<SVGSVGElement>)} />
                 <Title style={styles.title}>{module.title}</Title>
               </View>
               <Paragraph>{module.description}</Paragraph>
