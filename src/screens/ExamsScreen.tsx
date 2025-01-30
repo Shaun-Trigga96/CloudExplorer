@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Image } from 'react-native'; // Add Image import
 import { Card, Title, Paragraph, Button } from 'react-native-paper';
 
 interface Exam {
@@ -7,7 +7,7 @@ interface Exam {
   title: string;
   description: string;
   duration: string;
-  icon: string;
+  icon: number; // Change to number for require() references
 }
 
 const ExamsScreen = () => {
@@ -17,28 +17,28 @@ const ExamsScreen = () => {
       title: 'Cloud Engineer',
       description: 'Professional Cloud Engineer Certification Practice Exam',
       duration: '2 hours',
-      icon: '🎯',
+      icon: require('../assets/images/cloud-engineer.png'),
     },
     {
       id: '2',
       title: 'Cloud Architect',
       description: 'Professional Cloud Architect Certification Practice Exam',
       duration: '2 hours',
-      icon: '🏗️',
+      icon: require('../assets/images/cloud-architect.png'),
     },
     {
       id: '3',
       title: 'Data Engineer',
       description: 'Professional Data Engineer Certification Practice Exam',
       duration: '2 hours',
-      icon: '📊',
+      icon: require('../assets/images/data-engineer.png'),
     },
     {
       id: '4',
       title: 'Security Engineer',
       description: 'Professional Security Engineer Certification Practice Exam',
       duration: '2 hours',
-      icon: '🔒',
+      icon: require('../assets/images/security-engineer.png'),
     },
   ];
 
@@ -48,7 +48,12 @@ const ExamsScreen = () => {
         <Card key={exam.id} style={styles.card}>
           <Card.Content>
             <View style={styles.headerRow}>
-              <Title>{exam.icon} {exam.title}</Title>
+              <Image
+                source={exam.icon}
+                style={styles.icon}
+                resizeMode="contain"
+              />
+              <Title style={styles.title}>{exam.title}</Title>
             </View>
             <Paragraph>{exam.description}</Paragraph>
             <Paragraph style={styles.duration}>
@@ -67,6 +72,14 @@ const ExamsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  icon: {
+    width: 32,
+    height: 32,
+    marginRight: 12,
+  },
+  title: {
+    marginLeft: 8,
+  },
   container: {
     flex: 1,
     padding: 16,
