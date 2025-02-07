@@ -85,3 +85,11 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+
+devices:
+  - "/dev/kvm:/dev/kvm"
+privileged: true
+
+environment:
+  - REACT_NATIVE_PACKAGER_HOSTNAME=localhost
+  - ADB_IP=host.docker.internal
