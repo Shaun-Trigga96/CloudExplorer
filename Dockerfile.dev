@@ -1,0 +1,44 @@
+# Development Dockerfile (Dockerfile.dev)
+FROM node:18-slim
+
+# Install development tools and dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    python3 \
+    make \
+    g++ \
+    ruby-full \
+    openssh-client \
+    default-jdk \
+    android-tools-adb \
+    # Debug tools
+    vim \
+    nano \
+    htop \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install development tools
+RUN npm install -g \
+    react-native-cli \
+    react-devtools \
+    metro-bundler
+
+WORKDIR /app
+
+# Install app dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy the rest of the application code
+COPY . .
+
+# Expose ports for Metro bundler, dev server, and React DevTools
+EXPOSE 8081
+EXPOSE 19000
+EXPOSE 19001
+EXPOSE 19002
+EXPOSE 8097
+
+# Start development server with debugging enabled
+CMD ["npm", "run", "start"]

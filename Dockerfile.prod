@@ -1,0 +1,49 @@
+# Production Dockerfile (Dockerfile.prod)
+# Build stage
+FROM node:18-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files
+COPY package*.json ./
+COPY yarn.lock ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Production stage
+FROM node:18-slim
+
+WORKDIR /app
+
+# Copy built assets from builder
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
+# Install serve to run the application
+RUN npm install -g serve
+
+# Expose production port
+EXPOSE 3000
+
+# Start production server
+CMD ["serve", "-s", "build", "-l", "3000"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/ || exit 1

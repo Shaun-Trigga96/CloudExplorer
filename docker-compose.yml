@@ -1,14 +1,87 @@
+# docker-compose.yml
 version: '3.8'
 
 services:
-  app:
-    build: .
+  # Frontend Development
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: cloud-explorer-frontend-dev
     volumes:
       - .:/app
       - /app/node_modules
     ports:
-      - "8081:8081"  # Metro bundler
+      - "8081:8081"
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
+      - "8097:8097"
     environment:
       - NODE_ENV=development
-    stdin_open: true
-    tty: true
+      - REACT_NATIVE_PACKAGER_HOSTNAME=${REACT_NATIVE_PACKAGER_HOSTNAME}
+    command: npm run start
+
+  # Frontend Production
+  frontend-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: cloud-explorer-frontend-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  # Backend Service (placeholder for future implementation)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cloud-explorer-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+
+  # Redis for caching
+  redis:
+    image: redis:alpine
+    container_name: cloud-explorer-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus
+    container_name: cloud-explorer-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana
+    container_name: cloud-explorer-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:

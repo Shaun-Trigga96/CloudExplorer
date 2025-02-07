@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   StyleSheet,
   View,
@@ -7,41 +7,59 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { TextInput, Button, Text } from 'react-native-paper';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/RootNavigator';
+import {TextInput, Button, Text} from 'react-native-paper';
+import {StackNavigationProp} from '@react-navigation/stack';
+import {RootStackParamList} from '../navigation/RootNavigator';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { GoogleAuthService } from '../services/GoogleAuthService';
+import {GoogleAuthService} from '../services/GoogleAuthService';
 import auth from '@react-native-firebase/auth';
 
-
+// Replace the original AppleAuthService import with:
+let AppleAuthService: { getInstance: () => any; };
+if (Platform.OS === 'ios') {
+  AppleAuthService = require('../services/AppleAuthService').AppleAuthService;
+}
 const GoogleIcon = () => <Icon name="google" size={20} color="white" />;
 type AuthScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Auth'>;
 
+const AppleIcon = () => <Icon name="apple" size={20} color="white" />;
 interface AuthScreenProps {
   navigation: AuthScreenNavigationProp;
 }
 
-const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
+const AuthScreen: React.FC<AuthScreenProps> = ({navigation}) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const googleAuthService = GoogleAuthService.getInstance();
+  const appleAuthService = Platform.OS === 'ios' ? AppleAuthService?.getInstance() : null;
 
   useEffect(() => {
-    console.log('Initializing Google Sign-In service');
-    googleAuthService.initialize({
-      webClientId: '502638141687-rnoto7rbd205ngclna875vtkgejr4fg1.apps.googleusercontent.com',
-      offlineAccess: true,
-    }).catch(error => {
-      console.error('Google Sign-In initialization failed:', error);
-      Alert.alert(
-        'Initialization Error',
-        'Failed to initialize Google authentication. Please restart the app.'
-      );
-    });
-  }, [googleAuthService]);
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing authentication services');
+        console.log('Initializing Google Sign-In service');
+        googleAuthService.initialize({
+          webClientId:
+            '502638141687-rnoto7rbd205ngclna875vtkgejr4fg1.apps.googleusercontent.com',
+          offlineAccess: true,
+        });
+        if (Platform.OS === 'ios' && appleAuthService) {
+          console.log('Initializing Apple Sign-In');
+          await appleAuthService.initialize();
+        }
+      } catch (error) {
+        console.error('Authentication service initialization failed:', error);
+        Alert.alert(
+          'Initialization Error',
+          'Failed to initialize authentication services. Please restart the app.',
+        );
+      }
+    };
+
+    initializeAuth();
+  }, []);
 
   const handleGoogleSignIn = async () => {
     console.log('Starting Google Sign-In process');
@@ -49,6 +67,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
     try {
       await googleAuthService.signIn();
       console.log('Google Sign-In successful, navigating to Home');
+
       navigation.navigate('Home');
     } catch (error) {
       console.error('Google Sign-In process failed:', error);
@@ -56,8 +75,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       let errorMessage = 'An unexpected error occurred';
       if (error instanceof Error) {
         errorMessage = error.message;
-
-        // Handle specific error scenarios
         if (error.message.includes('network error')) {
           errorMessage = 'Internet connection required for sign-in';
         }
@@ -69,7 +86,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
     }
   };
 
-  // Keep your existing handleEmailAuth function as is
   const handleEmailAuth = async () => {
     try {
       if (isLogin) {
@@ -101,19 +117,45 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
       navigation.navigate('Home');
     } catch (error: any) {
       if (error.code?.startsWith('auth/')) {
-        const errorMessages: { [key: string]: string } = {
+        const errorMessages: {[key: string]: string} = {
           'auth/email-already-in-use': 'This email address is already in use.',
           'auth/invalid-email': 'Please enter a valid email address.',
-          'auth/weak-password': 'Please choose a stronger password (minimum 6 characters).',
+          'auth/weak-password':
+            'Please choose a stronger password (minimum 6 characters).',
           'auth/user-disabled': 'This account has been disabled.',
           'auth/user-not-found': 'No account found with this email address.',
           'auth/wrong-password': 'The password you entered is incorrect.',
         };
-        Alert.alert('Authentication Error', errorMessages[error.code] || 'Failed to authenticate. Please try again.');
+        Alert.alert(
+          'Authentication Error',
+          errorMessages[error.code] ||
+            'Failed to authenticate. Please try again.',
+        );
       } else {
         Alert.alert('Error', 'An unexpected error occurred');
       }
     } finally {
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    console.log('Starting Apple Sign-In process');
+    if (Platform.OS !== 'ios' || !appleAuthService) return;
+    try {
+      await appleAuthService.signIn();
+      console.log('Apple Sign-In successful, navigating to Home');
+      navigation.navigate('Home');
+    } catch (error) {
+      console.error('Apple Sign-In process failed:', error);
+
+      let errorMessage = 'An unexpected error occurred';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert('Authentication Error', errorMessage);
+    } finally {
+      console.log('Apple Sign-In process completed');
     }
   };
 
@@ -127,11 +169,9 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
           style={styles.logo}
           resizeMode="contain"
         />
-
         <Text style={styles.title}>
           {isLogin ? 'Log In!!!' : 'Create an Account'}
         </Text>
-
         <TextInput
           label="Email"
           value={email}
@@ -141,7 +181,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-
         <TextInput
           label="Password"
           value={password}
@@ -150,7 +189,6 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
           style={styles.input}
           secureTextEntry
         />
-
         <Button
           mode="contained"
           onPress={handleEmailAuth}
@@ -158,17 +196,25 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
           labelStyle={styles.buttonLabel}>
           {isLogin ? 'Login' : 'Sign Up'}
         </Button>
-
         <Button
-        mode="contained"
-        onPress={handleGoogleSignIn}
-        style={styles.googleButton}
-        labelStyle={styles.buttonLabel}
-        icon={GoogleIcon}
-        >
+          mode="contained"
+          onPress={handleGoogleSignIn}
+          style={styles.googleButton}
+          labelStyle={styles.buttonLabel}
+          icon={GoogleIcon}>
           Continue with Google
         </Button>
-
+        {Platform.OS === 'ios' && (
+          <Button
+            mode="contained"
+            onPress={handleAppleSignIn}
+            style={styles.appleButton}
+            labelStyle={[styles.buttonLabel, {color: 'white'}]}
+            icon={AppleIcon}
+            testID="apple-signin-button">
+            Continue with Apple
+          </Button>
+        )}
         <View style={styles.toggleContainer}>
           <Text style={styles.toggleText}>
             {isLogin ? "Don't have an account? " : 'Already have an account? '}
@@ -176,8 +222,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
           <Button
             mode="text"
             onPress={() => setIsLogin(!isLogin)}
-            labelStyle={styles.toggleButton}
-            >
+            labelStyle={styles.toggleButton}>
             {isLogin ? 'Sign Up' : 'Login'}
           </Button>
         </View>
@@ -187,6 +232,19 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  appleButton: {
+    marginTop: 15,
+    backgroundColor: '#000000',
+    paddingVertical: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#000000',
+  },
+  buttonLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
@@ -197,8 +255,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: 100,
+    height: 100,
     alignSelf: 'center',
     marginBottom: 30,
   },
@@ -223,10 +281,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#DB4437',
     paddingVertical: 8,
     borderRadius: 4,
-  },
-  buttonLabel: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   toggleContainer: {
     flexDirection: 'row',

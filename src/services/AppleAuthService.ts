@@ -1,13 +1,9 @@
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+import { appleAuth, AppleRequestResponseFullName } from '@invertase/react-native-apple-authentication';
 
-interface GoogleSignInConfig {
-  webClientId: string;
-  offlineAccess: boolean;
-}
 interface UserData {
   userId: string;
   email: string | null;
@@ -25,80 +21,83 @@ interface UserData {
   };
 }
 
-export class GoogleAuthService {
-  private static instance: GoogleAuthService;
+export class AppleAuthService {
+  private static instance: AppleAuthService;
   private isInitialized: boolean = false;
 
   private constructor() {}
 
-  static getInstance(): GoogleAuthService {
-    if (!GoogleAuthService.instance) {
-      GoogleAuthService.instance = new GoogleAuthService();
+  static getInstance(): AppleAuthService {
+    if (!AppleAuthService.instance) {
+      AppleAuthService.instance = new AppleAuthService();
     }
-    return GoogleAuthService.instance;
+    return AppleAuthService.instance;
   }
 
-  async initialize(config: GoogleSignInConfig) {
+  async initialize(): Promise<void> {
     if (this.isInitialized) {
-      console.warn('Google Sign-In is already initialized');
+      console.warn('Apple Sign-In is already initialized');
       return;
     }
 
     try {
-      GoogleSignin.configure(config);
+      if (!appleAuth.isSupported) {
+        throw new Error('Apple Sign-In is not supported on this device');
+      }
+
       this.isInitialized = true;
-      console.log('Google Sign-In initialized successfully');
+      console.log('Apple Sign-In initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize Google Sign-In:', error);
-      throw new Error('Failed to initialize Google authentication service. Please try again later.');
+      console.error('Failed to initialize Apple Sign-In:', error);
+      throw new Error('Failed to initialize Apple authentication service. Please try again later.');
     }
   }
 
   async signIn(): Promise<FirebaseAuthTypes.UserCredential> {
     if (!this.isInitialized) {
-      throw new Error('Google Sign-In service not initialized');
+      throw new Error('Apple Sign-In service not initialized');
     }
+
     try {
-      console.log('Checking Google Play services availability');
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      console.log('Attempting Google Sign-In');
+      console.log('Attempting Apple Sign-In');
+      
+      // Perform Apple sign-in request
+      const appleAuthResponse = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
+      });
 
-     // Get the users ID token
-     const signInResult = await GoogleSignin.signIn();
+      // Get credentials
+      const { identityToken, nonce } = appleAuthResponse;
 
-     // Try the new style of google-sign in result, from v13+ of that module
-      const idToken = signInResult.data?.idToken;
-
-      if (!idToken) {
-       //idToken? = signInResult.idToken;
-        console.error('Google Sign-In succeeded but no ID token was returned');
-        throw new Error('Authentication failed. Please try again.');
-      }
-      if (!idToken) {
-        throw new Error('No ID token found');
+      if (!identityToken) {
+        throw new Error('No identity token returned from Apple Sign-In');
       }
 
-      console.log('Creating Firebase credential with ID token');
-      const credential = auth.GoogleAuthProvider.credential(idToken);
+      // Create Firebase credential
+      console.log('Creating Firebase credential with Apple identity token');
+      const credential = auth.AppleAuthProvider.credential(identityToken, nonce);
 
+      // Sign in to Firebase
       console.log('Signing in with Firebase credential');
       const userCredential = await auth().signInWithCredential(credential);
 
+      // If this is a new user, create their profile
       if (userCredential.additionalUserInfo?.isNewUser) {
         console.log('New user detected, creating profile');
-        await this.createUserProfile(userCredential);
+        await this.createUserProfile(userCredential, appleAuthResponse.fullName);
       }
 
-      return auth().signInWithCredential(credential);
+      return userCredential;
     } catch (error: any) {
-      console.error('Google Sign-In error:', error);
+      console.error('Apple Sign-In error:', error);
 
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+      if (error.code === appleAuth.Error.CANCELED) {
         throw new Error('Sign-in cancelled by user');
-      } else if (error.code === statusCodes.IN_PROGRESS) {
-        throw new Error('Sign-in already in progress');
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        throw new Error('Google Play Services not available or outdated');
+      } else if (error.code === appleAuth.Error.FAILED) {
+        throw new Error('Sign-in failed');
+      } else if (error.code === appleAuth.Error.INVALID_RESPONSE) {
+        throw new Error('Invalid response received');
       } else if (error.message?.includes('network error')) {
         throw new Error('Network error. Please check your internet connection.');
       }
@@ -107,12 +106,24 @@ export class GoogleAuthService {
     }
   }
 
-  private async createUserProfile(userCredential: FirebaseAuthTypes.UserCredential): Promise<void> {
+  private async createUserProfile(
+    userCredential: FirebaseAuthTypes.UserCredential, 
+    fullName?: AppleRequestResponseFullName | null
+  ): Promise<void> {
     try {
+      let displayName = userCredential.user.displayName;
+      
+      // If we have fullName from Apple response, construct display name
+      if (fullName) {
+        displayName = [fullName.givenName, fullName.familyName]
+          .filter(Boolean)
+          .join(' ');
+      }
+
       const userData: UserData = {
         userId: userCredential.user.uid,
         email: userCredential.user.email,
-        displayName: userCredential.user.displayName,
+        displayName: displayName,
         photoURL: userCredential.user.photoURL,
         createdAt: firestore.FieldValue.serverTimestamp(),
         learningProgress: {
@@ -141,13 +152,8 @@ export class GoogleAuthService {
 
   async signOut(): Promise<void> {
     try {
-      console.log('Attempting Google Sign-Out');
-      await GoogleSignin.revokeAccess();
-      await GoogleSignin.signOut();
-
       console.log('Attempting Firebase Sign-Out');
       await auth().signOut();
-
       console.log('Sign-out completed successfully');
     } catch (error) {
       console.error('Sign-out error:', error);
