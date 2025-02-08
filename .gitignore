@@ -72,3 +72,11 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Secrets
+.env
+*.keystore
+*.jks
+
+# Start Up Script
+script-start-push-images.sh

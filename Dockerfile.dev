@@ -1,15 +1,12 @@
 FROM node:18-slim
 
-# Install essential build tools
+# Install essential tools
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     python3 \
     make \
     g++ \
-    android-tools-adb \
-    qemu-kvm \
-    libvirt-daemon-system \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
