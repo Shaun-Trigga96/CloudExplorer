@@ -1,6 +1,6 @@
 # Cloud Explorer
 
-![Alt](src/assets/images/CloudExplorer.png)
+![Alt](src/assets/images/cloud_explorer.png)
 
 ## Introduction
 
@@ -157,7 +157,6 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
 
    ```bash
    git clone https://github.com/220296006/CloudExplorer
-   cd cloud-explorer
    ```
 
 2. Install dependencies:

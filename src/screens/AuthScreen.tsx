@@ -59,7 +59,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({navigation}) => {
     };
 
     initializeAuth();
-  }, []);
+  }, );
 
   const handleGoogleSignIn = async () => {
     console.log('Starting Google Sign-In process');
@@ -165,7 +165,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({navigation}) => {
       style={styles.container}>
       <View style={styles.content}>
         <Image
-          source={require('../assets/images/CloudExplorer.png')}
+          source={require('../assets/images/cloud_explorer.png')}
           style={styles.logo}
           resizeMode="contain"
         />

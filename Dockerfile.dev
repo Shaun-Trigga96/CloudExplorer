@@ -9,20 +9,42 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
+# Create a non-root user
 RUN useradd -m appuser
-USER appuser
 
+# Set the working directory
 WORKDIR /app
 
-# Install project dependencies
-COPY package*.json ./
-RUN npm install
+# --- Stage 1: Install Dependencies ---
 
-# Copy app source
+# Copy dependency files only
+COPY package*.json ./
+
+# Change ownership of these files to appuser
+RUN chown -R appuser:appuser /app
+
+# Switch to the non-root user for installing dependencies
+USER appuser
+
+# Install dependencies using npm
+RUN npm install --no-bin-links --cache /tmp/.npm
+
+# --- Stage 2: Copy Application Code ---
+
+# Switch back to root to copy the rest of the files
+USER root
+
+# Copy the remaining application source code
 COPY . .
 
-# Expose development ports
+# Ensure all files are owned by appuser
+RUN chown -R appuser:appuser /app
+
+# Switch back to the non-root user for running the app
+USER appuser
+
+# Expose the necessary ports
 EXPOSE 19000 19001 19002 8081 8097
 
+# Start the application
 CMD ["npm", "run", "start"]
