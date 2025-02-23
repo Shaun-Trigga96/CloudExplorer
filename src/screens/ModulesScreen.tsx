@@ -50,7 +50,6 @@ const ModulesScreen = () => {
     <ScrollView style={styles.container}>
       {modules.map((module) => {
         const IconComponent = module.icon;
-        
         return (
           <Card key={module.id} style={styles.card}>
             <Card.Content>

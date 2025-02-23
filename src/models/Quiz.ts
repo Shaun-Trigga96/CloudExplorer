@@ -1,17 +1,12 @@
+import { Question } from './Question';
+import { Timestamp } from 'firebase/firestore'; // Import Timestamp directly from firestore
+
 export interface Quiz {
-    quizId: string, // Unique ID for the quiz
-  moduleId: string, // ID of the associated learning module
-  title: string,
-  questions: [
-    {
-        questionId: string, // Unique ID for the question
-        questionText: string,
-        options: [], // Array of answer options
-        correctAnswer: string, // Correct answer
-        explanation: string, // Explanation for the correct answer
-      }
-  ], // Array of question objects
-  passingScore: number, // Minimum score required to pass the quiz
-  createdAt: Date,
-  updatedAt: Date,
+  quizId: string; // Unique ID for the quiz
+  moduleId: string; // ID of the associated learning module
+  title: string;
+  questions: Question[];
+  passingScore: number; // Minimum score required to pass the quiz
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }

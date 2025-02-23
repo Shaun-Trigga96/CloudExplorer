@@ -180,7 +180,7 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
 
    ```bash
    npx react-native run-android
-   npx react-native run-aios
+   npx react-native run-ios
    ```
 
 ## Contributing
