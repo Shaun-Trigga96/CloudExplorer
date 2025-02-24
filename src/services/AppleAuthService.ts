@@ -60,7 +60,6 @@ export class AppleAuthService {
 
     try {
       console.log('Attempting Apple Sign-In');
-      
       // Perform Apple sign-in request
       const appleAuthResponse = await appleAuth.performRequest({
         requestedOperation: appleAuth.Operation.LOGIN,
@@ -107,12 +106,11 @@ export class AppleAuthService {
   }
 
   private async createUserProfile(
-    userCredential: FirebaseAuthTypes.UserCredential, 
+    userCredential: FirebaseAuthTypes.UserCredential,
     fullName?: AppleRequestResponseFullName | null
   ): Promise<void> {
     try {
       let displayName = userCredential.user.displayName;
-      
       // If we have fullName from Apple response, construct display name
       if (fullName) {
         displayName = [fullName.givenName, fullName.familyName]

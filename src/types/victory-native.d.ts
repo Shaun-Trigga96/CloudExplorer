@@ -35,3 +35,4 @@ declare module 'victory-native' {
     export class VictoryLabel extends React.Component<any> {}
     export class VictoryContainer extends React.Component<any> {}
   }
+  

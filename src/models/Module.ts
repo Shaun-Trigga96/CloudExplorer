@@ -11,3 +11,4 @@ export interface Module {
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
+

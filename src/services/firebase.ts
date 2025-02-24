@@ -1,13 +1,13 @@
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { initializeApp } from 'firebase/app';
+import { getAnalytics } from 'firebase/analytics';
 import {
   FIREBASE_API_KEY,
   FIREBASE_AUTH_DOMAIN,
   FIREBASE_PROJECT_ID,
   FIREBASE_STORAGE_BUCKET,
   FIREBASE_MESSAGING_SENDER_ID,
-  FIREBASE_APP_ID
-} from "@env";
+  FIREBASE_APP_ID,
+} from '@env';
 
 const firebaseConfig = {
   apiKey: FIREBASE_API_KEY,
@@ -19,4 +19,5 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const analytics = getAnalytics(app);
