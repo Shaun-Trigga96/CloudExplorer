@@ -1,4 +1,4 @@
-import { Timestamp } from 'firebase/firestore'; // Import Timestamp directly from firestore
+import { Timestamp } from 'firebase-admin/firestore';
 
 export interface UserProgress {
     userId: string; // ID of the user

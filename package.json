@@ -8,7 +8,11 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "start-push-images": "bash ./script-start-push-images.sh"
+    "start-push-images": "bash ./script-start-push-images.sh",
+    "clean": "if exist dist rmdir /s /q dist",
+    "build-schema": "tsc -p tsconfig.node.json",
+    "run-schema": "node --no-deprecation dist/create-schema.js",
+    "schema": "npm run clean && npm run build-schema && npm run run-schema"
   },
   "dependencies": {
     "@invertase/react-native-apple-authentication": "^2.4.0",
@@ -21,8 +25,10 @@
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",
     "@react-navigation/stack": "^6.3.20",
+    "dotenv": "^16.4.5",
     "firebase": "^11.3.1",
     "firebase-admin": "^13.1.0",
+    "googleapis": "^137.0.0",
     "react": "18.3.1",
     "react-native": "0.77.0",
     "react-native-dotenv": "^3.4.11",
@@ -46,7 +52,9 @@
     "@react-native/eslint-config": "0.77.0",
     "@react-native/metro-config": "0.77.0",
     "@react-native/typescript-config": "0.77.0",
+    "@types/firebase": "^2.4.32",
     "@types/jest": "^29.5.13",
+    "@types/node": "^20.14.10",
     "@types/react": "^18.2.6",
     "@types/react-native-dotenv": "^0.2.2",
     "@types/react-native-vector-icons": "^6.4.18",

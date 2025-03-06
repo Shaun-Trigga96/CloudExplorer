@@ -1,4 +1,4 @@
-import { Timestamp } from 'firebase/firestore'; // Import Timestamp directly from firestore
+import { Timestamp } from 'firebase-admin/firestore';
 import { LearningProgress } from './LearningProgress';
 import { UserSettings } from './UserSettings';
 

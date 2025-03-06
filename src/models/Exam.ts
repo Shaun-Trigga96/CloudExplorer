@@ -1,4 +1,4 @@
-import { Timestamp } from 'firebase/firestore'; // Import Timestamp directly from firestore
+import { Timestamp } from '@react-native-firebase/firestore';
 import { Question } from './Question';
 
 export interface Exam {

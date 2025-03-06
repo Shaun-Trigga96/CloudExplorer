@@ -1,5 +1,5 @@
+import { Timestamp } from 'firebase-admin/firestore';
 import { Question } from './Question';
-import { Timestamp } from 'firebase/firestore'; // Import Timestamp directly from firestore
 
 export interface Quiz {
   quizId: string; // Unique ID for the quiz
