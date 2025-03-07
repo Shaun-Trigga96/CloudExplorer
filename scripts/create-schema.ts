@@ -8,6 +8,8 @@ import { aiContentService } from './schema/AIContentService';
 import { Module, Section, Exam, User } from '../src/types/types';
 import { Timestamp } from 'firebase-admin/firestore';
 import { firestoreService } from './schema/FirestoreService';
+import { AIContent, Notification, ProgressData } from './types';
+import { quizService } from './schema/QuizService';
 
 dotenv.config();
 
@@ -56,52 +58,23 @@ Compute Engine offers a variety of VM types to suit different workloads:
 For more details, visit: https://cloud.google.com/compute/docs
 `;
 
-interface ProgressData {
-  id: string;
-  data: {
-    userId: string;
-    quizId: string | null;
-    examId: string | null;
-    score: number;
-    totalQuestions: number;
-    correctAnswers: number;
-    completedAt: Date;
-  };
-}
-
-interface Notification {
-  notificationId: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: string;
-  read: boolean;
-  createdAt: Date;
-}
-
-interface AIContent {
-  contentId: string;
-  type: string;
-  source: string;
-  content: string;
-  metadata: { moduleId: string; quizId: string };
-  createdAt: Date;
-}
-
-async function cleanupModules(): Promise<void> {
+async function cleanupFirestore(): Promise<void> {
   const service = await firestoreService;
-  const snapshot = await service.getCollection('modules').get();
-  const batch = service.getBatch();
-  snapshot.forEach((doc: { ref: any; }) => {
-    batch.delete(doc.ref);
-  });
-  await batch.commit();
-  console.log('Cleaned up existing modules');
+  const collections = ['modules', 'users','quizzes', 'exams', 'notifications', 'aiContent', 'progressData']; // Add all relevant collections
+  for (const collection of collections) {
+    console.log(`Cleaning up ${collection}...`);
+    const snapshot = await service.getCollection(collection).get();
+    const batch = service.getBatch();
+    snapshot.forEach((doc: { ref: any }) => batch.delete(doc.ref));
+    await batch.commit();
+  }
+  console.log('Firestore cleanup completed.');
 }
+
 
 async function createSchema(): Promise<void> {
   try {
-    await cleanupModules();
+    await cleanupFirestore();
     // User
     const user: User = {
       uid: 'Mbcy1W9YEynQujbWQFqbW5d0Ij2',
@@ -175,6 +148,28 @@ async function createSchema(): Promise<void> {
           { title: 'Object Storage Concepts', content: 'Content for concepts...', order: 2 },
         ],
       },
+      {
+        moduleId: 'cloud-functions',
+        title: 'Cloud Functions',
+        description: 'Build serverless applications',
+        duration: 60,
+        quizzes: ['cloud-function-quiz1'],
+        sections: [
+          { order: 1, title: 'Introduction to Serverless Computing', content: 'This section covers serverless basics.' },
+          { order: 2, title: 'Building Serverless Applications', content: 'Learn how to build serverless apps.' },
+        ],
+      },
+      {
+        moduleId: 'kubernetes-engine',
+        title: 'Kubernetes Engine',
+        description: 'Container orchestration with GKE',
+        duration: 60,
+        quizzes: ['cloud-ubernetes-quiz1'],
+        sections: [
+          { order: 1, title: 'Introduction to Kubernetes', content: 'This section introduces Kubernetes.' },
+          { order: 2, title: 'Container Orchestration with GKE', content: 'Learn about GKE.' },
+        ],
+      },
     ];
     for (const mod of modules) {
       const module: Module = {
@@ -192,6 +187,27 @@ async function createSchema(): Promise<void> {
       await moduleService.createModule(module, mod.sections);
     }
 
+    const quizzes = [
+      {
+        quizId: 'compute-engine-quiz1',
+        moduleId: 'compute-engine',
+        title: 'Compute Engine Basics',
+        questions: [
+          {
+            question: 'What is Compute Engine?',
+            options: ['Storage Service', 'Virtual Machines', 'Big Data Analysis'],
+            correctAnswer: 'Virtual Machines',
+          },
+        ],
+        createdAt: new Date('2025-02-24T15:00:00Z'),
+        passingScore: 60, // Add the passingScore property
+        updatedAt: new Date('2025-02-24T14:53:22Z'), // Add the updatedAt property
+      },
+    ];
+    for (const quiz of quizzes) {
+      await quizService.createQuiz(quiz);
+    }
+
     // Exams
     const exams: Exam[] = [
       {
@@ -201,8 +217,8 @@ async function createSchema(): Promise<void> {
         content: 'Exam questions and answers...',
         duration: 120,
         prerequisites: ['compute-engine', 'cloud-storage'],
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date('2025-02-24T14:53:22Z'),
+        updatedAt:new Date('2025-02-24T15:00:00Z'),
       },
     ];
     for (const exam of exams) {

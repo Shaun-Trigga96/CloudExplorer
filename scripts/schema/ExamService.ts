@@ -12,7 +12,7 @@ class ExamService {
     console.log(`Overwriting exam: ${examId}`);
 
     const response = await axios.post(`${BASE_URL}/create-doc`, {
-      title: `${title} Exam`,
+      title: title || 'Default exam title',
       content: content || 'Default exam content',
       examId,
     }).catch(error => {

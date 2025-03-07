@@ -1,3 +1,4 @@
+// backend/server.js
 const express = require('express');
 const cors = require('cors');
 const { google } = require('googleapis');
@@ -23,7 +24,7 @@ console.log('Loading credentials from:', absoluteCredentialsPath);
 const credentials = require(absoluteCredentialsPath);
 
 // Initialize Firebase Admin SDK
-admin.initializeApp({credential: admin.credential.cert(credentials)});
+admin.initializeApp({ credential: admin.credential.cert(credentials) });
 
 const db = admin.firestore();
 
@@ -40,14 +41,14 @@ async function authenticateGoogleDocs() {
 // Create a Google Doc and save to Firestore
 app.post('/create-doc', async (req, res) => {
   try {
-    const { title, content, moduleId } = req.body;
-    const auth = await authenticateGoogleDocs();
+    const { moduleId, title, content = 'No content provided' } = req.body;    const auth = await authenticateGoogleDocs();
+    await authenticateGoogleDocs();
     const docs = google.docs({ version: 'v1', auth });
-
     const document = await docs.documents.create({ requestBody: { title } });
     const documentId = document.data.documentId;
-    if (!documentId) {throw new Error('No documentId returned');}
-
+    if (!documentId || typeof documentId !== 'string' || documentId.trim() === '') {      throw new Error('No documentId returned');
+    }
+    console.log('BatchUpdate params:', { documentId, content }); // Debug log
     await docs.documents.batchUpdate({
       documentId,
       requestBody: {
@@ -57,24 +58,18 @@ app.post('/create-doc', async (req, res) => {
 
     const docUrl = `https://docs.google.com/document/d/${documentId}/edit`;
 
-    // Save to Firestore
-    await db.collection('modules').doc(moduleId || documentId).set({
-      title,
-      content: docUrl,
-      description: 'Auto-generated module',
-      duration: 60,
-      quizzes: [],
-      prerequisites: [],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-
+    // Save to Firestore using provided moduleId
+    if (moduleId) {
+      await db.collection('modules').doc(moduleId).set({ content: docUrl }, { merge: true });
+    } else if (req.body.examId) {
+      await db.collection('exams').doc(req.body.examId).set({ content: docUrl }, { merge: true });
+    }
     res.json({ documentId, docUrl });
   } catch (error) {
+    console.error('Error creating Google Doc:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
-
 // Get Google Doc content
 app.get('/get-doc-content/:docId', async (req, res) => {
   try {
@@ -85,10 +80,12 @@ app.get('/get-doc-content/:docId', async (req, res) => {
     const response = await docs.documents.get({ documentId: docId });
     res.json(response.data.body?.content || []);
   } catch (error) {
+    console.error('Error fetching Google Doc content:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
+// List all modules
 app.get('/list-modules', async (req, res) => {
   try {
     const modulesSnapshot = await db.collection('modules').get();
@@ -105,6 +102,53 @@ app.get('/list-modules', async (req, res) => {
     }));
     res.json(modules);
   } catch (error) {
+    console.error('Error listing modules:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get a single module by moduleId
+app.get('/module/:id', async (req, res) => {
+  try {
+    const moduleId = req.params.id;
+    const moduleDoc = await db.collection('modules').doc(moduleId).get();
+    if (!moduleDoc.exists) {
+      return res.status(404).json({ error: 'Module not found' });
+    }
+    const moduleData = moduleDoc.data();
+    res.json({
+      id: moduleDoc.id,
+      title: moduleData.title,
+      description: moduleData.description || 'No description available',
+      content: moduleData.content,
+      duration: moduleData.duration,
+      quizzes: moduleData.quizzes || [],
+      prerequisites: moduleData.prerequisites || [],
+      createdAt: moduleData.createdAt?.toDate(),
+      updatedAt: moduleData.updatedAt?.toDate(),
+    });
+  } catch (error) {
+    console.error('Error fetching module:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/module/:id/sections', async (req, res) => {
+  try {
+    const moduleId = req.params.id;
+    const sectionsSnapshot = await db.collection('modules').doc(moduleId).collection('sections').get();
+    if (sectionsSnapshot.empty) {
+      return res.status(404).json({ error: 'No sections found for this module' });
+    }
+    const sections = sectionsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      title: doc.data().title,
+      content: doc.data().content,
+      order: doc.data().order,
+    }));
+    res.json(sections);
+  } catch (error) {
+    console.error('Error fetching sections:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -113,4 +157,3 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
