@@ -9,10 +9,10 @@
     "start": "react-native start",
     "test": "jest",
     "start-push-images": "bash ./script-start-push-images.sh",
+    "schema": "npm run clean && npm run build-schema && npm run run-schema",
     "clean": "if exist dist rmdir /s /q dist",
     "build-schema": "tsc -p tsconfig.node.json",
-    "run-schema": "node --no-deprecation dist/create-schema.js",
-    "schema": "npm run clean && npm run build-schema && npm run run-schema"
+    "run-schema": "node --no-deprecation dist/scripts/create-schema.js"
   },
   "dependencies": {
     "@invertase/react-native-apple-authentication": "^2.4.0",
@@ -25,6 +25,7 @@
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",
     "@react-navigation/stack": "^6.3.20",
+    "axios": "1.7.7",
     "dotenv": "^16.4.5",
     "firebase": "^11.3.1",
     "firebase-admin": "^13.1.0",
@@ -39,6 +40,7 @@
     "react-native-screens": "^4.5.0",
     "react-native-svg": "^15.11.1",
     "react-native-vector-icons": "^10.2.0",
+    "react-native-webview": "^13.13.2",
     "victory-native": "^41.16.0"
   },
   "devDependencies": {

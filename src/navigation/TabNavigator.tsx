@@ -17,6 +17,7 @@ const TabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
+        // eslint-disable-next-line react/no-unstable-nested-components
         tabBarIcon: ({ color, size }) => {
           let iconName = 'alert';
 
@@ -57,28 +58,28 @@ const TabNavigator = () => {
         headerShown: false,
       })}
     >
-      <Tab.Screen 
-        name="Dashboard" 
+      <Tab.Screen
+        name="Dashboard"
         component={DashboardScreen}
         options={{ title: 'Overview' }}
       />
-      <Tab.Screen 
-        name="Modules" 
+      <Tab.Screen
+        name="Modules"
         component={ModulesScreen}
         options={{ title: 'Learning' }}
       />
-      <Tab.Screen 
-        name="Quizzes" 
+      <Tab.Screen
+        name="Quizzes"
         component={QuizzesScreen}
         options={{ title: 'Practice' }}
       />
-      <Tab.Screen 
-        name="Exams" 
+      <Tab.Screen
+        name="Exams"
         component={ExamsScreen}
         options={{ title: 'Certify' }}
       />
-      <Tab.Screen 
-        name="Settings" 
+      <Tab.Screen
+        name="Settings"
         component={SettingsScreen}
         options={{ title: 'Profile' }}
       />

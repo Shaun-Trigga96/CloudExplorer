@@ -10,6 +10,6 @@
       "rootDir": "./",
       "baseUrl": "./"
     },
-    "include": ["create-schema.ts", "src/**/*.ts"],
+    "include": ["create-schema.ts", "src/**/*.ts", "scripts/**/*"],
     "exclude": ["node_modules", "dist"]
   }
