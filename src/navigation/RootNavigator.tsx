@@ -11,6 +11,7 @@ export type RootStackParamList = {
   Home: undefined;
   ModuleDetail: { moduleId: string };
   MainApp: undefined;
+  ModulesScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -25,6 +26,7 @@ const RootNavigator = () => {
     >
       <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="ModulesScreen" component={TabNavigator} />
       <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen}/>
       <Stack.Screen name="MainApp" component={TabNavigator} />
     </Stack.Navigator>

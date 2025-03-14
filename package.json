@@ -11,7 +11,7 @@
     "start-push-images": "bash ./script-start-push-images.sh",
     "schema": "npm run clean && npm run build-schema && npm run run-schema",
     "clean": "if exist dist rmdir /s /q dist",
-    "build-schema": "tsc -p tsconfig.node.json",
+    "build-schema": "tsc -p tsconfig.node.json && xcopy /E /I /Y scripts\\content dist\\scripts\\content",
     "run-schema": "node --no-deprecation dist/scripts/create-schema.js"
   },
   "dependencies": {
@@ -34,6 +34,7 @@
     "react-native": "0.77.0",
     "react-native-dotenv": "^3.4.11",
     "react-native-gesture-handler": "^2.22.0",
+    "react-native-markdown-display": "^7.0.2",
     "react-native-paper": "^5.13.1",
     "react-native-reanimated": "^3.16.7",
     "react-native-safe-area-context": "^5.1.0",

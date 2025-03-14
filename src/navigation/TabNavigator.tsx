@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack'; // Import createStackNavigator
 import { useTheme } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 // Import screens directly
@@ -8,9 +9,25 @@ import ModulesScreen from '../screens/ModulesScreen';
 import QuizzesScreen from '../screens/QuizzesScreen';
 import ExamsScreen from '../screens/ExamsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import ModuleDetailScreen from '../screens/ModuleDetailScreen';
+import { RootStackParamList } from './RootNavigator';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator<RootStackParamList>(); // Create a StackNavigator
 
+// Create a Stack Navigator for Modules
+function ModulesStackNavigator() {
+  return (
+    <Stack.Navigator
+        screenOptions={{
+        headerShown: false,
+        }}
+    >
+      <Stack.Screen name="ModulesScreen" component={ModulesScreen} />
+      <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
+    </Stack.Navigator>
+  );
+}
 const TabNavigator = () => {
   const theme = useTheme();
 
@@ -65,7 +82,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="Modules"
-        component={ModulesScreen}
+        component={ModulesStackNavigator}
         options={{ title: 'Learning' }}
       />
       <Tab.Screen
