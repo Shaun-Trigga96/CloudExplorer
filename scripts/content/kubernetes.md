@@ -2,7 +2,7 @@
 
 ## Introduction to Kubernetes Engine
 
-![icon:googl_kubernetes_engine]
+![icon:google_kubernetes_engine]
 
 Google Kubernetes Engine (GKE) is a managed Kubernetes service for deploying, managing, and scaling containerized applications. It automates cluster management, upgrades, and scaling while leveraging Google's infrastructure expertise.
 

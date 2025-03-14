@@ -1,16 +1,50 @@
-/* eslint-disable react/no-unstable-nested-components */
+/* eslint-disable no-catch-shadow */
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { Text } from 'react-native';
+import { View, ScrollView, StyleSheet, Text } from 'react-native';
 import axios from 'axios';
 import Markdown from 'react-native-markdown-display';
-import iconMap from '../utils/iconMap';
-import { SvgProps } from 'react-native-svg';
+import iconMap from '../utils/iconMap'; // Ensure this file exports SVG components
 
 const BASE_URL: string = 'http://10.0.2.2:5000'; // Android Emulator
 
-// Define a type for the icon components
-type IconComponent = React.ComponentType<SvgProps>;
+// Preprocess Markdown content to replace icon syntax with custom components
+const preprocessMarkdownWithIcons = (content: string) => {
+  const iconRegex = /!\[icon:([a-zA-Z0-9-_]+)\]/g; // Updated regex to handle underscores
+  let modifiedContent = content;
+  const replacements: { placeholder: string; component: JSX.Element }[] = [];
+
+  // Extract all icon references and replace with a unique identifier
+  let match;
+  let index = 0;
+  while ((match = iconRegex.exec(content)) !== null) {
+    const iconName = match[1]; // e.g., "compute_engine"
+    const placeholder = `__ICON_${index}__`;
+    const IconComponent = iconMap[iconName];
+    if (IconComponent) {
+      replacements.push({
+        placeholder,
+        component: (
+          <View key={placeholder} style={markdownStyles.iconContainer}>
+            <IconComponent width={44} height={44} fill="#000" />
+          </View>
+        ),
+      });
+    } else {
+      replacements.push({
+        placeholder,
+        component: (
+          <Text key={placeholder} style={markdownStyles.iconContainer}>
+            [Icon not found: {iconName}]
+          </Text>
+        ),
+      });
+    }
+    modifiedContent = modifiedContent.replace(match[0], placeholder);
+    index++;
+  }
+
+  return { modifiedContent, replacements };
+};
 
 const ModuleDetailScreen = ({ route }: { route: any }) => {
   const { moduleId } = route.params;
@@ -19,55 +53,6 @@ const ModuleDetailScreen = ({ route }: { route: any }) => {
   const [error, setError] = useState<string | null>(null);
 
   console.log(`ModuleDetailScreen initialized with moduleId: ${moduleId}`);
-
-  // Custom renderer for Markdown to handle SVG icons
-  const renderMarkdownWithIcons = (content: string) => {
-    // Replace ![icon:name] with a placeholder that we can render as a component
-    const iconRegex = /!\[icon:([a-zA-Z0-9_-]+)\]/g; // Adjusted regex to allow underscores and hyphens
-    let modifiedContent = content;
-    const icons: { placeholder: string; iconName: string }[] = [];
-
-    // Extract all icon references
-    let match;
-    let index = 0;
-    while ((match = iconRegex.exec(content)) !== null) {
-      const iconName = match[1]; // e.g., "compute_engine"
-      const placeholder = `__ICON_${index}__`;
-      icons.push({ placeholder, iconName });
-      modifiedContent = modifiedContent.replace(match[0], placeholder);
-      index++;
-    }
-
-    // Custom renderer for Markdown
-    const renderer: any = {
-      text: (node: any, _children: any, _parent: any, styles: any) => {
-        const text = node.content;
-        const iconMatch = icons.find((icon) => text.includes(icon.placeholder));
-        if (iconMatch) {
-          const IconComponent: IconComponent | undefined = iconMap[iconMatch.iconName as keyof typeof iconMap];
-          if (IconComponent) {
-            return (
-              <View key={node.key} style={markdownStyles.iconContainer}>
-                <IconComponent width={24} height={24} fill="#000" />
-              </View>
-            );
-          } else {
-            console.warn(`Icon component for "${iconMatch.iconName}" not found.`);
-            return (
-              <Text key={node.key} style={styles.text}>{`[Icon ${iconMatch.iconName} not found]`}</Text>
-            );
-          }
-        }
-        return <Text key={node.key} style={styles.text}>{text}</Text>;
-      },
-    };
-
-    return (
-      <Markdown style={markdownStyles} renderer={renderer}>
-        {modifiedContent}
-      </Markdown>
-    );
-  };
 
   useEffect(() => {
     const fetchModuleData = async () => {
@@ -79,7 +64,7 @@ const ModuleDetailScreen = ({ route }: { route: any }) => {
         console.log('Module response data:', moduleResponse.data);
         setModule(moduleResponse.data);
       } catch (err) {
-        console.error('Fetch module error:', err instanceof Error ? err.message : 'Unknown error');
+        console.error('Fetch module error:', err);
         setError(`Failed to load data: ${err instanceof Error ? err.message : 'Unknown error'}`);
       }
     };
@@ -92,7 +77,7 @@ const ModuleDetailScreen = ({ route }: { route: any }) => {
         console.log('Sections response status:', sectionsResponse.status);
         console.log('Sections response data:', sectionsResponse.data);
         setSections(sectionsResponse.data);
-      // eslint-disable-next-line no-catch-shadow, @typescript-eslint/no-shadow
+      // eslint-disable-next-line @typescript-eslint/no-shadow
       } catch (error) {
         console.error('Fetch sections error:', error);
         setError(`Failed to load sections: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -115,18 +100,40 @@ const ModuleDetailScreen = ({ route }: { route: any }) => {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>{module.title || 'No title'}</Text>
       <Text style={styles.description}>{module.description || 'No description'}</Text>
-
-      {/* Display section content as markdown */}
-      <Text style={styles.contentTitle}>Module Notes:</Text>
-
       {sections && sections.length > 0 ? (
-        <>
-          {sections.map((section) => (
+        sections.map((section) => {
+          const { modifiedContent, replacements } = preprocessMarkdownWithIcons(
+            section.content || 'No content available'
+          );
+
+          // Split content into segments based on placeholders
+          const segments = modifiedContent.split(/(?:__ICON_\d+__)/g);
+          const renderedContent: JSX.Element[] = [];
+          let replacementIndex = 0;
+
+          segments.forEach((segment, i) => {
+            if (segment) {
+              renderedContent.push(
+                <Markdown key={`text-${i}`} style={markdownStyles}>
+                  {segment}
+                </Markdown>
+              );
+            }
+            if (replacementIndex < replacements.length) {
+              const replacement = replacements[replacementIndex];
+              if (modifiedContent.includes(replacement.placeholder)) {
+                renderedContent.push(replacement.component);
+                replacementIndex++;
+              }
+            }
+          });
+
+          return (
             <View key={section.id} style={styles.markdownContainer}>
-              {renderMarkdownWithIcons(section.content || 'No content available')}
+              {renderedContent}
             </View>
-          ))}
-        </>
+          );
+        })
       ) : (
         <Text style={styles.noSections}>No content available</Text>
       )}
@@ -139,7 +146,6 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
   },
-  // ... (rest of your styles)
   title: {
     fontSize: 26,
     fontWeight: 'bold',
@@ -161,33 +167,6 @@ const styles = StyleSheet.create({
   },
   markdownContainer: {
     marginBottom: 20,
-  },
-  sectionsContainer: {
-    marginTop: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#444',
-  },
-  sectionItem: {
-    marginTop: 10,
-    padding: 12,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  sectionItemTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  sectionItemOrder: {
-    fontSize: 14,
-    color: '#777',
-    marginTop: 4,
   },
   noSections: {
     fontSize: 16,
@@ -242,6 +221,8 @@ const markdownStyles = StyleSheet.create({
   },
   list_item: {
     marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   bullet_list: {
     marginBottom: 16,
@@ -254,10 +235,14 @@ const markdownStyles = StyleSheet.create({
     marginBottom: 16,
   },
   iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginRight: 8,
     marginVertical: 4,
-  }
+  },
+  text: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 24,
+  },
 });
 
 export default ModuleDetailScreen;

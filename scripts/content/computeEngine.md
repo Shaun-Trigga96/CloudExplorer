@@ -2,7 +2,7 @@
 
 ## Introduction to Compute Engine
 
-![icon:compute_engine]:
+![icon:compute_engine]
 
 Compute Engine is Google Cloud Platform's Infrastructure-as-a-Service (IaaS) offering, enabling users to create and manage virtual machines (VMs) in the cloud. It provides flexible, scalable, and high-performance computing resources that can be customized to meet specific workload requirements.
 
