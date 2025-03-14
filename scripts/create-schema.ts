@@ -34,6 +34,24 @@ const kubernetesNotes: string = readFileSync(
   'utf8'
 );
 
+// New Imports for distinct section content
+const virtualMachineNotes: string = readFileSync(
+  path.resolve(__dirname, 'content', 'virtualMachineNotes.md'),
+  'utf8'
+);
+const storageConceptsNotes: string = readFileSync(
+  path.resolve(__dirname, 'content', 'storageConceptsNotes.md'),
+  'utf8'
+);
+const buildingServerlessFunctionsNotes: string = readFileSync(
+  path.resolve(__dirname, 'content', 'buildingServerlessFunctionsNotes.md'),
+  'utf8'
+);
+const containerOrchestrationNotes: string = readFileSync(
+  path.resolve(__dirname, 'content', 'containerOrchestrationNotes.md'),
+  'utf8'
+);
+
 /**
  * Cleans up all collections in Firestore before loading new schema
  */
@@ -172,7 +190,7 @@ async function createSchema(): Promise<void> {
         quizzes: ['compute-engine-quiz1'],
         sections: [
           { title: 'Introduction to Compute Engine', content: computeEngineNotes, order: 1 },
-          { title: 'Virtual Machine Types', content: computeEngineNotes, order: 2 },
+          { title: 'Virtual Machine Types', content: virtualMachineNotes, order: 2 },
         ],
       },
       {
@@ -183,7 +201,7 @@ async function createSchema(): Promise<void> {
         quizzes: ['cloud-storage-quiz1'],
         sections: [
           { title: 'Overview of Cloud Storage', content: cloudStorageNotes, order: 1 },
-          { title: 'Object Storage Concepts', content: cloudStorageNotes, order: 2 },
+          { title: 'Object Storage Concepts', content: storageConceptsNotes, order: 2 },
         ],
       },
       {
@@ -194,7 +212,7 @@ async function createSchema(): Promise<void> {
         quizzes: ['cloud-function-quiz1'],
         sections: [
           { order: 1, title: 'Introduction to Serverless Computing', content: cloudFunctionsNotes },
-          { order: 2, title: 'Building Serverless Applications', content: cloudFunctionsNotes },
+          { order: 2, title: 'Building Serverless Applications', content: buildingServerlessFunctionsNotes },
         ],
       },
       {
@@ -205,7 +223,7 @@ async function createSchema(): Promise<void> {
         quizzes: ['cloud-kubernetes-quiz1'],
         sections: [
           { order: 1, title: 'Introduction to Kubernetes', content: kubernetesNotes },
-          { order: 2, title: 'Container Orchestration with GKE', content: kubernetesNotes },
+          { order: 2, title: 'Container Orchestration with GKE', content: containerOrchestrationNotes },
         ],
       },
     ];

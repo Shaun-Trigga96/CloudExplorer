@@ -25,7 +25,7 @@ const preprocessMarkdownWithIcons = (content: string) => {
         placeholder,
         component: (
           <View key={placeholder} style={markdownStyles.iconContainer}>
-            <IconComponent width={44} height={44} fill="#000" />
+            <IconComponent width={100} height={100} fill="#000" />
           </View>
         ),
       });
