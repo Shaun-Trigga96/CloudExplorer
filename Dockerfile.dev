@@ -1,3 +1,4 @@
+# Dockerfile.dev
 FROM node:18-slim
 
 # Install essential tools
@@ -14,8 +15,6 @@ RUN useradd -m appuser
 
 # Set the working directory
 WORKDIR /app
-
-# --- Stage 1: Install Dependencies ---
 
 # Copy dependency files only
 COPY package*.json ./

@@ -1,0 +1,41 @@
+# cloudbuild.yaml
+steps:
+  # Build and push the frontend development image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: Build Frontend Dev Image
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        docker build -t gcr.io/cloud-explorer-c3d98/cloud-explorer-frontend-dev:$COMMIT_SHA -f Dockerfile.dev .
+        docker push gcr.io/cloud-explorer-c3d98/cloud-explorer-frontend-dev:$COMMIT_SHA
+
+  # Build and push the backend production image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: Build Backend Prod Image
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        docker build -t gcr.io/cloud-explorer-c3d98/cloud-explorer-backend-prod:$COMMIT_SHA -f backend/Dockerfile backend/
+        docker push gcr.io/cloud-explorer-c3d98/cloud-explorer-backend-prod:$COMMIT_SHA
+        
+  #deploy in cloud run (backend)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: Deploy Backend to Cloud Run
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'cloud-explorer-backend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1' # Change if needed
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated' # if you need public access
+
+images:
+  - 'gcr.io/cloud-explorer-c3d98/cloud-explorer-frontend-dev:$COMMIT_SHA'
+  - 'gcr.io/cloud-explorer-c3d98/cloud-explorer-backend-prod:$COMMIT_SHA'
