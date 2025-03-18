@@ -113,66 +113,9 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
 
 ## Screenshots
 
-### Register/Login Screen
 
-![Alt](src/screenshots/Register-Login.png)
+![Alt](src/screenshots/ezgif.com-animated-gif-maker.gif)
 
-### Welcome Screen
-
-![Alt](src/screenshots/Home.png)
-
-### Dasboard Screen
-
-![Alt](src/screenshots/Dashboard.png)
-
-### Learning Progress Screen
-
-![Alt](src/screenshots/LearningProgress.png)
-
-### Modules Screen
-
-![Alt](src/screenshots/ModuleScreen.png)
-
-### Quizzes Screen
-
-![Alt](src/screenshots/Quizzes.png)
-
-### Exams Screen
-
-![Alt](src/screenshots/Exams.png)
-
-### Settings Screen
-
-![Alt](src/screenshots/Settings.png)
-
-### Compute Engine Screen
-
-![Alt](src/screenshots/ComputeEngine.png)
-
-### Cloud Storage Screen
-
-![Alt](src/screenshots/CloudStorage.png)
-
-### Cloud Fuctions Screen
-
-![Alt](src/screenshots/CloudFunctions.png)
-
-### Kubernetes Screen
-
-![Alt](src/screenshots/KubernetesEngine.png)
-
-### Compute Engine Quiz Screen
-
-![Alt](src/screenshots/ComputeEngineQuiz.png)
-
-
-### Cloud Storage Quiz Screen
-
-![Alt](src/screenshots/CloudStorageQuiz.png)
-
-### Kubernetes Quiz Screen
-
-![Alt](src/screenshots/KubernetesEngineQuiz.png)
 
 ## Getting Started
 
