@@ -125,6 +125,10 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
 
 ![Alt](src/screenshots/Dashboard.png)
 
+### Learning Progress Screen
+
+![Alt](src/screenshots/LearningProgress.png)
+
 ### Modules Screen
 
 ![Alt](src/screenshots/ModuleScreen.png)
@@ -157,6 +161,18 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
 
 ![Alt](src/screenshots/KubernetesEngine.png)
 
+### Compute Engine Quiz Screen
+
+![Alt](src/screenshots/ComputeEngineQuiz.png)
+
+
+### Cloud Storage Quiz Screen
+
+![Alt](src/screenshots/CloudStorageQuiz.png)
+
+### Kubernetes Quiz Screen
+
+![Alt](src/screenshots/KubernetesEngineQuiz.png)
 
 ## Getting Started
 

@@ -340,7 +340,7 @@ function parseQuizFromAIResponse(text) {
       if (mcAnswerMatch) {
         answers.push({
           letter: mcAnswerMatch[1].toLowerCase(),
-          answer: mcAnswerMatch[2].trim()
+          answer: mcAnswerMatch[2].trim(),
         });
         continue;
       }
@@ -361,7 +361,7 @@ function parseQuizFromAIResponse(text) {
         id: index,
         question,
         answers,
-        correctAnswer
+        correctAnswer,
       });
     }
   });

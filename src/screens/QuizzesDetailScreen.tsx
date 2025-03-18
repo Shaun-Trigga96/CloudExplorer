@@ -42,8 +42,8 @@ const QuizzesDetailScreen = ({ route }: { route: any }) => {
         });
         const formattedQuiz = quizResponse.data.quiz
           .filter((q: Quiz) => {
-            const isValidQuestion = q.question && q.question.trim().length > 0 && 
-                                   (q.correctAnswer === 'True' || q.correctAnswer === 'False' || 
+            const isValidQuestion = q.question && q.question.trim().length > 0 &&
+                                   (q.correctAnswer === 'True' || q.correctAnswer === 'False' ||
                                     ['a', 'b', 'c', 'd'].includes(q.correctAnswer));
             return isValidQuestion && (q.answers.length > 0 || q.correctAnswer === 'True' || q.correctAnswer === 'False');
           })
