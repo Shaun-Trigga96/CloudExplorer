@@ -1,11 +1,13 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { Card, Title, Paragraph, Button } from 'react-native-paper';
-import CloudGeneric from '../assets/icons/cloud_generic.svg';
-import CloudNetwork from '../assets/icons/cloud_network.svg';
 import CloudStorage from '../assets/icons/cloud_storage.svg';
 import ComputeEngine from '../assets/icons/compute_engine.svg';
-
+import CloudFunctions from '../assets/icons/cloud_functions.svg';
+import KubernetesEngine from '../assets/icons/google_kubernetes_engine.svg';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
+import { useNavigation } from '@react-navigation/native';
 
 interface Quiz {
   id: string;
@@ -15,37 +17,45 @@ interface Quiz {
   icon: React.FC;
 }
 
+type NavigationProp = StackNavigationProp<RootStackParamList, 'QuizzesDetail'>;
+
 const QuizzesScreen = () => {
+  const navigation = useNavigation<NavigationProp>();
+
   const quizzes: Quiz[] = [
     {
-      id: '1',
-      title: 'GCP Fundamentals',
+      id: 'compute-engine', // Updated IDs
+      title: 'Compute Engine',
       description: 'Test your knowledge of basic GCP concepts',
       questionCount: 20,
-      icon: CloudGeneric,
-    },
-    {
-      id: '2',
-      title: 'Compute Services',
-      description: 'Practice questions on GCP compute services',
-      questionCount: 15,
       icon: ComputeEngine,
     },
     {
-      id: '3',
-      title: 'Storage Solutions',
-      description: 'Questions about GCP storage options',
+      id: 'cloud-storage',// Updated IDs
+      title: 'Cloud Storage',
+      description: 'Practice questions on GCP cloud storage services',
       questionCount: 15,
       icon: CloudStorage,
     },
     {
-      id: '4',
-      title: 'Networking',
-      description: 'Test your GCP networking knowledge',
+      id: 'cloud-functions',// Updated IDs
+      title: '  Cloud Functions',
+      description: 'Practice Questions about Cloud Functions',
+      questionCount: 15,
+      icon: CloudFunctions,
+    },
+    {
+      id: 'kubernetes-engine',// Updated IDs
+      title: ' Google Kubernetes Engine',
+      description: 'Test Kubernets knowledge',
       questionCount: 20,
-      icon: CloudNetwork,
+      icon: KubernetesEngine,
     },
   ];
+
+  const handleStartQuiz = (moduleId: string) => {
+    navigation.navigate('QuizzesDetail', { moduleId: moduleId});
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -66,7 +76,8 @@ const QuizzesScreen = () => {
               </Paragraph>
             </Card.Content>
             <Card.Actions>
-              <Button mode="contained" onPress={() => {}}>
+              <Button mode="contained"
+                onPress={() => handleStartQuiz(quiz.id)}>
                 Start Quiz
               </Button>
             </Card.Actions>

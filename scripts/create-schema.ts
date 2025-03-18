@@ -241,8 +241,13 @@ async function createSchema(): Promise<void> {
         content: '',
         sections: mod.sections,
       };
-      await moduleService.createModule(module, mod.sections);
+      await moduleService.createModule(module, mod.sections); // this was correct
       console.log('Module created:', module.moduleId);
+      // Get a reference to the Firestore service
+      const service = await firestoreService;
+      //Save the module into the firestore `modules` collection
+      await service.getCollection('modules').doc(mod.moduleId).set(module)
+      console.log('Module added to firestore:', module.moduleId); // check your logs
     }
 
     console.log('Creating quizzes...');

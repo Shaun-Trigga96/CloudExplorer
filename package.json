@@ -15,6 +15,7 @@
     "run-schema": "node --no-deprecation dist/scripts/create-schema.js"
   },
   "dependencies": {
+    "@huggingface/inference": "^3.5.2",
     "@invertase/react-native-apple-authentication": "^2.4.0",
     "@react-native-firebase/app": "^21.11.0",
     "@react-native-firebase/auth": "^21.7.1",

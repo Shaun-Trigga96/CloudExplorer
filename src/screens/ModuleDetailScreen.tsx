@@ -1,6 +1,5 @@
-/* eslint-disable no-catch-shadow */
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, Text } from 'react-native';
+import { View, ScrollView, StyleSheet, Text, Animated } from 'react-native';
 import axios from 'axios';
 import Markdown from 'react-native-markdown-display';
 import iconMap from '../utils/iconMap'; // Ensure this file exports SVG components
@@ -9,15 +8,14 @@ const BASE_URL: string = 'http://10.0.2.2:5000'; // Android Emulator
 
 // Preprocess Markdown content to replace icon syntax with custom components
 const preprocessMarkdownWithIcons = (content: string) => {
-  const iconRegex = /!\[icon:([a-zA-Z0-9-_]+)\]/g; // Updated regex to handle underscores
+  const iconRegex = /!\[icon:([a-zA-Z0-9-_]+)\]/g;
   let modifiedContent = content;
   const replacements: { placeholder: string; component: JSX.Element }[] = [];
 
-  // Extract all icon references and replace with a unique identifier
   let match;
   let index = 0;
   while ((match = iconRegex.exec(content)) !== null) {
-    const iconName = match[1]; // e.g., "compute_engine"
+    const iconName = match[1];
     const placeholder = `__ICON_${index}__`;
     const IconComponent = iconMap[iconName];
     if (IconComponent) {
@@ -25,7 +23,7 @@ const preprocessMarkdownWithIcons = (content: string) => {
         placeholder,
         component: (
           <View key={placeholder} style={markdownStyles.iconContainer}>
-            <IconComponent width={100} height={100} fill="#000" />
+            <IconComponent width={80} height={80} fill="#1a73e8" />
           </View>
         ),
       });
@@ -33,7 +31,7 @@ const preprocessMarkdownWithIcons = (content: string) => {
       replacements.push({
         placeholder,
         component: (
-          <Text key={placeholder} style={markdownStyles.iconContainer}>
+          <Text key={placeholder} style={markdownStyles.iconFallback}>
             [Icon not found: {iconName}]
           </Text>
         ),
@@ -51,6 +49,7 @@ const ModuleDetailScreen = ({ route }: { route: any }) => {
   const [module, setModule] = useState<any>(null);
   const [sections, setSections] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
   console.log(`ModuleDetailScreen initialized with moduleId: ${moduleId}`);
 
@@ -77,7 +76,6 @@ const ModuleDetailScreen = ({ route }: { route: any }) => {
         console.log('Sections response status:', sectionsResponse.status);
         console.log('Sections response data:', sectionsResponse.data);
         setSections(sectionsResponse.data);
-      // eslint-disable-next-line @typescript-eslint/no-shadow
       } catch (error) {
         console.error('Fetch sections error:', error);
         setError(`Failed to load sections: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -86,27 +84,41 @@ const ModuleDetailScreen = ({ route }: { route: any }) => {
 
     fetchModuleData();
     fetchSections();
-  }, [moduleId]);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [moduleId, fadeAnim]);
 
   if (error) {
-    return <Text style={styles.error}>{error}</Text>;
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
   }
 
   if (!module) {
-    return <Text style={styles.loading}>Loading...</Text>;
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>{module.title || 'No title'}</Text>
-      <Text style={styles.description}>{module.description || 'No description'}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+        <Text style={styles.title}>{module.title || 'No title'}</Text>
+        <Text style={styles.description}>{module.description || 'No description'}</Text>
+      </Animated.View>
       {sections && sections.length > 0 ? (
         sections.map((section) => {
           const { modifiedContent, replacements } = preprocessMarkdownWithIcons(
             section.content || 'No content available'
           );
 
-          // Split content into segments based on placeholders
           const segments = modifiedContent.split(/(?:__ICON_\d+__)/g);
           const renderedContent: JSX.Element[] = [];
           let replacementIndex = 0;
@@ -129,91 +141,117 @@ const ModuleDetailScreen = ({ route }: { route: any }) => {
           });
 
           return (
-            <View key={section.id} style={styles.markdownContainer}>
+            <Animated.View key={section.id} style={[styles.sectionCard, { opacity: fadeAnim }]}>
               {renderedContent}
-            </View>
+            </Animated.View>
           );
         })
       ) : (
-        <Text style={styles.noSections}>No content available</Text>
+        <Animated.View style={[styles.sectionCard, { opacity: fadeAnim }]}>
+          <Text style={styles.noContent}>No content available</Text>
+        </Animated.View>
       )}
     </ScrollView>
   );
 };
 
-// Styles for the component
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    flex: 1,
+    backgroundColor: '#f0f2f5',
+  },
+  contentContainer: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#333',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#202124',
+    marginBottom: 10,
+    fontFamily: 'System',
   },
   description: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-    lineHeight: 24,
+    color: '#5f6368',
+    lineHeight: 22,
+    fontFamily: 'System',
   },
-  contentTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginTop: 10,
-    marginBottom: 8,
-    color: '#444',
+  sectionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  markdownContainer: {
-    marginBottom: 20,
-  },
-  noSections: {
+  noContent: {
     fontSize: 16,
-    color: '#666',
-    marginTop: 20,
-  },
-  loading: {
-    padding: 16,
-    fontSize: 16,
+    color: '#5f6368',
     textAlign: 'center',
-    color: '#333',
+    padding: 20,
+    fontFamily: 'System',
   },
-  error: {
-    padding: 16,
-    fontSize: 16,
-    color: 'red',
+  loadingText: {
+    fontSize: 18,
+    color: '#5f6368',
     textAlign: 'center',
+    padding: 20,
+    fontFamily: 'System',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#d93025',
+    textAlign: 'center',
+    padding: 20,
+    fontFamily: 'System',
   },
 });
 
-// Styles for markdown content
 const markdownStyles = StyleSheet.create({
   body: {
     fontSize: 16,
-    color: '#333',
+    color: '#202124',
     lineHeight: 24,
+    fontFamily: 'System',
   },
   heading1: {
     fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-    color: '#222',
+    fontWeight: '700',
+    color: '#1a73e8',
+    marginTop: 20,
+    marginBottom: 10,
+    fontFamily: 'System',
   },
   heading2: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 16,
+    fontWeight: '600',
+    color: '#202124',
+    marginTop: 15,
     marginBottom: 8,
-    color: '#333',
+    fontFamily: 'System',
   },
   heading3: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-    color: '#444',
+    fontWeight: '600',
+    color: '#5f6368',
+    marginTop: 12,
+    marginBottom: 6,
+    fontFamily: 'System',
   },
   paragraph: {
     marginBottom: 16,
@@ -222,26 +260,40 @@ const markdownStyles = StyleSheet.create({
   list_item: {
     marginBottom: 8,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   bullet_list: {
     marginBottom: 16,
+    paddingLeft: 10,
   },
   code_block: {
     backgroundColor: '#f5f5f5',
     padding: 12,
-    borderRadius: 4,
+    borderRadius: 8,
     fontFamily: 'monospace',
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   iconContainer: {
-    marginRight: 8,
-    marginVertical: 4,
+    marginRight: 12,
+    marginVertical: 8,
+    alignItems: 'center',
+  },
+  iconFallback: {
+    fontSize: 14,
+    color: '#d93025',
+    marginVertical: 8,
+    fontFamily: 'System',
   },
   text: {
     fontSize: 16,
-    color: '#333',
+    color: '#202124',
     lineHeight: 24,
+    fontFamily: 'System',
   },
 });
 

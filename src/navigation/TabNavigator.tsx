@@ -11,6 +11,7 @@ import ExamsScreen from '../screens/ExamsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ModuleDetailScreen from '../screens/ModuleDetailScreen';
 import { RootStackParamList } from './RootNavigator';
+import QuizzesDetailScreen from '../screens/QuizzesDetailScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator<RootStackParamList>(); // Create a StackNavigator
@@ -25,6 +26,20 @@ function ModulesStackNavigator() {
     >
       <Stack.Screen name="ModulesScreen" component={ModulesScreen} />
       <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Create a Stack Navigator for Quizzes
+function QuizzesStackNavigator() {
+  return (
+    <Stack.Navigator
+        screenOptions={{
+        headerShown: false,
+        }}
+    >
+      <Stack.Screen name="QuizzesScreen" component={QuizzesScreen} />
+      <Stack.Screen name="QuizzesDetail" component={QuizzesDetailScreen} />
     </Stack.Navigator>
   );
 }
@@ -87,7 +102,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="Quizzes"
-        component={QuizzesScreen}
+        component={QuizzesStackNavigator}
         options={{ title: 'Practice' }}
       />
       <Tab.Screen
