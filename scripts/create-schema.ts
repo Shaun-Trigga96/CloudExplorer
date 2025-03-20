@@ -246,7 +246,7 @@ async function createSchema(): Promise<void> {
       // Get a reference to the Firestore service
       const service = await firestoreService;
       //Save the module into the firestore `modules` collection
-      await service.getCollection('modules').doc(mod.moduleId).set(module)
+      await service.getCollection('modules').doc(mod.moduleId).set(module);
       console.log('Module added to firestore:', module.moduleId); // check your logs
     }
 

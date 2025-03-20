@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { GoogleAuthService } from '../services/GoogleAuthService';
 import auth from '@react-native-firebase/auth';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 
 let AppleAuthService: { getInstance: () => any; };
 if (Platform.OS === 'ios') {
@@ -66,7 +67,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
   const handleGoogleSignIn = async () => {
     console.log('Starting Google Sign-In process');
     try {
-      await googleAuthService.signIn();
+      const userCredential = await googleAuthService.signIn(); await googleAuthService.signIn();
+      // Store the Firebase userId in AsyncStorage
+      await AsyncStorage.setItem('userId', userCredential.user.uid);
+      console.log('Firebase Auth UID:', userCredential.user.uid);
       console.log('Google Sign-In successful, navigating to Home');
       navigation.navigate('Home');
     } catch (error) {
@@ -86,10 +90,11 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
 
   const handleEmailAuth = async () => {
     try {
+      let userCredential;
       if (isLogin) {
-        await auth().signInWithEmailAndPassword(email, password);
+        userCredential = await auth().signInWithEmailAndPassword(email, password);
       } else {
-        const userCredential = await auth().createUserWithEmailAndPassword(
+        userCredential = await auth().createUserWithEmailAndPassword(
           email,
           password,
         );
@@ -111,6 +116,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
             },
           });
       }
+      // Store the Firebase userId in AsyncStorage
+      await AsyncStorage.setItem('userId', userCredential.user.uid);
       navigation.navigate('Home');
     } catch (error: any) {
       if (error.code?.startsWith('auth/')) {
@@ -135,9 +142,11 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
 
   const handleAppleSignIn = async () => {
     console.log('Starting Apple Sign-In process');
-    if (Platform.OS !== 'ios' || !appleAuthService) return;
+    if (Platform.OS !== 'ios' || !appleAuthService) {return;}
     try {
-      await appleAuthService.signIn();
+      const userCredential = await appleAuthService.signIn();
+      // Store the Firebase userId in AsyncStorage
+      await AsyncStorage.setItem('userId', userCredential.user.uid);
       console.log('Apple Sign-In successful, navigating to Home');
       navigation.navigate('Home');
     } catch (error) {
