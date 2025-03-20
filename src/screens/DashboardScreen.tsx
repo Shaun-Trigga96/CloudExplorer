@@ -128,7 +128,11 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
       'kubernetes-engine': { icon: KubernetesEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#f97316', title: 'Kubernetes Engine' },
     };
     const module = modules.find((m) => m.id === moduleId);
-    const mapped = moduleMap[moduleId] || { icon: ComputeEngineIcon, color: '#3b82f6', title: module?.title || moduleId };
+    const mapped = moduleMap[moduleId] || { 
+      icon: ComputeEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>, 
+      color: '#3b82f6', 
+      title: module?.title || moduleId 
+    };
     return { ...mapped, title: module?.title || mapped.title };
   };
 
@@ -248,8 +252,8 @@ const GridLayout: FC = () => {
 const ModuleProgressItem: FC<ModuleProgressItemProps> = ({ title, progress, color, icon: IconComponent }) => (
   <View style={styles.moduleItem}>
     <View style={styles.moduleItemHeader}>
-      <View style={[styles.moduleIconCircle, { backgroundColor: color }]}>
-        <IconComponent width={24} height={24} />
+      <View style={styles.moduleIconCircle}>
+        <IconComponent width={20} height={20} fill={color} />
       </View>
       <Text style={styles.moduleTitle}>{title}</Text>
       <Text style={styles.modulePercentage}>{progress}%</Text>
