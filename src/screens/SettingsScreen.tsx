@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Switch } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { FadeInUp, FadeInRight } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+// import { LinearGradient } from 'expo-linear-gradient';
 
 const SettingsScreen = () => {
   const [notifications, setNotifications] = React.useState(true);
@@ -165,7 +165,7 @@ const SettingsScreen = () => {
             entering={FadeInUp.duration(600).delay(groupIndex * 200)}
             style={styles.sectionContainer}
           >
-            <LinearGradient
+            {/* <LinearGradient
               colors={group.gradient as [string, string]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -173,7 +173,7 @@ const SettingsScreen = () => {
             >
               <Icon name={group.icon} size={20} color="#FFFFFF" />
               <Text style={styles.sectionTitle}>{group.title}</Text>
-            </LinearGradient>
+            </LinearGradient> */}
 
             <View style={styles.sectionContent}>
               {group.items.map((item, index) => (

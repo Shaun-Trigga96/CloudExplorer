@@ -10,6 +10,7 @@
     "test": "jest",
     "start-push-images": "bash ./script-start-push-images.sh",
     "schema": "npm run clean && npm run build-schema && npm run run-schema",
+    "create-modules": "npm run clean && npm run build-schema && node --no-deprecation dist/scripts/create-modules.js",
     "clean": "if exist dist rmdir /s /q dist",
     "build-schema": "tsc -p tsconfig.node.json && xcopy /E /I /Y scripts\\content dist\\scripts\\content",
     "run-schema": "node --no-deprecation dist/scripts/create-schema.js"
@@ -70,7 +71,8 @@
     "prettier": "2.8.8",
     "react-native-svg-transformer": "^1.5.0",
     "react-test-renderer": "18.3.1",
-    "typescript": "5.4.5"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
   },
   "engines": {
     "node": ">=18"

@@ -188,10 +188,11 @@ const QuizzesDetailScreen = ({
     setSubmittingResults(true);
     try {
       const score = calculateScore();
-
+      await AsyncStorage.getItem('userId');
       await axios.post(`${BASE_URL}/save-quiz-result`, {
         userId,
         moduleId,
+        quizId: quiz || '',
         score,
         totalQuestions: quiz.length,
         answers: userAnswers,

@@ -1,5 +1,5 @@
+/* eslint-disable no-useless-escape */
 // backend/server.js
-
 const express = require('express');
 const cors = require('cors');
 const {google} = require('googleapis');
@@ -63,6 +63,28 @@ const errorHandler = (err, req, res, next) => {
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 };
+
+app.post('/user/:userId/module/start', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { moduleId } = req.body;
+    const userRef = db.collection('users').doc(userId);
+
+    // Option 1: Subcollection
+    await userRef.collection('progress').doc(`${moduleId}_start`).set({
+      moduleId,
+      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: 'in_progress',
+    });
+
+    // Option 2: Embedded Data (Alternative)
+    // You could also add the moduleId to an array of startedModules in learningProgress
+
+    res.status(200).send({ message: 'Module started' });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Create a Google Doc and save to Firestore
 app.post('/create-doc', async (req, res, next) => {
@@ -352,141 +374,6 @@ app.post('/generate-quiz', async (req, res, next) => {
   }
 });
 
-// Add new endpoint to save quiz results
-app.post('/save-quiz-result', async (req, res, next) => {
-  try {
-    const {
-      userId,
-      moduleId,
-      quizId,
-      score,
-      totalQuestions,
-      answers,
-      timestamp = new Date(),
-    } = req.body;
-
-    if (!userId || !moduleId || !score || !totalQuestions) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        message: 'userId, moduleId, score, and totalQuestions are required',
-      });
-    }
-
-    // Create a new quiz result document
-    const quizResultRef = db.collection('quizResults').doc();
-
-    await quizResultRef.set({
-      userId,
-      moduleId,
-      quizId: quizId || quizResultRef.id, // Use generated ID if none provided
-      score,
-      totalQuestions,
-      percentage: (score / totalQuestions) * 100,
-      answers: answers || {}, // Store user's answers
-      timestamp: admin.firestore.Timestamp.fromDate(
-        typeof timestamp === 'string' ? new Date(timestamp) : timestamp,
-      ),
-    });
-
-    // Update the user's progress
-    const userRef = db.collection('users').doc(userId);
-    const userDoc = await userRef.get();
-
-    if (userDoc.exists) {
-      // Get existing completed modules and quizzes
-      const userData = userDoc.data();
-      const completedModules = userData.completedModules || [];
-      const completedQuizzes = userData.completedQuizzes || [];
-
-      // Add new quiz to completedQuizzes if not already there
-      if (!completedQuizzes.some(quiz => quiz.moduleId === moduleId)) {
-        completedQuizzes.push({
-          moduleId,
-          quizId: quizId || quizResultRef.id,
-          score: (score / totalQuestions) * 100,
-          completedAt: admin.firestore.Timestamp.fromDate(
-            typeof timestamp === 'string' ? new Date(timestamp) : timestamp,
-          ),
-        });
-      }
-
-      // Update user document
-      await userRef.update({
-        completedQuizzes,
-        lastActivity: admin.firestore.Timestamp.now(),
-      });
-
-      // Check if all module requirements are completed to mark module as complete
-      // This is a simplified check - you might want to add more criteria
-      if (!completedModules.includes(moduleId)) {
-        // This is just a placeholder - you would need to implement your own logic
-        // to determine if a module is fully completed (e.g., all quizzes passed with minimum score)
-        const moduleCompleted = score / totalQuestions >= 0.7; // 70% passing threshold
-
-        if (moduleCompleted) {
-          completedModules.push(moduleId);
-          await userRef.update({completedModules});
-        }
-      }
-    } else {
-      // Create new user document if it doesn't exist
-      await userRef.set({
-        userId,
-        completedQuizzes: [
-          {
-            moduleId,
-            quizId: quizId || quizResultRef.id,
-            score: (score / totalQuestions) * 100,
-            completedAt: admin.firestore.Timestamp.fromDate(
-              typeof timestamp === 'string' ? new Date(timestamp) : timestamp,
-            ),
-          },
-        ],
-        completedModules: [],
-        lastActivity: admin.firestore.Timestamp.now(),
-        createdAt: admin.firestore.Timestamp.now(),
-      });
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Quiz result saved successfully',
-      resultId: quizResultRef.id,
-    });
-  } catch (error) {
-    console.error('Error saving quiz result:', error);
-    next(error);
-  }
-});
-
-// Add endpoint to get user's quiz history
-app.get('/user/:userId/quiz-history', async (req, res, next) => {
-  try {
-    const {userId} = req.params;
-
-    if (!userId) {
-      return res.status(400).json({error: 'User ID is required'});
-    }
-
-    const quizResultsSnapshot = await db
-      .collection('quizResults')
-      .where('userId', '==', userId)
-      .orderBy('timestamp', 'desc')
-      .get();
-
-    const quizHistory = quizResultsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      timestamp: doc.data().timestamp.toDate(),
-    }));
-
-    res.json({quizHistory});
-  } catch (error) {
-    console.error('Error fetching quiz history:', error);
-    next(error);
-  }
-});
-
 function parseQuizFromAIResponse(text) {
   const questions = [];
 
@@ -593,59 +480,303 @@ function parseQuizFromAIResponse(text) {
   return questions;
 }
 
+// Add new endpoint to save quiz results
+app.post('/save-quiz-result', async (req, res, next) => {
+  try {
+    const {
+      userId,
+      moduleId,
+      quizId,
+      score,
+      totalQuestions,
+      answers,
+      timestamp = new Date(),
+    } = req.body;
+    const userRef = db.collection('users').doc(userId);
+
+    if (!userId || !moduleId || !score || !totalQuestions) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'userId, moduleId, score, and totalQuestions are required',
+      });
+    }
+
+    // Create a new quiz result document
+    const quizResultRef = db.collection('quizResults').doc();
+
+    await quizResultRef.set({
+      userId,
+      moduleId,
+      quizId: quizId || quizResultRef.id, // Use generated ID if none provided
+      score,
+      totalQuestions,
+      percentage: (score / totalQuestions) * 100,
+      answers: answers || {}, // Store user's answers
+      timestamp: admin.firestore.Timestamp.fromDate(
+        typeof timestamp === 'string' ? new Date(timestamp) : timestamp,
+      ),
+    });
+
+    // Update the user's progress
+    const userDoc = await userRef.get();
+
+    if (userDoc.exists) {
+      // Get existing completed modules and quizzes
+      const userData = userDoc.data();
+      const completedModules = userData.completedModules || [];
+      const completedQuizzes = userData.completedQuizzes || [];
+
+      // Add new quiz to completedQuizzes if not already there
+      if (!completedQuizzes.some(quiz => quiz.moduleId === moduleId)) {
+        completedQuizzes.push({
+          moduleId,
+          quizId: quizId || quizResultRef.id,
+          score: (score / totalQuestions) * 100,
+          completedAt: admin.firestore.Timestamp.fromDate(
+            typeof timestamp === 'string' ? new Date(timestamp) : timestamp,
+          ),
+        });
+      }
+
+      // Update user document
+      await userRef.update({
+        'learningProgress.completedQuizzes': admin.firestore.FieldValue.arrayUnion({
+          moduleId,
+          quizId: quizId || quizResultRef.id,
+          score: (score / totalQuestions) * 100,
+          completedAt: admin.firestore.Timestamp.fromDate(
+            typeof timestamp === 'string' ? new Date(timestamp) : timestamp
+          ),
+        }),
+        lastActivity: admin.firestore.Timestamp.now(),
+      });
+
+      // Check if all module requirements are completed to mark module as complete
+      // This is a simplified check - you might want to add more criteria
+      if (!completedModules.includes(moduleId)) {
+        // This is just a placeholder - you would need to implement your own logic
+        // to determine if a module is fully completed (e.g., all quizzes passed with minimum score)
+        const moduleCompleted = score / totalQuestions >= 0.7; // 70% passing threshold
+
+        if (moduleCompleted) {
+          completedModules.push(moduleId);
+          await userRef.update({
+            'learningProgress.completedQuizzes': admin.firestore.FieldValue.arrayUnion(moduleCompleted),
+          });
+        }
+      }
+    } else {
+      // Create new user document if it doesn't exist
+      await userRef.set({
+        userId,
+        completedQuizzes: [
+          {
+            moduleId,
+            quizId: quizId || quizResultRef.id,
+            score: (score / totalQuestions) * 100,
+            completedAt: admin.firestore.Timestamp.fromDate(
+              typeof timestamp === 'string' ? new Date(timestamp) : timestamp,
+            ),
+          },
+        ],
+        completedModules: [],
+        lastActivity: admin.firestore.Timestamp.now(),
+        createdAt: admin.firestore.Timestamp.now(),
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Quiz result saved successfully',
+      resultId: quizResultRef.id,
+    });
+  } catch (error) {
+    console.error('Error saving quiz result:', error);
+    next(error);
+  }
+});
+
+// Add endpoint to get user's quiz history
+app.get('/user/:userId/quiz-history', async (req, res, next) => {
+  try {
+    const {userId} = req.params;
+
+    if (!userId) {
+      return res.status(400).json({error: 'User ID is required'});
+    }
+
+    const quizResultsSnapshot = await db
+      .collection('quizResults')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+
+    const quizHistory = quizResultsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp.toDate(),
+    }));
+
+    res.json({quizHistory});
+  } catch (error) {
+    console.error('Error fetching quiz history:', error);
+    next(error);
+  }
+});
+
+
+
+// Add endpoint to track module reading progress
+app.post('/user/:userId/progress', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { moduleId, action, timestamp } = req.body;
+
+    if (!userId || !moduleId || !action) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const userRef = db.collection('users').doc(userId);
+
+    if (action === 'start') {
+      // Record module start
+      await userRef.collection('progress').doc(`${moduleId}_start`).set({
+        moduleId,
+        startedAt: timestamp ? new Date(timestamp) : admin.firestore.FieldValue.serverTimestamp(),
+        status: 'in_progress',
+      });
+    }
+    else if (action === 'complete') {
+      // Record module completion (read all content)
+      await userRef.collection('progress').doc(`${moduleId}_content`).set({
+        moduleId,
+        completedAt: timestamp ? new Date(timestamp) : admin.firestore.FieldValue.serverTimestamp(),
+        status: 'content_completed',
+      });
+
+      // Update user's learning progress
+      await userRef.update({
+        'learningProgress.completedModules': admin.firestore.FieldValue.arrayUnion(moduleId),
+        lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error updating progress:', error);
+    next(error);
+  }
+});
+
 app.get('/user/:userId/progress', async (req, res, next) => {
   try {
     const { userId } = req.params;
+
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    // Fetch user document
+    // Get user document
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
+
     if (!userDoc.exists) {
-      console.log(`User ${userId} not found`);
       return res.status(404).json({ error: 'User not found' });
     }
-    const userData = userDoc.data();
 
-    // Fetch learningProgress from user document
+    const userData = userDoc.data() || {};
     const learningProgress = userData.learningProgress || {
       completedModules: [],
       completedQuizzes: [],
       completedExams: [],
-      score: 0,
+      modulesInProgress: [],
+      score: null,
     };
 
-    // Optionally fetch progress subcollection (if you still need it)
-    const progressSnapshot = await userRef.collection('progress').orderBy('completedAt', 'desc').get();
-    console.log(`Progress subcollection entries for ${userId}: ${progressSnapshot.size}`);
-    const progressData = progressSnapshot.docs.map(doc => {
+    // Get progress documents
+    const progressSnapshot = await userRef.collection('progress').get();
+    const progress = progressSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
+        moduleId: data.moduleId || '',
         quizId: data.quizId || '',
-        moduleId: data.moduleId || data.quizId?.split('-quiz')[0] || '',
+        examId: data.examId || '',
         score: data.score || 0,
         totalQuestions: data.totalQuestions || 0,
-        completedAt: data.completedAt?.toDate().toISOString() || null,
+        status: data.status || '',
+        startedAt: data.startedAt ? data.startedAt.toDate().toISOString() : null,
+        completedAt: data.completedAt ? data.completedAt.toDate().toISOString() : null,
       };
     });
 
-    // Fetch modules
+    // Get modules data
     const modulesSnapshot = await db.collection('modules').get();
-    const modules = modulesSnapshot.docs.map(doc => ({
-      id: doc.id,
-      title: doc.id.replace(/-/g, ' ').replace(/\b\w/g, char => char.toUpperCase()),
-    }));
+    const modules = modulesSnapshot.docs.map(doc => {
+      return {
+        id: doc.id,
+        title: doc.data().title || '',
+        description: doc.data().description || '',
+      };
+    });
+
+    // Get quiz results
+    const quizResultsSnapshot = await db
+      .collection('quizResults')
+      .where('userId', '==', userId)
+      .orderBy('timestamp', 'desc')
+      .get();
+
+    const quizResults = quizResultsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        moduleId: data.moduleId || '',
+        score: data.score || 0,
+        totalQuestions: data.totalQuestions || 0,
+        percentage: data.percentage || 0,
+        timestamp: data.timestamp ? data.timestamp.toDate().toISOString() : null,
+      };
+    });
+
+    // Get exam results (assuming you have an exams collection)
+    // const examResultsSnapshot = await db
+    //   .collection('examResults')
+    //   .where('userId', '==', userId)
+    //   .orderBy('timestamp', 'desc')
+    //   .get();
+
+    // const examResults = examResultsSnapshot.docs.map(doc => {
+    //   const data = doc.data();
+    //   return {
+    //     id: doc.id,
+    //     examId: data.examId || '',
+    //     score: data.score || 0,
+    //     totalQuestions: data.totalQuestions || 0,
+    //     percentage: data.percentage || 0,
+    //     timestamp: data.timestamp ? data.timestamp.toDate().toISOString() : null,
+    //   };
+    // });
+
+    //    // Get exams data for reference
+    //    const examsSnapshot = await db.collection('exams').get();
+    //    const exams = examsSnapshot.docs.map(doc => {
+    //      return {
+    //        id: doc.id,
+    //        title: doc.data().title || '',
+    //      };
+    //    });
 
     res.json({
-      learningProgress, // Main data source
-      progress: progressData, // Optional subcollection data
+      learningProgress,
+      progress,
       modules,
+      //exams,
+      //examResults,
+      quizResults,
     });
   } catch (error) {
-    console.error('Error fetching user progress:', error.message, error.stack);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching user progress:', error);
+    next(error);
   }
 });
 
@@ -673,9 +804,62 @@ app.get('/user/:userId/quiz-history', async (req, res, next) => {
       };
     });
 
+    const userRef = db.collection('users').doc(userId);
+    await userRef.update({
+      'learningProgress.completedQuizzes': admin.firestore.FieldValue.arrayUnion({
+        moduleId: quizHistory[0]?.moduleId,
+        quizId: quizHistory[0]?.id,
+      }),
+    });
+
     res.json({ quizHistory });
   } catch (error) {
     console.error('Error fetching quiz history:', error.message, error.stack);
+    next(error);
+  }
+});
+
+app.post('/user/:userId/exam', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { moduleId, examId, quizId, score } = req.body;
+
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection('users').doc(userId);
+      const userDoc = await transaction.get(userRef);
+
+      if (!userDoc.exists) {
+        throw new Error('User not found');
+      }
+
+      // Create progress document
+      const progressRef = userRef.collection('progress').doc(examId);
+      transaction.set(progressRef, {
+        examId,
+        moduleId,
+        quizId,
+        score,
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Update user document
+      transaction.update(userRef, {
+        'learningProgress.completedExams': admin.firestore.FieldValue.arrayUnion(examId),
+        'learningProgress.completedModules': admin.firestore.FieldValue.arrayUnion(moduleId),
+        'learningProgress.completedQuizzes': admin.firestore.FieldValue.arrayUnion(quizId),
+        'learningProgress.score': admin.firestore.FieldValue.increment(score),
+      });
+
+      // Update module start status
+      const moduleStartRef = userRef.collection('progress').doc(`${moduleId}_start`);
+      transaction.update(moduleStartRef, {
+        status: 'completed',
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    res.status(200).send({ message: 'Exam completed' });
+  } catch (error) {
     next(error);
   }
 });

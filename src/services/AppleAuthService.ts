@@ -11,9 +11,10 @@ interface UserData {
   photoURL: string | null;
   createdAt: FirebaseFirestoreTypes.FieldValue;
   learningProgress: {
-    modules: Record<string, any>;
-    quizzes: Record<string, any>;
-    exams: Record<string, any>;
+    completedModules: Record<string, any>;
+    completedQuizzes: Record<string, any>;
+    completedExams: Record<string, any>;
+    score: number,
   };
   settings: {
     notificationsEnabled: boolean;
@@ -125,11 +126,12 @@ export class AppleAuthService {
         photoURL: userCredential.user.photoURL,
         createdAt: firestore.FieldValue.serverTimestamp(),
         learningProgress: {
-          modules: {},
-          quizzes: {},
-          exams: {},
-        },
-        settings: {
+          completedModules: {},
+          completedQuizzes: {},
+          completedExams: {},
+          score: 0,
+         },
+          settings: {
           notificationsEnabled: true,
           darkMode: false,
         },

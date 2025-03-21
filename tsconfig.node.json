@@ -8,7 +8,8 @@
       "forceConsistentCasingInFileNames": true,
       "outDir": "./dist",
       "rootDir": "./",
-      "baseUrl": "./"
+      "baseUrl": "./",
+      "resolveJsonModule": true
     },
     "include": ["create-schema.ts", "src/**/*.ts", "scripts/**/*"],
     "exclude": ["node_modules", "dist"]

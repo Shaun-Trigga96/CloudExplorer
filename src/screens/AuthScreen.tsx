@@ -106,9 +106,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
             email: userCredential.user.email,
             createdAt: firestore.FieldValue.serverTimestamp(),
             learningProgress: {
-              modules: {},
-              quizzes: {},
-              exams: {},
+              completedModules: [],
+              completedQuizzes: [],
+              completedExams: [],
+              score: 0,
             },
             settings: {
               notificationsEnabled: true,
