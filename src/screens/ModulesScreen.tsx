@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Card, Title, Paragraph, Button, ProgressBar } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import firestore from '@react-native-firebase/firestore';
@@ -11,15 +11,14 @@ import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
-const BASE_URL = '[http://10.0.2.2:5000](http://10.0.2.2:5000)';
+const BASE_URL = 'http://10.0.2.2:5000';
 
 interface Module {
   id: string;
   title: string;
   description: string;
-  progress: number;
   icon: React.FC;
 }
 
@@ -34,40 +33,42 @@ interface LearningProgress {
 const ModulesScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const [moduleProgress, setModuleProgress] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState<boolean>(true);
 
   const modules: Module[] = [
     {
       id: 'compute-engine',
       title: 'Compute Engine',
       description: 'Learn about virtual machines in Google Cloud Platform',
-      progress: 0,
       icon: ComputeEngineIcon,
     },
     {
       id: 'cloud-storage',
       title: 'Cloud Storage',
       description: 'Master object storage in the cloud',
-      progress: 0,
       icon: CloudStorageIcon,
     },
     {
       id: 'cloud-functions',
       title: 'Cloud Functions',
       description: 'Build serverless applications',
-      progress: 0,
       icon: CloudFunctionsIcon,
     },
     {
       id: 'kubernetes-engine',
       title: 'Kubernetes Engine',
       description: 'Container orchestration with GKE',
-      progress: 0,
       icon: KubernetesEngineIcon,
     },
   ];
+
   const fetchUserProgress = async () => {
+    setLoading(true);
     const userId = await AsyncStorage.getItem('userId');
-    if (!userId) {return;}
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await axios.get(`${BASE_URL}/user/${userId}/progress`);
@@ -75,12 +76,10 @@ const ModulesScreen = () => {
 
       const progress: Record<string, number> = {};
 
-      // Calculate progress percentage for each module
       apiModules.forEach((module: { id: string }) => {
         const moduleId = module.id;
         const learningData = learningProgress as LearningProgress;
 
-        // Check if module is in different states
         const isStarted = learningData.modulesInProgress?.includes(moduleId);
         const isCompleted = learningData.completedModules?.includes(moduleId);
         const hasCompletedQuiz = learningData.completedQuizzes?.some(
@@ -101,78 +100,160 @@ const ModulesScreen = () => {
       setModuleProgress(progress);
     } catch (error) {
       console.error('Error fetching user progress:', error);
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError;
+        if (!axiosError.response) {
+          Alert.alert(
+            'Network Error',
+            'Could not connect to the server. Please check your internet connection and try again.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert(
+            'Server Error',
+            `An error occurred on the server: ${axiosError.response.status}`,
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        Alert.alert(
+          'Unexpected Error',
+          'An unexpected error occurred. Please try again later.',
+          [{ text: 'OK' }]
+        );
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchUserProgress();
     const userId = auth().currentUser?.uid;
-    if (!userId) {return;}
+    if (!userId) {
+      return;
+    }
 
-     // Subscribe to progress updates
-     const unsubscribe = firestore()
-     .collection('users')
-     .doc(userId)
-     .collection('learningProgress')
-     .onSnapshot(snapshot => {
-       const progress: Record<string, number> = {};
-       // Check if snapshot exists and has docs
-       if (snapshot && snapshot.docs) {
-         snapshot.docs.forEach(doc => {
-           progress[doc.id] = doc.data().progress || 0;
-         });
-       }
-       setModuleProgress(progress);
-     });
+    const unsubscribe = firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('learningProgress')
+      .onSnapshot((snapshot) => {
+        const progress: Record<string, number> = {};
+        if (snapshot && snapshot.docs) {
+          snapshot.docs.forEach((doc) => {
+            progress[doc.id] = doc.data().progress || 0;
+          });
+        }
+        setModuleProgress(progress);
+      });
 
-   return () => unsubscribe();
- }, []);
+    return () => unsubscribe();
+  }, []);
 
   const handleStartLearning = async (moduleId: string) => {
     const userId = await AsyncStorage.getItem('userId');
-    console.log('userId', userId);
     if (userId) {
       try {
         await axios.post(`${BASE_URL}/user/${userId}/module/start`, { moduleId });
       } catch (error) {
         console.error('Error starting module:', error);
-        // Handle the error appropriately (e.g., show an error message to the user)
+        if (axios.isAxiosError(error)) {
+          const axiosError = error as AxiosError;
+          if (!axiosError.response) {
+            Alert.alert(
+              'Network Error',
+              'Could not connect to the server. Please check your internet connection and try again.',
+              [{ text: 'OK' }]
+            );
+          } else {
+            Alert.alert(
+              'Server Error',
+              `An error occurred on the server: ${axiosError.response.status}`,
+              [{ text: 'OK' }]
+            );
+          }
+        } else {
+          Alert.alert(
+            'Unexpected Error',
+            'An unexpected error occurred. Please try again later.',
+            [{ text: 'OK' }]
+          );
+        }
       }
     }
     navigation.navigate('ModuleDetail', { moduleId });
   };
 
+  const getProgressColor = (progress: number) => {
+    if (progress === 1) {
+      return '#4CAF50'; // Green for completed
+    } else if (progress > 0) {
+      return '#FFC107'; // Yellow for in progress
+    } else {
+      return '#e0e0e0'; // Light gray for not started
+    }
+  };
+
+  const getButtonLabel = (progress: number) => {
+    if (progress === 1) {
+      return 'Completed';
+    } else if (progress > 0) {
+      return 'Continue Learning';
+    } else {
+      return 'Start Learning';
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
-      {modules.map((module) => {
-        const IconComponent = module.icon;
-        const progress = moduleProgress[module.id] || 0;
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ProgressBar indeterminate={true} color="#6200ee" />
+        </View>
+      )}
+      {!loading &&
+        modules.map((module) => {
+          const IconComponent = module.icon;
+          const progress = moduleProgress[module.id] || 0;
+          const progressColor = getProgressColor(progress);
+          const buttonLabel = getButtonLabel(progress);
 
-        return (
-          <Card key={module.id} style={styles.card}>
-            <Card.Content>
-              <View style={styles.headerRow}>
-                <IconComponent width={34} height={34} style={styles.icon} {...(IconComponent as React.SVGProps<SVGSVGElement>)} />
-                <Title style={styles.title}>{module.title}</Title>
-              </View>
-              <Paragraph>{module.description}</Paragraph>
-              <ProgressBar
-                progress={progress}
-                style={styles.progressBar}
-              />
-            </Card.Content>
-            <Card.Actions>
-              <Button
-                mode="contained"
-                onPress={() => handleStartLearning(module.id)}
-              >
-                {progress > 0 ? 'Continue Learning' : 'Start Learning'}
-              </Button>
-            </Card.Actions>
-          </Card>
-        );
-      })}
+          return (
+            <Card key={module.id} style={styles.card}>
+              <Card.Content>
+                <View style={styles.headerRow}>
+                  <IconComponent
+                    width={34}
+                    height={34}
+                    style={styles.icon}
+                    {...(IconComponent as React.SVGProps<SVGSVGElement>)}
+                  />
+                  <Title style={styles.title}>{module.title}</Title>
+                </View>
+                <Paragraph>{module.description}</Paragraph>
+                <ProgressBar
+                  progress={progress}
+                  color={progressColor}
+                  style={styles.progressBar}
+                />
+                <Paragraph style={styles.percentageText}>
+                  {`${(progress * 100).toFixed(0)}%`}
+                </Paragraph>
+              </Card.Content>
+              <Card.Actions>
+                <Button
+                  mode="contained"
+                  onPress={() => handleStartLearning(module.id)}
+                  disabled={buttonLabel === 'Completed'}
+                  style={buttonLabel === 'Completed' ? styles.completedButton : {}}
+                >
+                  {buttonLabel}
+                </Button>
+              </Card.Actions>
+            </Card>
+          );
+        })}
     </ScrollView>
   );
 };
@@ -201,6 +282,17 @@ const styles = StyleSheet.create({
     height: 6,
     marginTop: 8,
     backgroundColor: '#e0e0e0',
+  },
+  loadingContainer: {
+    marginBottom: 16,
+  },
+  percentageText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#666',
+  },
+  completedButton: {
+    backgroundColor: '#4CAF50', // Green for completed
   },
 });
 

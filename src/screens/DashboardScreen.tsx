@@ -141,7 +141,7 @@ const ProgressItem: FC<ProgressItemProps> = ({ title, status, percentage, color,
   </View>
 );
 
-const DashboardScreen: FC<{ navigation: any }> = ({ }) => {
+const DashboardScreen: FC<{ navigation: any }> = ({ navigation}) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [learningProgress, setLearningProgress] = useState<LearningProgress | null>(null);
   const [progress, setProgress] = useState<ProgressEntry[]>([]);
@@ -168,64 +168,58 @@ const DashboardScreen: FC<{ navigation: any }> = ({ }) => {
     }
   };
 
-    const fetchUserData = async () => {
-      try {
-        let storedUserId = await AsyncStorage.getItem('userId');
-        console.log('Stored User ID (original):', storedUserId);
-        if (!storedUserId) {
-          return;
-        }
-
-        const response = await axios.get(`${BASE_URL}/user/${storedUserId}/progress`);
-        console.log('Full Progress Response:', JSON.stringify(response.data, null, 2));
-
-        setLearningProgress(response.data.learningProgress || null);
-        setProgress(response.data.progress || []);
-        setModules(response.data.modules || []);
-        setExams(response.data.exams || []);
-        setQuizResults(response.data.quizResults || []);
-        //setExamResults(response.data.examResults || []);
-        setErrorInfo(null);
-      } catch (err: any) {
-        console.error('Error fetching dashboard data:', err.response?.data || err.message);
-
-        const errorMessage = err.response?.data?.error || '';
-        if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('index')) {
-          // This is a Firestore index error
-          const indexUrl = extractFirestoreIndexUrl(errorMessage);
-          setErrorInfo({
-            message: 'The database query requires an index which needs to be created.',
-            isIndexError: true,
-            indexUrl,
-          });
-
-          // Try to load partial data that doesn't rely on the indexed queries
-          if (err.response?.data?.modules) {
-            setModules(err.response.data.modules);
-          }
-          if (err.response?.data?.exams) {
-            setExams(err.response.data.exams);
-          }
-        } else {
-          setErrorInfo({
-            message: errorMessage || 'Failed to load dashboard data. Please try again.',
-            isIndexError: false,
-          });
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
     useEffect(() => {
-    fetchUserData();
-  });
+      const fetchUserData = async () => {
+        try {
+          let storedUserId = await AsyncStorage.getItem('userId');
+          console.log('Stored User ID (original):', storedUserId);
+          if (!storedUserId) {
+            return;
+          }
+    
+          const response = await axios.get(`${BASE_URL}/user/${storedUserId}/progress`);
+          setLearningProgress(response.data.learningProgress || null);
+          setProgress(response.data.progress || []);
+          setModules(response.data.modules || []);
+          setExams(response.data.exams || []);
+          setQuizResults(response.data.quizResults || []);
+          //setExamResults(response.data.examResults || []);
+          setErrorInfo(null);
+        } catch (err: any) {
+          console.error('Error fetching dashboard data:', err.response?.data || err.message);
+    
+          const errorMessage = err.response?.data?.error || '';
+          if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('index')) {
+            // This is a Firestore index error
+            const indexUrl = extractFirestoreIndexUrl(errorMessage);
+            setErrorInfo({
+              message: 'The database query requires an index which needs to be created.',
+              isIndexError: true,
+              indexUrl,
+            });
+    
+            // Try to load partial data that doesn't rely on the indexed queries
+            if (err.response?.data?.modules) {
+              setModules(err.response.data.modules);
+            }
+            if (err.response?.data?.exams) {
+              setExams(err.response.data.exams);
+            }
+          } else {
+            setErrorInfo({
+              message: errorMessage || 'Failed to load dashboard data. Please try again.',
+              isIndexError: false,
+            });
+          }
+        } finally {
+          setLoading(false);
+        }
+      };
+    
+      fetchUserData();
+    }, [navigation]);
 
-  const retryFetch = () => {
-    setLoading(true);
-    setErrorInfo(null);
-   fetchUserData();
-  };
+
 
   // Calculate overall progress
   const totalModules = modules.length;
@@ -290,7 +284,6 @@ const DashboardScreen: FC<{ navigation: any }> = ({ }) => {
 
             <Button
               mode="contained"
-              onPress={retryFetch}
               style={styles.retryButton}
               icon="refresh"
             >
@@ -313,7 +306,6 @@ const DashboardScreen: FC<{ navigation: any }> = ({ }) => {
               Some data couldn't be loaded.
             </Text>
             <TouchableOpacity
-              onPress={retryFetch}
               style={styles.refreshButton}
             >
               <Text style={styles.refreshButtonText}>Retry</Text>
@@ -369,10 +361,10 @@ const DashboardScreen: FC<{ navigation: any }> = ({ }) => {
           )}
 
           {/* Quizzes Section - Only show if we have quizResults */}
-          {quizResults.length > 0 && (
-            <>
+         
               <Text style={styles.sectionTitle}>Quizzes</Text>
-              {quizResults.map((quiz) => {
+              {quizResults.length > 0 ? (
+              quizResults.map((quiz) => {
                 const module = modules.find((m) => m.id === quiz.moduleId);
                 const { icon, color } = getModuleDetails(quiz.moduleId);
                 return (
@@ -385,8 +377,10 @@ const DashboardScreen: FC<{ navigation: any }> = ({ }) => {
                     icon={icon}
                   />
                 );
-              })}
-            </>
+              })
+            ) : (
+              <Text style={styles.noDataText}>No quizzes available.</Text>
+
           )}
 
           {/* Exams Section */}
@@ -516,7 +510,7 @@ const styles = StyleSheet.create({
     fontSize: 24, 
     fontWeight: '700', 
     marginBottom: 16, 
-    color: '#202124'
+    color: '#202124',
   },
   gridContainer: { 
     flexDirection: 'row', 

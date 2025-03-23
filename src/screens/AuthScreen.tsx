@@ -173,7 +173,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
           resizeMode="contain"
         />
         <Text style={styles.title}>
-          {isLogin ? 'Log In' : 'Create an Account'}
+          {isLogin ? 'Login' : 'Sign Up'}
         </Text>
         <TextInput
           label="Email"

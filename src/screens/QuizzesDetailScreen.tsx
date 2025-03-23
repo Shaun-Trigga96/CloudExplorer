@@ -8,9 +8,10 @@ import {
   Animated,
   Alert,
 } from 'react-native';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { Button, Card, Paragraph, Title, IconButton } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+
 const BASE_URL: string = 'http://10.0.2.2:5000';
 
 interface Answer {
@@ -109,26 +110,31 @@ const QuizzesDetailScreen = ({
         setQuiz(formattedQuiz);
         // eslint-disable-next-line no-catch-shadow, @typescript-eslint/no-shadow
       } catch (error: any) {
-        console.error('Error fetching quiz:', error);
-        if (error.response) {
-          if (error.response.status === 403) {
+        console.error('Error fetching quiz:', error); // Log the error
+        if (axios.isAxiosError(error)) {
+          const axiosError = error as AxiosError;
+          if (axiosError.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            console.error('Server responded with:', axiosError.response.status, axiosError.response.data);
             setError(
-              'Error: Invalid Hugging Face API Key. Please check your backend configuration.',
+              `Server Error: ${axiosError.response.status} - ${axiosError.response.data || axiosError.response.statusText}`,
             );
-          } else if (error.response.status === 404) {
-            setError('Module not found. Please check the module ID.');
+          } else if (axiosError.request) {
+            // The request was made but no response was received
+            console.error('No response received:', axiosError.request);
+            setError(
+              'Network error: Unable to connect to server. Please check your connection.',
+            );
           } else {
-            setError(
-              `Error fetching quiz: ${error.response.data?.error || error.response.statusText
-              }`,
-            );
+            // Something happened in setting up the request that triggered an Error
+            console.error('Error setting up the request:', axiosError.message);
+            setError(`Error: ${axiosError.message}`);
           }
-        } else if (error.request) {
-          setError(
-            'Network error: Unable to connect to server. Please check your connection.',
-          );
         } else {
-          setError(`Error: ${error.message}`);
+          // Handle non-Axios errors
+          console.error('An unexpected error occurred:', error.message);
+          setError(`An unexpected error occurred: ${error.message}`);
         }
       } finally {
         setLoading(false);
@@ -290,6 +296,7 @@ const QuizzesDetailScreen = ({
           const userAnswer = userAnswers[question.id];
           const isCorrect = isAnswerCorrect(question.id);
 
+         
           return (
             <Card
               key={question.id}
@@ -311,7 +318,7 @@ const QuizzesDetailScreen = ({
 
                 {question.answers.length > 0 ? (
                   // Multiple choice review
-                  <View style={styles.reviewAnswers}>
+                  <View style={styles.reviewAnswersContainer}>
                     {question.answers.map(answer => (
                       <View
                         key={answer.uniqueKey}
@@ -335,7 +342,7 @@ const QuizzesDetailScreen = ({
                   </View>
                 ) : (
                   // True/False review
-                  <View style={styles.reviewAnswers}>
+                  <View style={styles.reviewAnswersContainer}>
                     {['True', 'False'].map(option => (
                       <View
                         key={`${question.id}-${option.toLowerCase()}`} // Unique key for each option
@@ -664,82 +671,98 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  // --- Review Section ---
-  reviewTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 10,
-    color: '#202124', // Dark text color
-  },
-  reviewCard: {
-    borderRadius: 12,
-    marginBottom: 15,
-    overflow: 'hidden',
-    elevation: 2,
-  },
-  correctCard: {
-    borderLeftWidth: 5,
-    borderLeftColor: '#34a853', // Green color
-  },
-  incorrectCard: {
-    borderLeftWidth: 5,
-    borderLeftColor: '#ea4335', // Red color
-  },
-  questionHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 15,
-  },
-  statusIcon: {
-    marginRight: 10,
-  },
-  reviewQuestion: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#202124', // Dark text color
-  },
-  reviewAnswers: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginTop: 10,
-  },
-  reviewAnswer: {
-    borderRadius: 10,
-    padding: 10,
-    flex: 1,
-    alignItems: 'center',
-  },
-  reviewAnswerText: {
-    fontSize: 16,
-    color: '#202124', // Dark text color
-  },
-  neutralAnswer: {
-    backgroundColor: '#f0f2f5', // Light gray
-  },
-  correctAnswer: {
-    backgroundColor: '#e8f5e9', // Light green
-  },
-  wrongAnswer: {
-    backgroundColor: '#ffebee', // Light red
-  },
-  explanationContainer: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#f0f2f5', // Light gray
-    borderRadius: 8,
-  },
-  explanationTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#202124', // Dark text color
-    marginBottom: 5,
-  },
-  explanationText: {
-    fontSize: 14,
-    color: '#5f6368', // Gray text color
-  },
+// --- Review Section ---
+reviewTitle: {
+  fontSize: 22,
+  fontWeight: 'bold',
+  marginTop: 20,
+  marginBottom: 10,
+  color: '#202124', // Dark text color
+  textAlign: 'center', // Center the title
+},
+reviewCard: {
+  borderRadius: 12,
+  marginBottom: 20, // Increased margin for more space
+  overflow: 'hidden',
+  elevation: 3, // Slightly increased elevation
+  shadowColor: '#000', // Added shadow color
+  shadowOffset: { width: 0, height: 2 }, // Added shadow offset
+  shadowOpacity: 0.1, // Added shadow opacity
+  shadowRadius: 4, // Added shadow radius
+},
+correctCard: {
+  borderLeftWidth: 8, // Increased border width
+  borderLeftColor: '#34a853', // Green color
+},
+incorrectCard: {
+  borderLeftWidth: 8, // Increased border width
+  borderLeftColor: '#ea4335', // Red color
+},
+questionHeader: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  padding: 15,
+  paddingBottom: 0, // Reduced padding at the bottom
+},
+statusIcon: {
+  marginRight: 10,
+  color: '#fff', // White icon color
+  backgroundColor: '#1a73e8', // Blue background for the icon
+  borderRadius: 100, // Make it circular
+  padding: 5, // Add some padding around the icon
+},
+reviewQuestion: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#202124', // Dark text color
+  flex: 1, // Allow the question to take up available space
+  lineHeight: 24, // Added line height for better readability
+},
+reviewAnswersContainer: {
+  marginTop: 10, // Added margin top
+  paddingHorizontal: 15, // Added horizontal padding
+  paddingBottom: 15, // Added padding bottom
+  gap: 10, // Added gap between answers
+},
+reviewAnswer: {
+  borderRadius: 10,
+  padding: 15, // Increased padding
+  flexDirection: 'row', // Align letter and text horizontally
+  alignItems: 'center', // Center items vertically
+  gap: 10, // Added gap between letter and text
+},
+reviewAnswerText: {
+  fontSize: 16,
+  color: '#202124', // Dark text color
+  flex: 1, // Allow the text to take up available space
+  lineHeight: 22, // Added line height for better readability
+},
+neutralAnswer: {
+  backgroundColor: '#f0f2f5', // Light gray
+},
+correctAnswer: {
+  backgroundColor: '#e8f5e9', // Light green
+},
+wrongAnswer: {
+  backgroundColor: '#ffebee', // Light red
+},
+explanationContainer: {
+  marginTop: 15, // Increased margin top
+  padding: 15, // Increased padding
+  backgroundColor: '#f0f2f5', // Light gray
+  borderRadius: 12, // Increased border radius
+},
+explanationTitle: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: '#202124', // Dark text color
+  marginBottom: 8, // Increased margin bottom
+},
+explanationText: {
+  fontSize: 15, // Slightly reduced font size
+  color: '#5f6368', // Gray text color
+  lineHeight: 22, // Added line height for better readability
+},
 });
 
 export default QuizzesDetailScreen;

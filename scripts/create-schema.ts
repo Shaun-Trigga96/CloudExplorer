@@ -121,7 +121,7 @@ async function createSchema(): Promise<void> {
     console.log('Creating sample users...');
     // User
     const user: User = {
-      uid: 'Mbcy1W9YEynQujbWQFqbW5d0Ij2',
+      uid: '1BOBpJ97HlcCsdtK3LvUBpWTIvG3',
       email: 'thabisomatsaba96@gmail.com',
       displayName: 'Thabiso Matsaba',
       photoURL: 'https://lh3.googleusercontent.com/a/ACg8ocJhbM695m1bCoCEFYBB...',
@@ -354,6 +354,34 @@ async function createSchema(): Promise<void> {
       await examService.createExam(exam);
       console.log('Exam created:', exam.examId);
     }
+
+     // Add this section:
+  console.log('Creating exam content...');
+  const examContents = [
+    {
+      examId: 'cloud-digital-leader-exam',
+      content:
+        'This exam covers fundamental cloud concepts, Google Cloud services, and basic cloud security. Focus on understanding core services like Compute Engine, Cloud Storage, and networking.',
+    },
+    {
+      examId: 'cloud-architect-exam',
+      content:
+        'This exam covers advanced cloud architecture, solution design, security, and optimization. Focus on designing scalable, secure, and cost-effective solutions using Google Cloud.',
+    },
+  ];
+
+  for (const examContent of examContents) {
+    await firestoreService
+      .then((service) =>
+        service.getCollection('examContent').add(examContent)
+      )
+      .then(() =>
+        console.log(
+          'Exam content created:',
+          examContent.examId
+        )
+      );
+  }
 
     console.log('Creating notifications...');
     // Notifications

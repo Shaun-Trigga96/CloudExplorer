@@ -5,6 +5,7 @@ import HomeScreen from '../screens/HomeScreen';
 import TabNavigator from './TabNavigator';
 import ModuleDetailScreen from '../screens/ModuleDetailScreen';
 import QuizzesDetailScreen from '../screens/QuizzesDetailScreen';
+import ExamDetailsScreen from '../screens/ExamDetailsScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -14,6 +15,7 @@ export type RootStackParamList = {
   ModulesScreen: undefined;
   QuizzesScreen: undefined;
   QuizzesDetail: { moduleId: string };
+  ExamDetail: { examId: string; title: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -32,6 +34,7 @@ const RootNavigator = () => {
       <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen}/>
       <Stack.Screen name="QuizzesScreen" component={TabNavigator} />
       <Stack.Screen name="QuizzesDetail" component={QuizzesDetailScreen} />
+      <Stack.Screen name="ExamDetail" component={ExamDetailsScreen} />
       <Stack.Screen name="MainApp" component={TabNavigator} />
     </Stack.Navigator>
   );
