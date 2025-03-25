@@ -28,17 +28,17 @@ const ExamsScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [exams] = useState<Exam[]>([
     {
-      id: 'cloud-engineer-exam',
-      title: 'Cloud Engineer',
-      description: 'Professional Cloud Engineer Certification Practice Exam',
+      id: 'cloud-digital-leader-exam',
+      title: 'Cloud Digital Leader',
+      description: 'Cloud Digital LeaderCertification Practice Exam',
       duration: '2 hours',
-      icon: require('../assets/images/cloud-engineer.png'),
+      icon: require('../assets/images/cloud-digital-leader.png'),
       passRate: 70,
       questionsCount: 50,
     },
-    {
+      {
       id: 'cloud-architect-exam',
-      title: 'Cloud Architect',
+      title: 'Professional Cloud Architect',
       description: 'Professional Cloud Architect Certification Practice Exam',
       duration: '2 hours',
       icon: require('../assets/images/cloud-architect.png'),
@@ -47,13 +47,14 @@ const ExamsScreen = () => {
     },
     {
       id: 'cloud-data-engineer-exam',
-      title: 'Data Engineer',
+      title: 'Proffesional Data Engineer',
       description: 'Professional Data Engineer Certification Practice Exam',
       duration: '2 hours',
       icon: require('../assets/images/data-engineer.png'),
       passRate: 70,
       questionsCount: 50,
     },
+
     {
       id: 'cloud-security-engineer-exam',
       title: 'Security Engineer',

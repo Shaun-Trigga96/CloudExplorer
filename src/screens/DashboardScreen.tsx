@@ -1,7 +1,6 @@
-/* eslint-disable no-trailing-spaces */
 /* eslint-disable react-native/no-inline-styles */
 import React, { FC, useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Linking, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Linking, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -12,6 +11,7 @@ import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
 import CloudStorageIcon from '../assets/icons/cloud_storage.svg';
 import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
 import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
+import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
 
 const BASE_URL = 'http://10.0.2.2:5000';
 
@@ -38,7 +38,6 @@ interface Module {
   id: string;
   title: string;
 }
-
 
 interface QuizResult {
   id: string;
@@ -68,7 +67,9 @@ interface ProgressItemProps {
   status: string;
   percentage?: number;
   color: string;
-  icon: React.FC<React.SVGProps<SVGSVGElement>>;
+  icon?: React.FC<React.SVGProps<SVGSVGElement>>;
+  imageIcon?: any; // For Image source
+  isImage?: boolean;
 }
 
 interface ErrorInfo {
@@ -113,12 +114,16 @@ const GridLayout: FC = () => {
   );
 };
 
-// Implement the ProgressItem component
-const ProgressItem: FC<ProgressItemProps> = ({ title, status, percentage, color, icon: IconComponent }) => (
+// Implement the ProgressItem component with support for both SVG and Image icons
+const ProgressItem: FC<ProgressItemProps> = ({ title, status, percentage, color, icon: IconComponent, imageIcon, isImage = false }) => (
   <View style={styles.progressItem}>
     <View style={styles.progressItemHeader}>
-      <View style={[styles.progressIconCircle, { backgroundColor: color }]}>
-        <IconComponent width={20} height={20} />
+      <View style={[styles.progressIconCircle, { backgroundColor: isImage ? 'transparent' : color }]}>
+        {isImage ? (
+          <Image source={imageIcon} style={styles.progressImageIcon} resizeMode="contain" />
+        ) : (
+          IconComponent && <IconComponent width={20} height={20} />
+        )}
       </View>
       <View style={styles.progressTextContainer}>
         <Text style={styles.progressTitle}>{title}</Text>
@@ -141,7 +146,7 @@ const ProgressItem: FC<ProgressItemProps> = ({ title, status, percentage, color,
   </View>
 );
 
-const DashboardScreen: FC<{ navigation: any }> = ({ navigation}) => {
+const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [learningProgress, setLearningProgress] = useState<LearningProgress | null>(null);
   const [progress, setProgress] = useState<ProgressEntry[]>([]);
@@ -150,10 +155,60 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation}) => {
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [examResults] = useState<ExamResult[]>([]);
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
+  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+
+  // Exam icon mapping - matching the ExamsScreen structure
+  const examIcons: Record<string, any> = {
+    'cloud-digital-leader-exam': require('../assets/images/cloud-digital-leader.png'),
+    'cloud-data-engineer-exam': require('../assets/images/data-engineer.png'),
+    'cloud-architect-exam': require('../assets/images/cloud-architect.png'),
+    'cloud-security-engineer-exam': require('../assets/images/security-engineer.png'),
+  };
+
+  // Exam colors to match the icons
+  const examColors: Record<string, string> = {
+    'cloud-digital-leader-exam': '#4285F4', // Google Blue
+    'cloud-data-engineer-exam': '#0F9D58', // Google Green
+    'cloud-architect-exam': '#DB4437', // Google Red
+    'cloud-security-engineer-exam': '#F4B400', // Google Yellow
+  };
+
+  // Function to toggle the expanded state of a module
+  const toggleModuleExpanded = (moduleId: string) => {
+    setExpandedModules((prev) => ({
+      ...prev,
+      [moduleId]: !prev[moduleId],
+    }));
+  };
+
+  // Group quiz results by module
+  const groupQuizzesByModule = () => {
+    const grouped: Record<string, QuizResult[]> = {};
+
+    quizResults.forEach((quiz) => {
+      if (!grouped[quiz.moduleId]) {
+        grouped[quiz.moduleId] = [];
+      }
+      grouped[quiz.moduleId].push(quiz);
+    });
+
+    // Sort quizzes by timestamp if available
+    Object.keys(grouped).forEach((moduleId) => {
+      grouped[moduleId].sort((a, b) => {
+        if (!a.timestamp && !b.timestamp) { return 0; }
+        if (!a.timestamp) { return 1; }
+        if (!b.timestamp) { return -1; }
+        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      });
+    });
+
+    return grouped;
+  };
+
 
   // Helper function to extract Firestore index URL from error message
   const extractFirestoreIndexUrl = (errorMessage: string): string | undefined => {
-    if (!errorMessage) {return undefined;}
+    if (!errorMessage) { return undefined; }
 
     const urlMatch = errorMessage.match(/(https:\/\/console\.firebase\.google\.com\/[^\s"]+)/);
     return urlMatch ? urlMatch[1] : undefined;
@@ -168,58 +223,56 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation}) => {
     }
   };
 
-    useEffect(() => {
-      const fetchUserData = async () => {
-        try {
-          let storedUserId = await AsyncStorage.getItem('userId');
-          console.log('Stored User ID (original):', storedUserId);
-          if (!storedUserId) {
-            return;
-          }
-    
-          const response = await axios.get(`${BASE_URL}/user/${storedUserId}/progress`);
-          setLearningProgress(response.data.learningProgress || null);
-          setProgress(response.data.progress || []);
-          setModules(response.data.modules || []);
-          setExams(response.data.exams || []);
-          setQuizResults(response.data.quizResults || []);
-          //setExamResults(response.data.examResults || []);
-          setErrorInfo(null);
-        } catch (err: any) {
-          console.error('Error fetching dashboard data:', err.response?.data || err.message);
-    
-          const errorMessage = err.response?.data?.error || '';
-          if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('index')) {
-            // This is a Firestore index error
-            const indexUrl = extractFirestoreIndexUrl(errorMessage);
-            setErrorInfo({
-              message: 'The database query requires an index which needs to be created.',
-              isIndexError: true,
-              indexUrl,
-            });
-    
-            // Try to load partial data that doesn't rely on the indexed queries
-            if (err.response?.data?.modules) {
-              setModules(err.response.data.modules);
-            }
-            if (err.response?.data?.exams) {
-              setExams(err.response.data.exams);
-            }
-          } else {
-            setErrorInfo({
-              message: errorMessage || 'Failed to load dashboard data. Please try again.',
-              isIndexError: false,
-            });
-          }
-        } finally {
-          setLoading(false);
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        let storedUserId = await AsyncStorage.getItem('userId');
+        console.log('Stored User ID (original):', storedUserId);
+        if (!storedUserId) {
+          return;
         }
-      };
-    
-      fetchUserData();
-    }, [navigation]);
 
+        const response = await axios.get(`${BASE_URL}/user/${storedUserId}/progress`);
+        setLearningProgress(response.data.learningProgress || null);
+        setProgress(response.data.progress || []);
+        setModules(response.data.modules || []);
+        setExams(response.data.exams || []);
+        setQuizResults(response.data.quizResults || []);
+        //setExamResults(response.data.examResults || []);
+        setErrorInfo(null);
+      } catch (err: any) {
+        console.error('Error fetching dashboard data:', err.response?.data || err.message);
 
+        const errorMessage = err.response?.data?.error || '';
+        if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('index')) {
+          // This is a Firestore index error
+          const indexUrl = extractFirestoreIndexUrl(errorMessage);
+          setErrorInfo({
+            message: 'The database query requires an index which needs to be created.',
+            isIndexError: true,
+            indexUrl,
+          });
+
+          // Try to load partial data that doesn't rely on the indexed queries
+          if (err.response?.data?.modules) {
+            setModules(err.response.data.modules);
+          }
+          if (err.response?.data?.exams) {
+            setExams(err.response.data.exams);
+          }
+        } else {
+          setErrorInfo({
+            message: errorMessage || 'Failed to load dashboard data. Please try again.',
+            isIndexError: false,
+          });
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [navigation]);
 
   // Calculate overall progress
   const totalModules = modules.length;
@@ -235,6 +288,7 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation}) => {
   // Map module IDs to icons, colors, and titles
   const getModuleDetails = (moduleId: string) => {
     const moduleMap: { [key: string]: { icon: React.FC<React.SVGProps<SVGSVGElement>>; color: string; title: string } } = {
+      'cloud-fundamentals': { icon: CloudGenericIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#0000', title: 'GCP Cloud Fundamentals' },
       'compute-engine': { icon: ComputeEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#0000', title: 'Compute Engine' },
       'cloud-storage': { icon: CloudStorageIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#0000', title: 'Cloud Storage' },
       'cloud-functions': { icon: CloudFunctionsIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#0000', title: 'Cloud Functions' },
@@ -248,6 +302,16 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation}) => {
       title: module?.title || moduleId,
     };
     return { ...mapped, title: module?.title || mapped.title };
+  };
+
+  // Helper function to format date
+  const formatDate = (dateString: string | number | Date) => {
+    if (!dateString) { return 'N/A'; }
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   if (loading) {
@@ -295,13 +359,16 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation}) => {
     );
   }
 
+  // Group quizzes by module
+  const quizzesByModule = groupQuizzesByModule();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
         {/* Show warning banner for index errors when we have partial data */}
         {errorInfo?.isIndexError && (
           <Animated.View entering={FadeIn.duration(800)} style={styles.warningBanner}>
-            <Icon name="alert-triangle" size={18} color="#fff" style={{marginRight: 8}} />
+            <Icon name="alert-triangle" size={18} color="#fff" style={{ marginRight: 8 }} />
             <Text style={styles.warningText}>
               Some data couldn't be loaded.
             </Text>
@@ -336,16 +403,15 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation}) => {
           </View>
 
           {/* Modules Section */}
-
           <Text style={styles.sectionTitle}>Modules</Text>
           {modules.length > 0 ? (
             modules.map((module) => {
               const { icon, color } = getModuleDetails(module.id);
               const status = Array.isArray(learningProgress?.completedModules) &&
-              learningProgress.completedModules.includes(module.id)              ? 'Completed'
-              : progress.some((p) => p.moduleId === module.id && p.status === 'in_progress')
-                ? 'In Progress'
-                : 'Not Started';
+                learningProgress.completedModules.includes(module.id) ? 'Completed'
+                : progress.some((p) => p.moduleId === module.id && p.status === 'in_progress')
+                  ? 'In Progress'
+                  : 'Not Started';
               return (
                 <ProgressItem
                   key={module.id}
@@ -359,47 +425,119 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation}) => {
           ) : (
             <Text style={styles.noDataText}>No modules available.</Text>
           )}
+          <Text style={styles.sectionTitle}>Quizzes</Text>
+          {Object.keys(quizzesByModule).length > 0 ? (
+            Object.keys(quizzesByModule).map((moduleId) => {
+              const { title, color, icon } = getModuleDetails(moduleId);
+              const moduleQuizzes = quizzesByModule[moduleId];
+              const completedQuizzes = moduleQuizzes.filter(quiz =>
+                quiz.percentage !== undefined && quiz.percentage >= 0
+              );
+              const isExpanded = expandedModules[moduleId] || false;
 
-          {/* Quizzes Section - Only show if we have quizResults */}
-         
-              <Text style={styles.sectionTitle}>Quizzes</Text>
-              {quizResults.length > 0 ? (
-              quizResults.map((quiz) => {
-                const module = modules.find((m) => m.id === quiz.moduleId);
-                const { icon, color } = getModuleDetails(quiz.moduleId);
-                return (
-                  <ProgressItem
-                    key={quiz.id}
-                    title={`Quiz for ${module?.title || 'Unknown Module'}`}
-                    status="Completed"
-                    percentage={quiz.percentage}
-                    color={color}
-                    icon={icon}
-                  />
-                );
-              })
-            ) : (
-              <Text style={styles.noDataText}>No quizzes available.</Text>
+              return (
+                <View key={moduleId} style={styles.quizModuleContainer}>
+                  {/* Module Header */}
+                  <TouchableOpacity
+                    style={[styles.quizModuleHeader, { borderColor: color }]}
+                    onPress={() => toggleModuleExpanded(moduleId)}
+                  >
+                    <View style={styles.quizModuleTitleContainer}>
+                      <View style={[styles.progressIconCircle, { backgroundColor: color }]}>
+                        {icon && React.createElement(icon, { width: 20, height: 20 })}
+                      </View>
+                      <Text style={styles.quizModuleTitle}>{title}</Text>
+                    </View>
+                    <View style={styles.quizModuleRightSection}>
+                      <Text style={styles.quizCountText}>
+                        {completedQuizzes.length}/{moduleQuizzes.length} Completed
+                      </Text>
+                      <Icon
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color="#5f6368"
+                      />
+                    </View>
+                  </TouchableOpacity>
 
+                  {/* Dropdown Content */}
+                  {isExpanded && (
+                    <View style={styles.quizListContainer}>
+                      {moduleQuizzes.length > 0 ? (
+                        moduleQuizzes.map((quiz, index) => {
+                          const isCompleted = quiz.percentage !== undefined && quiz.percentage >= 0;
+                          return (
+                            <View
+                              key={quiz.id}
+                              style={[
+                                styles.quizItem,
+                                index < moduleQuizzes.length - 1 && styles.quizItemBorder,
+                              ]}
+                            >
+                              <View style={styles.quizItemDetails}>
+                                <Text style={[
+                                  styles.quizItemTitle,
+                                  { color: isCompleted ? '#202124' : '#666' },
+                                ]}>
+                                  Quiz {index + 1}
+                                  {quiz.timestamp && ` - ${formatDate(quiz.timestamp)}`}
+                                  {!isCompleted && ' (Not Started)'}
+                                </Text>
+                                {isCompleted ? (
+                                  <Text style={styles.quizItemScore}>
+                                    Score: {quiz.score}/{quiz.totalQuestions} (
+                                    <Text style={{ color }}>{quiz.percentage}%</Text>)
+                                  </Text>
+                                ) : (
+                                  <Text style={styles.quizItemScore}>Not yet completed</Text>
+                                )}
+                              </View>
+                              {isCompleted && (
+                                <View style={styles.quizItemProgressContainer}>
+                                  <View
+                                    style={[
+                                      styles.quizItemProgress,
+                                      { width: `${quiz.percentage}%`, backgroundColor: color },
+                                    ]}
+                                  />
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })
+                      ) : (
+                        <Text style={styles.noDataText}>No quizzes available for this module.</Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          ) : (
+            <Text style={styles.noDataText}>No quizzes available.</Text>
           )}
 
-          {/* Exams Section */}
+          {/* Exams Section - Using image icons correctly */}
           <Text style={styles.sectionTitle}>Exams</Text>
           {exams.length > 0 ? (
             exams.map((exam) => {
-              const { icon, color } = getModuleDetails(exam.id);
+              const examImage = examIcons[exam.id];
+              const examColor = examColors[exam.id] || '#3b82f6';
               const examResult = examResults.find((er) => er.examId === exam.id);
               const status = learningProgress?.completedExams?.includes(exam.id)
                 ? 'Completed'
                 : 'Not Started';
+
+              // Use image icons for exams with explicit key
               return (
                 <ProgressItem
                   key={exam.id}
                   title={exam.title}
                   status={status}
                   percentage={examResult?.percentage}
-                  color={color}
-                  icon={icon}
+                  color={examColor}
+                  imageIcon={examImage}
+                  isImage={true}
                 />
               );
             })
@@ -507,14 +645,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   gridTitle: {
-    fontSize: 24, 
-    fontWeight: '700', 
-    marginBottom: 16, 
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 16,
     color: '#202124',
   },
-  gridContainer: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   gridItem: {
@@ -531,12 +669,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#f0f0f0',
   },
-  iconCircle: { 
-    width: 52, 
-    height: 52, 
-    borderRadius: 26, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -544,17 +682,17 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  itemTitle: { 
-    fontSize: 16, 
-    fontWeight: '600', 
-    textAlign: 'center', 
+  itemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
     color: '#202124',
     marginBottom: 4,
   },
-  itemDescription: { 
-    fontSize: 12, 
-    color: '#5f6368', 
-    textAlign: 'center', 
+  itemDescription: {
+    fontSize: 12,
+    color: '#5f6368',
+    textAlign: 'center',
     marginTop: 4,
     lineHeight: 16,
   },
@@ -592,6 +730,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
+  progressImageIcon: {
+    width: 32,
+    height: 32,
+  },
   progressTextContainer: {
     flex: 1,
   },
@@ -612,6 +754,77 @@ const styles = StyleSheet.create({
     color: '#202124',
     marginTop: 20,
     marginBottom: 12,
+  },
+  // Quiz module styles
+  quizModuleContainer: {
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#f8f9fa',
+  },
+  quizModuleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderLeftWidth: 4,
+    backgroundColor: 'white',
+    borderRadius: 8,
+  },
+  quizModuleTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quizModuleTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#202124',
+  },
+  quizModuleRightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quizCountText: {
+    fontSize: 13,
+    color: '#5f6368',
+    marginRight: 8,
+  },
+  quizListContainer: {
+    padding: 8,
+    backgroundColor: '#f8f9fa',
+  },
+  quizItem: {
+    padding: 12,
+    backgroundColor: 'white',
+    borderRadius: 6,
+    marginVertical: 4,
+  },
+  quizItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  quizItemDetails: {
+    marginBottom: 8,
+  },
+  quizItemTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#202124',
+    marginBottom: 2,
+  },
+  quizItemScore: {
+    fontSize: 13,
+    color: '#5f6368',
+  },
+  quizItemProgressContainer: {
+    height: 6,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  quizItemProgress: {
+    height: '100%',
+    borderRadius: 3,
   },
 });
 

@@ -10,7 +10,7 @@ export interface Exam {
     prerequisites?: string[];
     createdAt: admin.firestore.Timestamp | Date;
     updatedAt: admin.firestore.Timestamp | Date;
-  }
+}
 
   export interface User {
     uid: string;

@@ -296,7 +296,7 @@ const QuizzesDetailScreen = ({
           const userAnswer = userAnswers[question.id];
           const isCorrect = isAnswerCorrect(question.id);
 
-         
+
           return (
             <Card
               key={question.id}

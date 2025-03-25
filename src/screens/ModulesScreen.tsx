@@ -8,6 +8,7 @@ import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
 import CloudStorageIcon from '../assets/icons/cloud_storage.svg';
 import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
 import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
+import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -36,6 +37,12 @@ const ModulesScreen = () => {
   const [loading, setLoading] = useState<boolean>(true);
 
   const modules: Module[] = [
+    {
+      id: 'cloud-fundamentals',
+      title: 'GCP Cloud Fundamentals',
+      description: 'Learn the fundamentals of cloud computing in Google Cloud',
+      icon: CloudGenericIcon,
+    },
     {
       id: 'compute-engine',
       title: 'Compute Engine',
@@ -155,6 +162,7 @@ const ModulesScreen = () => {
     const userId = await AsyncStorage.getItem('userId');
     if (userId) {
       try {
+        // Always allow starting the module, regardless of completion status
         await axios.post(`${BASE_URL}/user/${userId}/module/start`, { moduleId });
       } catch (error) {
         console.error('Error starting module:', error);
@@ -197,7 +205,7 @@ const ModulesScreen = () => {
 
   const getButtonLabel = (progress: number) => {
     if (progress === 1) {
-      return 'Completed';
+      return 'Review Module'; // Changed label for completed modules
     } else if (progress > 0) {
       return 'Continue Learning';
     } else {
@@ -245,8 +253,8 @@ const ModulesScreen = () => {
                 <Button
                   mode="contained"
                   onPress={() => handleStartLearning(module.id)}
-                  disabled={buttonLabel === 'Completed'}
-                  style={buttonLabel === 'Completed' ? styles.completedButton : {}}
+                  // removed disabled={buttonLabel === 'Completed'}
+                  style={buttonLabel === 'Review Module' ? styles.completedButton : {}} // changed style check
                 >
                   {buttonLabel}
                 </Button>

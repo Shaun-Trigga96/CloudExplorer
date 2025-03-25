@@ -17,6 +17,15 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 // Load module content from separate files
 import { readFileSync } from 'fs';
+
+const fundamentalCloudConceptsNotes: string = readFileSync(
+  path.resolve(__dirname, 'content', 'fundamentalCloudConceptsNotes.md'),
+  'utf8'
+);
+const cloudComputingModelsNotes: string = readFileSync(
+  path.resolve(__dirname, 'content', 'cloudComputingModelsNotes.md'),
+  'utf8'
+);
 const computeEngineNotes: string = readFileSync(
   path.resolve(__dirname, 'content', 'computeEngine.md'),
   'utf8'
@@ -183,6 +192,17 @@ async function createSchema(): Promise<void> {
       sections: Section[]
     }[] = [
       {
+        moduleId: 'cloud-fundamentals',
+        title: 'GCP Cloud Fundamentals',
+        description: 'Learn the fundamentals of cloud computing in Google Cloud',
+        duration: 60,
+        quizzes: ['cloud-fundamentals-quiz1'],
+        sections: [
+          { title: 'Introduction to Cloud Computing', content: fundamentalCloudConceptsNotes, order: 1 },
+          { title: 'Clooud Computing Modoles', content: cloudComputingModelsNotes, order: 2 },
+        ],
+      },
+      {
         moduleId: 'compute-engine',
         title: 'Compute Engine',
         description: 'Learn about virtual machines in Google Cloud',
@@ -332,8 +352,8 @@ async function createSchema(): Promise<void> {
         examId: 'cloud-digital-leader-exam',
         title: 'Google Cloud Digital Leader Exam',
         description: 'Test your knowledge of Google Cloud fundamentals',
-        content: 'Exam questions and answers...',
-        duration: 120,
+        content: 'This exam covers fundamental cloud concepts, Google Cloud services, and basic cloud security.',
+        duration: 120, // minutes
         prerequisites: ['compute-engine', 'cloud-storage'],
         createdAt: new Date('2025-02-24T14:53:22Z'),
         updatedAt: new Date('2025-02-24T15:00:00Z'),
@@ -342,11 +362,31 @@ async function createSchema(): Promise<void> {
         examId: 'cloud-architect-exam',
         title: 'Google Cloud Architect Exam',
         description: 'Advanced exam for cloud architecture specialists',
-        content: 'Comprehensive architecture questions...',
-        duration: 180,
+        content: 'This exam covers advanced cloud architecture, solution design, security, and optimization.',
+        duration: 180, // minutes
         prerequisites: ['compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions'],
         createdAt: new Date('2025-02-28T12:00:00Z'),
         updatedAt: new Date('2025-02-28T12:00:00Z'),
+      },
+      {
+        examId: 'cloud-engineer-exam',
+        title: 'Google Cloud Engineer Exam',
+        description: 'Exam for cloud engineering professionals',
+        content: 'This exam covers more advanced GCP services and best practices.',
+        duration: 150, // minutes
+        prerequisites: ['compute-engine', 'cloud-storage', 'cloud-networking'],
+        createdAt: new Date('2025-03-01T09:00:00Z'),
+        updatedAt: new Date('2025-03-01T09:00:00Z'),
+      },
+      {
+        examId: 'cloud-security-engineer-exam',
+        title: 'Google Cloud Security Engineer Exam',
+        description: 'Specialized exam for cloud security professionals',
+        content: 'This exam covers advanced Google Cloud security services and best practices.',
+        duration: 180, // minutes
+        prerequisites: ['cloud-security', 'identity-access-management', 'security-command-center'],
+        createdAt: new Date('2025-03-15T10:30:00Z'),
+        updatedAt: new Date('2025-03-15T10:30:00Z'),
       },
     ];
 
@@ -355,33 +395,51 @@ async function createSchema(): Promise<void> {
       console.log('Exam created:', exam.examId);
     }
 
-     // Add this section:
-  console.log('Creating exam content...');
-  const examContents = [
-    {
-      examId: 'cloud-digital-leader-exam',
-      content:
-        'This exam covers fundamental cloud concepts, Google Cloud services, and basic cloud security. Focus on understanding core services like Compute Engine, Cloud Storage, and networking.',
-    },
-    {
-      examId: 'cloud-architect-exam',
-      content:
-        'This exam covers advanced cloud architecture, solution design, security, and optimization. Focus on designing scalable, secure, and cost-effective solutions using Google Cloud.',
-    },
-  ];
+    // Exam content creation
+    console.log('Creating exam content...');
+    const examContents = [
+      {
+        examId: 'cloud-digital-leader-exam',
+        content: 'This exam covers fundamental cloud concepts, Google Cloud services, and basic cloud security. Focus on understanding core services like Compute Engine, Cloud Storage, and networking.',
+        version: '1.0',
+        lastUpdated: new Date('2025-02-24T15:00:00Z'),
+        author: 'Google Cloud Certification Team',
+      },
+      {
+        examId: 'cloud-architect-exam',
+        content: 'This exam covers advanced cloud architecture, solution design, security, and optimization. Focus on designing scalable, secure, and cost-effective solutions using Google Cloud.',
+        version: '1.0',
+        lastUpdated: new Date('2025-02-28T12:00:00Z'),
+        author: 'Google Cloud Certification Team',
+      },
+      {
+        examId: 'cloud-engineer-exam',
+        content: 'This exam covers more advanced GCP services and best practices. Includes topics like infrastructure setup, monitoring, and basic automation.',
+        version: '1.0',
+        lastUpdated: new Date('2025-03-01T09:00:00Z'),
+        author: 'Google Cloud Certification Team',
+      },
+      {
+        examId: 'cloud-security-engineer-exam',
+        content: 'This exam covers advanced Google Cloud security services and best practices. Includes security policies, incident response, and compliance.',
+        version: '1.0',
+        lastUpdated: new Date('2025-03-15T10:30:00Z'),
+        author: 'Google Cloud Certification Team',
+      },
+    ];
 
-  for (const examContent of examContents) {
-    await firestoreService
-      .then((service) =>
-        service.getCollection('examContent').add(examContent)
-      )
-      .then(() =>
-        console.log(
-          'Exam content created:',
-          examContent.examId
+    for (const examContent of examContents) {
+      await firestoreService
+        .then((service) =>
+          service.getCollection('examContent').add(examContent)
         )
-      );
-  }
+        .then(() =>
+          console.log('Exam content created:', examContent.examId)
+        )
+        .catch((error) =>
+          console.error('Error creating exam content:', error)
+        );
+    }
 
     console.log('Creating notifications...');
     // Notifications

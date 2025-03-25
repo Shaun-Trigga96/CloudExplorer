@@ -75,6 +75,7 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
   const [examTiming, setExamTiming] = useState<ExamTimingData | null>(null);
 
   const fetchExamQuestions = useCallback(async () => {
+  console.log('fetchExamQuestions: Starting to fetch exam questions...');
     try {
       setLoading(true);
       setError(null);
@@ -88,21 +89,8 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
         timeout: 30000, // 20 seconds timeout for this specific request
       });
 
-      if (response.data && Array.isArray(response.data.questions)) {
-        // Validate questions have all required fields
-        const validQuestions = response.data.questions.filter((q: { id: undefined; question: any; answers: string | any[]; correctAnswer: any; }) =>
-          q.id !== undefined &&
-          q.question &&
-          Array.isArray(q.answers) &&
-          q.answers.length > 0 &&
-          q.correctAnswer
-        );
-
-        if (validQuestions.length === 0) {
-          throw new Error('No valid questions found in response');
-        }
-
-        setQuestions(validQuestions);
+      if (response.data && response.data.questions) {
+        setQuestions(response.data.questions);
       } else {
         throw new Error('Invalid response format');
       }
@@ -111,48 +99,29 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
       let errorMessage = 'Failed to load exam questions. Please try again.';
 
       if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Exam generation may take longer than expected. Please try again.';
+        errorMessage = 'Request timed out. Please check your connection and try again.';
       } else if (err.response) {
-        // Handle specific backend error codes
-        if (err.response.data && err.response.data.error) {
-          switch(err.response.data.error) {
-            case 'EXAM_NOT_FOUND':
-              errorMessage = 'Exam not found. Please check the exam ID.';
-              break;
-            case 'INVALID_REQUEST':
-              errorMessage = err.response.data.message || 'Invalid request format.';
-              break;
-            default:
-              errorMessage = `Server error: ${err.response.data.message || err.response.status}`;
-          }
-        } else if (err.response.status === 404) {
+        // Server responded with an error status
+        if (err.response.status === 404) {
           errorMessage = 'Exam not found. Please check the exam ID.';
         } else {
           errorMessage = `Server error (${err.response.status}). Please try again later.`;
         }
       } else if (err.request) {
+        // Request was made but no response received
         errorMessage = 'No response from server. Please check your network connection.';
       }
 
       setError(errorMessage);
-
-      // Implement exponential backoff for retries
-      if (retryCount < 2) { // Max 3 attempts total
-        const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
-        console.log(`Retrying in ${delay}ms...`);
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-          fetchExamQuestions();
-        }, delay);
-      } else {
-        setRetryCount(0); // Reset for next time
-      }
+      setRetryCount(prev => prev + 1);
     } finally {
       setLoading(false);
     }
-  }, [examId, retryCount]);
+  }, [examId]);
 
+  // Load any saved exam state when component mounts
   useEffect( () => {
+    console.log('useEffect [examId, fetchExamQuestions]: Component mounted or dependencies changed.');
     const loadSavedExamState = async () => {
       try {
         const savedExamState = await AsyncStorage.getItem(`exam_${examId}_state`);
@@ -172,7 +141,10 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
             setTimeLeft(remainingTime);
             setExamStarted(true);
             setExamStartTime(startDate);
+            console.log('useEffect [examId, fetchExamQuestions]: Loaded timer from saved state.');
           }
+        } else {
+          console.log('useEffect [examId, fetchExamQuestions]: No saved exam state found.');
         }
       } catch (error) {
         console.error('Error loading saved exam state:', error);
@@ -186,7 +158,10 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
   // Save exam state when answers or current question changes
   useEffect(() => {
     const saveExamState = async () => {
-      if (!examStarted || examCompleted) {return;}
+      if (!examStarted || examCompleted) {
+        console.log('useEffect [userAnswers, currentQuestionIndex, timeLeft, examId, examStarted, examCompleted, examStartTime]: Exam not started or already completed, skipping save.');
+        return;
+      }
 
       try {
         const examState = {
@@ -197,10 +172,11 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
             timeSpent: 7200 - timeLeft,
           },
         };
-
+        console.log('useEffect [userAnswers, currentQuestionIndex, timeLeft, examId, examStarted, examCompleted, examStartTime]: Saving exam state:', examState);
         await AsyncStorage.setItem(`exam_${examId}_state`, JSON.stringify(examState));
+        console.log('useEffect [userAnswers, currentQuestionIndex, timeLeft, examId, examStarted, examCompleted, examStartTime]: Exam state saved successfully.');
       } catch (error) {
-        console.error('Error saving exam state:', error);
+        console.error('useEffect [userAnswers, currentQuestionIndex, timeLeft, examId, examStarted, examCompleted, examStartTime]: Error saving exam state:', error);
       }
     };
 
@@ -208,6 +184,7 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
   }, [userAnswers, currentQuestionIndex, timeLeft, examId, examStarted, examCompleted, examStartTime]);
 
   const processExamSubmission = useCallback(async () => {
+    console.log('processExamSubmission: Starting exam submission process...');
     try {
       setSubmitting(true);
 
@@ -238,15 +215,19 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
         isPassed,
         answeredQuestions,
       };
+      console.log('processExamSubmission: Exam results calculated:', result);
 
       try {
         // Save exam results to your backend
-        await axios.post(`${BASE_URL}/save-exam-result`, {
+        const saveResultUrl = `${BASE_URL}/save-exam-result`;
+        console.log('processExamSubmission: Saving results to backend:', saveResultUrl, result);
+        await axios.post(saveResultUrl, {
           examId,
           result,
         });
+        console.log('processExamSubmission: Results saved to backend successfully.');
       } catch (error) {
-        console.error('Error saving results to backend:', error);
+        console.error('processExamSubmission: Error saving results to backend:', error);
         // Continue anyway as we have the results locally
       }
 
@@ -256,18 +237,21 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
       // Clear saved exam state when exam is completed
       try {
         await AsyncStorage.removeItem(`exam_${examId}_state`);
+        console.log('processExamSubmission: Cleared saved exam state.');
       } catch (error) {
-        console.error('Error clearing saved exam state:', error);
+        console.error('processExamSubmission: Error clearing saved exam state:', error);
       }
     } catch (err) {
-      console.error('Error submitting exam:', err);
+      console.error('processExamSubmission: Error submitting exam:', err);
       Alert.alert('Error', 'Failed to submit exam. Your results have been saved locally.');
     } finally {
       setSubmitting(false);
+      console.log('processExamSubmission: Submission process finished.');
     }
   }, [examId, questions, userAnswers]);
 
   const submitExam = useCallback(async () => {
+    console.log('submitExam: Attempting to submit the exam.');
     if (Object.keys(userAnswers).length < questions.length) {
       Alert.alert(
         'Incomplete Exam',
@@ -277,7 +261,9 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
           { text: 'Submit Anyway', onPress: processExamSubmission },
         ]
       );
+      console.log('submitExam: Exam is incomplete, showing confirmation alert.');
     } else {
+      console.log('submitExam: All questions answered, proceeding with submission.');
       processExamSubmission();
     }
   }, [userAnswers, questions, processExamSubmission]);
@@ -285,12 +271,15 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
   // Handle timer countdown
   useEffect(() => {
     if (!examStarted || examCompleted) {
+      console.log('useEffect [examStarted, examCompleted, submitExam]: Exam not started or completed, timer not running.');
       return;
     }
 
+    console.log('useEffect [examStarted, examCompleted, submitExam]: Starting timer.');
     const timer = setInterval(() => {
       setTimeLeft((prevTime) => {
         if (prevTime <= 1) {
+          console.log('useEffect [examStarted, examCompleted, submitExam]: Timer reached 0, submitting exam.');
           clearInterval(timer);
           submitExam();
           return 0;
@@ -299,11 +288,15 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      console.log('useEffect [examStarted, examCompleted, submitExam]: Timer cleared.');
+    };
   }, [examStarted, examCompleted, submitExam]);
 
 
   const startExam = () => {
+    console.log('startExam: Exam started.');
     const startTime = new Date();
     setExamStarted(true);
     setExamStartTime(startTime);
@@ -314,7 +307,12 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
   };
 
   const handleAnswerSelection = (questionId: number, answerLetter: string) => {
+    console.log(`handleAnswerSelection: Question ID: ${questionId}, Answer: ${answerLetter} selected.`);
     setUserAnswers({
+      ...userAnswers,
+      [questionId]: answerLetter,
+    });
+    console.log('handleAnswerSelection: Current user answers:', {
       ...userAnswers,
       [questionId]: answerLetter,
     });
@@ -323,17 +321,20 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
   const navigateToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
+      console.log(`MapsToNextQuestion: Navigated to question index: ${currentQuestionIndex + 1}`);
     }
   };
 
   const navigateToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
+      console.log(`MapsToPreviousQuestion: Navigated to question index: ${currentQuestionIndex - 1}`);
     }
   };
 
   const navigateToQuestion = (index: number) => {
     setCurrentQuestionIndex(index);
+    console.log(`MapsToQuestion: Navigated to question index: ${index}`);
   };
 
   const formatTime = (seconds: number) => {
@@ -733,7 +734,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   questionNavigator: {
-    padding: 8,
+    padding: 4,
     backgroundColor: 'white',
   },
   questionButton: {

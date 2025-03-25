@@ -5,6 +5,7 @@ import CloudStorage from '../assets/icons/cloud_storage.svg';
 import ComputeEngine from '../assets/icons/compute_engine.svg';
 import CloudFunctions from '../assets/icons/cloud_functions.svg';
 import KubernetesEngine from '../assets/icons/google_kubernetes_engine.svg';
+import CloudGeneric from '../assets/icons/cloud_generic.svg'
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useNavigation } from '@react-navigation/native';
@@ -24,9 +25,16 @@ const QuizzesScreen = () => {
 
   const quizzes: Quiz[] = [
     {
+      id: 'cloud-fundamentals', // Updated IDs
+      title: 'GCP Cloud Fundamentals',
+      description: 'Test your knowledge of basic GCP concepts',
+      questionCount: 20,
+      icon: CloudGeneric,
+    },
+    {
       id: 'compute-engine', // Updated IDs
       title: 'Compute Engine',
-      description: 'Test your knowledge of basic GCP concepts',
+      description: 'Test your knowledge of compute engine concepts',
       questionCount: 20,
       icon: ComputeEngine,
     },
