@@ -160,8 +160,8 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
   // Exam icon mapping - matching the ExamsScreen structure
   const examIcons: Record<string, any> = {
     'cloud-digital-leader-exam': require('../assets/images/cloud-digital-leader.png'),
-    'cloud-data-engineer-exam': require('../assets/images/data-engineer.png'),
-    'cloud-architect-exam': require('../assets/images/cloud-architect.png'),
+    'cloud-engineer-exam': require('../assets/images/data-engineer.png'),
+    'cloud-architect-exam' :require('../assets/images/cloud-architect.png'),
     'cloud-security-engineer-exam': require('../assets/images/security-engineer.png'),
   };
 
@@ -204,6 +204,7 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
 
     return grouped;
   };
+
 
 
   // Helper function to extract Firestore index URL from error message
@@ -465,7 +466,7 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                     <View style={styles.quizListContainer}>
                       {moduleQuizzes.length > 0 ? (
                         moduleQuizzes.map((quiz, index) => {
-                          const isCompleted = quiz.percentage !== undefined && quiz.percentage >= 0;
+                          const isCompleted = quiz.score !== undefined && quiz.totalQuestions !== undefined;
                           return (
                             <View
                               key={quiz.id}
@@ -485,14 +486,14 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                                 </Text>
                                 {isCompleted ? (
                                   <Text style={styles.quizItemScore}>
-                                    Score: {quiz.score}/{quiz.totalQuestions} (
-                                    <Text style={{ color }}>{quiz.percentage}%</Text>)
+                                    Score: {quiz.score}/{quiz.totalQuestions}
+                                    {quiz.percentage !== undefined && ` (${quiz.percentage}%)`}
                                   </Text>
                                 ) : (
                                   <Text style={styles.quizItemScore}>Not yet completed</Text>
                                 )}
                               </View>
-                              {isCompleted && (
+                              {isCompleted && quiz.percentage !== undefined && (
                                 <View style={styles.quizItemProgressContainer}>
                                   <View
                                     style={[
@@ -508,6 +509,7 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                       ) : (
                         <Text style={styles.noDataText}>No quizzes available for this module.</Text>
                       )}
+
                     </View>
                   )}
                 </View>

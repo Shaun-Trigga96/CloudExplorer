@@ -28,6 +28,9 @@ export interface Exam {
     settings: {
       notificationsEnabled: boolean;
       darkMode: boolean;
+      emailUpdates: boolean,
+      syncData: boolean,
+      soundEffects: boolean,
     };
   }
 

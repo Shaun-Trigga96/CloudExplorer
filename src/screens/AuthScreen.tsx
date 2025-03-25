@@ -114,6 +114,9 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
             settings: {
               notificationsEnabled: true,
               darkMode: false,
+              emailUpdates: true,
+              syncData: true,
+              soundEffects: true,
             },
           });
       }

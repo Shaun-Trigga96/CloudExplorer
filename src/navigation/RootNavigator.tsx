@@ -16,6 +16,9 @@ export type RootStackParamList = {
   QuizzesScreen: undefined;
   QuizzesDetail: { moduleId: string };
   ExamDetail: { examId: string; title: string };
+  SettingsScreen: undefined;
+  CertificationsScreen: undefined;
+  ProfileScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -36,6 +39,9 @@ const RootNavigator = () => {
       <Stack.Screen name="QuizzesDetail" component={QuizzesDetailScreen} />
       <Stack.Screen name="ExamDetail" component={ExamDetailsScreen} />
       <Stack.Screen name="MainApp" component={TabNavigator} />
+      <Stack.Screen name="SettingsScreen" component={TabNavigator} />
+      <Stack.Screen name="CertificationsScreen" component={TabNavigator} />
+      <Stack.Screen name="ProfileScreen" component={TabNavigator} />
     </Stack.Navigator>
   );
 }

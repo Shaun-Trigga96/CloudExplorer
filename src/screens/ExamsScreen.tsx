@@ -46,7 +46,7 @@ const ExamsScreen = () => {
       questionsCount: 50,
     },
     {
-      id: 'cloud-data-engineer-exam',
+      id: 'cloud-engineer-exam',
       title: 'Proffesional Data Engineer',
       description: 'Professional Data Engineer Certification Practice Exam',
       duration: '2 hours',

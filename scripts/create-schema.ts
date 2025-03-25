@@ -142,7 +142,13 @@ async function createSchema(): Promise<void> {
         completedExams: ['cloud-digital-leader-exam'],
         score: 90,
       },
-      settings: { notificationsEnabled: true, darkMode: false },
+      settings: {
+        notificationsEnabled: true,
+        darkMode: false,
+        emailUpdates: true,
+        syncData: true,
+        soundEffects: true,
+      },
     };
     await userService.createOrUpdateUser(user);
     console.log('User created:', user.uid);

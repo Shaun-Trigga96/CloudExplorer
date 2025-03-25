@@ -458,6 +458,63 @@ app.get('/module/:id/sections', async (req, res, next) => {
   }
 });
 
+// Get user settings
+app.get('/user/:userId/settings', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    console.log('GET /user/:userId/settings - User ID:', userId);
+
+    if (!userId) {
+      throw new AppError('User ID is required', 400, 'MISSING_USER_ID');
+    }
+
+    const userDoc = await db.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      console.log('GET /user/:userId/settings - User not found');
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    const userData = userDoc.data();
+    const settings = userData.settings || {
+      notificationsEnabled: true,
+      darkMode: false,
+      emailUpdates: true,
+      syncData: true,
+      soundEffects: true,
+    };
+
+    console.log('GET /user/:userId/settings - Settings:', settings);
+    res.json({ settings });
+  } catch (error) {
+    console.error('GET /user/:userId/settings - Error:', error);
+    next(error);
+  }
+});
+// Update user settings
+app.put('/user/:userId/settings', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { settings } = req.body;
+
+    if (!userId) {
+      throw new AppError('User ID is required', 400, 'MISSING_USER_ID');
+    }
+
+    if (!settings || typeof settings !== 'object') {
+      throw new AppError('Invalid settings data', 400, 'INVALID_SETTINGS_DATA');
+    }
+
+    const userRef = db.collection('users').doc(userId);
+    await userRef.update({ settings });
+
+    res.json({ message: 'Settings updated successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
 //Create reusable controller functions
 const controllers = {
   // Generate quiz questions using Hugging Face API
