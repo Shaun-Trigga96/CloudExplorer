@@ -5,8 +5,9 @@ import Markdown from 'react-native-markdown-display';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from 'react-native-paper';
 import iconMap from '../utils/iconMap';
+import {REACT_APP_BASE_URL} from '@env';
 
-const BASE_URL: string = 'http://10.0.2.2:5000'; // Android Emulator
+const BASE_URL = REACT_APP_BASE_URL; 
 
 // This tracks scroll progress and visibility of content
 const useIsContentRead = (sectionRefs: React.RefObject<View>[]) => {

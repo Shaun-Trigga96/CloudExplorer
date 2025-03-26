@@ -3,6 +3,7 @@ import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+//import { userInitializationService } from './UserInitializationService';
 
 interface GoogleSignInConfig {
   webClientId: string;
@@ -13,6 +14,7 @@ interface UserData {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
+  bio: string | null;
   createdAt: FirebaseFirestoreTypes.FieldValue;
   learningProgress: {
     completedModules: Record<string, any>;
@@ -23,6 +25,9 @@ interface UserData {
   settings: {
     notificationsEnabled: boolean;
     darkMode: boolean;
+    emailUpdates: boolean,
+    syncData: boolean,
+    soundEffects: boolean,
   };
 }
 
@@ -115,6 +120,7 @@ export class GoogleAuthService {
         email: userCredential.user.email,
         displayName: userCredential.user.displayName,
         photoURL: userCredential.user.photoURL,
+        bio: null,
         createdAt: firestore.FieldValue.serverTimestamp(),
         learningProgress: {
           completedModules: {},
@@ -123,8 +129,11 @@ export class GoogleAuthService {
           score: 0,
         },
         settings: {
-          notificationsEnabled: true,
+          notificationsEnabled: false,
           darkMode: false,
+          emailUpdates: false,
+          syncData: false,
+          soundEffects: false,
         },
       };
 
@@ -133,6 +142,16 @@ export class GoogleAuthService {
         .collection('users')
         .doc(userCredential.user.uid)
         .set(userData);
+
+        // NEW: Initialize user's learning path
+        //await userInitializationService.initializeUserLearningPath(userCredential.user.uid);
+      
+        // NEW: Assign initial quizzes
+       // await userInitializationService.assignInitialQuizzes(userCredential.user.uid);
+        
+        // NEW: Create welcome notifications
+       // await userInitializationService.createInitialNotifications(userCredential.user.uid);
+  
 
       console.log('User profile created successfully');
     } catch (error) {

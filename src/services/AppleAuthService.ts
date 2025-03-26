@@ -3,10 +3,12 @@ import firestore from '@react-native-firebase/firestore';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import { appleAuth, AppleRequestResponseFullName } from '@invertase/react-native-apple-authentication';
+//import { userInitializationService } from './UserInitializationService';
 
 interface UserData {
   userId: string;
   email: string | null;
+  bio: string | null;
   displayName: string | null;
   photoURL: string | null;
   createdAt: FirebaseFirestoreTypes.FieldValue;
@@ -19,6 +21,9 @@ interface UserData {
   settings: {
     notificationsEnabled: boolean;
     darkMode: boolean;
+    emailUpdates: boolean,
+    syncData: boolean,
+    soundEffects: boolean,
   };
 }
 
@@ -123,6 +128,7 @@ export class AppleAuthService {
         userId: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: displayName,
+        bio: null,       
         photoURL: userCredential.user.photoURL,
         createdAt: firestore.FieldValue.serverTimestamp(),
         learningProgress: {
@@ -134,8 +140,20 @@ export class AppleAuthService {
           settings: {
           notificationsEnabled: true,
           darkMode: false,
+          emailUpdates: false,
+          syncData: false,
+          soundEffects: false,
         },
       };
+
+        // NEW: Initialize user's learning path
+       // await userInitializationService.initializeUserLearningPath(userCredential.user.uid);
+      
+        // NEW: Assign initial quizzes
+       // await userInitializationService.assignInitialQuizzes(userCredential.user.uid);
+        
+        // NEW: Create welcome notifications
+       // await userInitializationService.createInitialNotifications(userCredential.user.uid);
 
       console.log('Saving user profile to Firestore');
       await firestore()

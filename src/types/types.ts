@@ -14,6 +14,7 @@ export interface Exam {
 
   export interface User {
     uid: string;
+    bio: string;
     email: string;
     displayName: string;
     photoURL?: string;

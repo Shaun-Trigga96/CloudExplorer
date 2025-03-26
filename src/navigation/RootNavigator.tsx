@@ -6,6 +6,7 @@ import TabNavigator from './TabNavigator';
 import ModuleDetailScreen from '../screens/ModuleDetailScreen';
 import QuizzesDetailScreen from '../screens/QuizzesDetailScreen';
 import ExamDetailsScreen from '../screens/ExamDetailsScreen';
+import DashboardScreen from './../screens/DashboardScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -19,6 +20,8 @@ export type RootStackParamList = {
   SettingsScreen: undefined;
   CertificationsScreen: undefined;
   ProfileScreen: undefined;
+  DashboardScreen: undefined;
+  ExamsScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -42,6 +45,7 @@ const RootNavigator = () => {
       <Stack.Screen name="SettingsScreen" component={TabNavigator} />
       <Stack.Screen name="CertificationsScreen" component={TabNavigator} />
       <Stack.Screen name="ProfileScreen" component={TabNavigator} />
+      <Stack.Screen name="DashboardScreen" component={DashboardScreen} />
     </Stack.Navigator>
   );
 }

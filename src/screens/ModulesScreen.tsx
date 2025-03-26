@@ -13,8 +13,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError } from 'axios';
+import {REACT_APP_BASE_URL} from '@env';
 
-const BASE_URL = 'http://10.0.2.2:5000';
+const BASE_URL = REACT_APP_BASE_URL; 
 
 interface Module {
   id: string;

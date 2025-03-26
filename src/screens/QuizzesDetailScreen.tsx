@@ -11,8 +11,9 @@ import {
 import axios, { AxiosError } from 'axios';
 import { Button, Card, Paragraph, Title, IconButton } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import {REACT_APP_BASE_URL} from '@env';
 
-const BASE_URL: string = 'http://10.0.2.2:5000';
+const BASE_URL = REACT_APP_BASE_URL; 
 
 interface Answer {
   letter: string;

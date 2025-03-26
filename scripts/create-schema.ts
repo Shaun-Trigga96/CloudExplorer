@@ -130,11 +130,12 @@ async function createSchema(): Promise<void> {
     console.log('Creating sample users...');
     // User
     const user: User = {
-      uid: '1BOBpJ97HlcCsdtK3LvUBpWTIvG3',
+      uid: 'dk22HkpH9ZOpn1tq6gmJdCVTSZa2',
       email: 'thabisomatsaba96@gmail.com',
       displayName: 'Thabiso Matsaba',
       photoURL: 'https://lh3.googleusercontent.com/a/ACg8ocJhbM695m1bCoCEFYBB...',
       createdAt: new Date('2025-02-23T15:03:09Z'),
+      bio: 'Cloud enthusiast and aspiring cloud architect. Always learning!',
       lastLogin: new Date('2025-03-04T10:00:00Z'),
       learningProgress: {
         completedModules: ['compute-engine'],
@@ -152,6 +153,32 @@ async function createSchema(): Promise<void> {
     };
     await userService.createOrUpdateUser(user);
     console.log('User created:', user.uid);
+
+     // Create certifications subcollection for the user
+     const certifications = [
+      {
+        id: 'cert1',
+        title: 'Google Cloud Certified - Cloud Digital Leader',
+        dateEarned: new Date('2025-03-10T10:00:00Z'),
+        issuer: 'Google',
+        description: 'This certification demonstrates an understanding of basic cloud concepts and Google Cloud services.',
+      },
+      {
+        id: 'cert2',
+        title: 'AWS Certified Cloud Practitioner',
+        dateEarned: new Date('2024-11-15T10:00:00Z'),
+        issuer: 'AWS',
+        description: 'This certification validates the ability to define what the AWS Cloud is and the basic global infrastructure.',
+      },
+    ];
+
+    const service = await firestoreService;
+    const userRef = service.getCollection('users').doc(user.uid);
+    for (const cert of certifications) {
+      await userRef.collection('certifications').doc(cert.id).set(cert);
+      console.log(`Certification created for user ${user.uid}:`, cert.id);
+    }
+
 
     console.log('Creating progress data...');
     // Progress

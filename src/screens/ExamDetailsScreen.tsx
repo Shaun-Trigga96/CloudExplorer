@@ -8,9 +8,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {REACT_APP_BASE_URL} from '@env';
 
-// Update to your actual backend URL (consider using environment variables in production)
-const BASE_URL = 'http://10.0.2.2:5000';
+const BASE_URL = REACT_APP_BASE_URL; 
 
 // Add timeout and retry functionality to axios
 axios.defaults.timeout = 10000; // 10 seconds timeout

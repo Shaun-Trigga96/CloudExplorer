@@ -12,14 +12,13 @@ const rateLimit = require('express-rate-limit');
 
 dotenv.config({path: path.resolve(__dirname, '..', '.env')});
 
-
 // Centralized Error Handling Class
 class AppError extends Error {
   constructor(message, statusCode, code = null) {
     super(message);
     this.statusCode = statusCode;
     this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
-    this.isOperational = true;  // Distinguish operational errors from programming errors
+    this.isOperational = true; // Distinguish operational errors from programming errors
     this.code = code; // Add an optional error code
 
     Error.captureStackTrace(this, this.constructor);
@@ -35,57 +34,57 @@ const errorHandler = (err, req, res, next) => {
   let message = err.message || 'Internal server error';
   let details = {};
 
+  if (err.isOperational) {
+    // Use the values from the AppError
+    statusCode = err.statusCode;
+    message = err.message;
+  } else {
+    // Handle non-operational errors (programming errors, etc.)
+    // In a production environment, you might not want to expose detailed error messages.
+    message = 'Internal Server Error'; // Generic message for non-operational errors.
+    // Consider more robust logging here, possibly sending to an error tracking service.
+  }
 
-   if (err.isOperational) {
-        // Use the values from the AppError
-        statusCode = err.statusCode;
-        message = err.message;
-   } else {
-     // Handle non-operational errors (programming errors, etc.)
-     // In a production environment, you might not want to expose detailed error messages.
-     message = 'Internal Server Error'; // Generic message for non-operational errors.
-     // Consider more robust logging here, possibly sending to an error tracking service.
-   }
+  // Handle specific error codes from Google APIs, Hugging Face, etc.
+  if (
+    err.code === '8' ||
+    (err.message && err.message.includes('Quota exceeded'))
+  ) {
+    statusCode = 429; // Too Many Requests
+    message = 'API Quota Exceeded. Please try again later.';
+  } else if (err.message && err.message.includes('Document not found')) {
+    statusCode = 404;
+    message = 'Google doc not found.';
+  } else if (err.code === 404) {
+    statusCode = 404;
+    message = 'Not Found';
+  } else if (err.code === 403) {
+    statusCode = 403;
+    message = 'Forbidden';
+  } else if (err.message && err.message.includes('Network')) {
+    statusCode = 503; // Service Unavailable
+    message = 'Network error. Please try again.';
+  } else if (err.name === 'AbortError') {
+    statusCode = 504;
+    message = 'Request timed out';
+  }
 
-    // Handle specific error codes from Google APIs, Hugging Face, etc.
-    if (err.code === '8' || (err.message && err.message.includes('Quota exceeded'))) {
-        statusCode = 429; // Too Many Requests
-        message = 'API Quota Exceeded. Please try again later.';
-    } else if(err.message && err.message.includes('Document not found')){
-        statusCode = 404;
-        message = 'Google doc not found.';
-    } else if (err.code === 404) {
-        statusCode = 404;
-        message = 'Not Found';
-    } else if (err.code === 403) {
-        statusCode = 403;
-        message = 'Forbidden';
-    }else if (err.message && err.message.includes('Network')) {
-      statusCode = 503; // Service Unavailable
-      message = 'Network error. Please try again.';
-    } else if (err.name === 'AbortError') {
-         statusCode = 504;
-         message = 'Request timed out';
+  // Add detailed response in development for debugging
+  if (process.env.NODE_ENV === 'development') {
+    details.stack = err.stack;
+    if (err.response && err.response.data) {
+      details.apiResponse = err.response.data; // Include API response details if available
     }
-
-    // Add detailed response in development for debugging
-    if (process.env.NODE_ENV === 'development') {
-        details.stack = err.stack;
-        if (err.response && err.response.data) {
-          details.apiResponse = err.response.data; // Include API response details if available
-        }
-        if (err.errors) {
-            details.errors = err.errors; // Include validation errors, if any.
-        }
+    if (err.errors) {
+      details.errors = err.errors; // Include validation errors, if any.
     }
+  }
 
-    res.status(statusCode).json({
-        error: message,
-        details: Object.keys(details).length > 0 ? details : undefined, // Only include details if present
-    });
+  res.status(statusCode).json({
+    error: message,
+    details: Object.keys(details).length > 0 ? details : undefined, // Only include details if present
+  });
 };
-
-
 
 const hfApiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
@@ -103,20 +102,24 @@ app.use(cors({origin: '*'})); //  Allow all origins (for development) -  Restric
 app.use(express.json());
 app.use(morgan('combined')); // Use 'tiny' or 'combined' in production for less verbose logging
 
-
 // Validate credentials path and initialize Firebase
 if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
   throw new Error('FIREBASE_SERVICE_ACCOUNT_PATH is not defined in .env');
 }
-const absoluteCredentialsPath = path.resolve(__dirname, process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+const absoluteCredentialsPath = path.resolve(
+  __dirname,
+  process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
+);
 console.log('Loading credentials from:', absoluteCredentialsPath);
 
 try {
-    const credentials = require(absoluteCredentialsPath);
-    admin.initializeApp({ credential: admin.credential.cert(credentials) });
+  const credentials = require(absoluteCredentialsPath);
+  admin.initializeApp({credential: admin.credential.cert(credentials)});
 } catch (error) {
-    console.error('Error initializing Firebase Admin SDK:', error);
-    throw new Error('Failed to initialize Firebase. Check your service account configuration.');  // Critical: Halt if Firebase fails.
+  console.error('Error initializing Firebase Admin SDK:', error);
+  throw new Error(
+    'Failed to initialize Firebase. Check your service account configuration.',
+  ); // Critical: Halt if Firebase fails.
 }
 
 const db = admin.firestore();
@@ -134,15 +137,19 @@ async function authenticateGoogleDocs() {
   }
 
   try {
-      const auth = new google.auth.GoogleAuth({
-          credentials: require(absoluteCredentialsPath), // Use the resolved path
-          scopes: SCOPES,
-      });
-      authClient = await auth.getClient();
-      return authClient;
+    const auth = new google.auth.GoogleAuth({
+      credentials: require(absoluteCredentialsPath), // Use the resolved path
+      scopes: SCOPES,
+    });
+    authClient = await auth.getClient();
+    return authClient;
   } catch (error) {
-      console.error('Error authenticating with Google:', error);
-      throw new AppError('Failed to authenticate with Google APIs.', 500, 'GOOGLE_AUTH_ERROR'); // Use AppError
+    console.error('Error authenticating with Google:', error);
+    throw new AppError(
+      'Failed to authenticate with Google APIs.',
+      500,
+      'GOOGLE_AUTH_ERROR',
+    ); // Use AppError
   }
 }
 
@@ -151,44 +158,48 @@ const serverTimestamp = () => admin.firestore.FieldValue.serverTimestamp();
 
 // Input Validation Middleware (Example - can be expanded)
 const validateModuleInput = (req, res, next) => {
-    const { moduleId, title } = req.body;
-    const errors = {};
-
-    if (!moduleId || typeof moduleId !== 'string' || moduleId.trim() === '') {
-        errors.moduleId = 'Module ID is required and must be a non-empty string.';
-    }
-    if (!title || typeof title !== 'string' || title.trim() === '') {
-        errors.title = 'Title is required and must be a non-empty string.';
-    }
-
-    if (Object.keys(errors).length > 0) {
-        return next(new AppError('Validation Error', 400, 'VALIDATION_ERROR', errors));
-    }
-
-    next();
-};
-// Validation for exams
-const validateExamInput = (req, res, next) => {
-  const {examId, title, description} = req.body;  //examID
+  const {moduleId, title} = req.body;
   const errors = {};
 
-  if (!examId || typeof examId !== 'string' || examId.trim() === '') {
-      errors.examId = 'Exam ID is required and must be a non-empty string.';
-    }
-  if (!title || typeof title !== 'string' || title.trim() === '') {
-  errors.title = 'Title is required and must be a non-empty string.';
+  if (!moduleId || typeof moduleId !== 'string' || moduleId.trim() === '') {
+    errors.moduleId = 'Module ID is required and must be a non-empty string.';
   }
-      if (description && typeof description !== 'string') { // Optional description check
-          errors.description = 'Description must be a string.';
-      }
+  if (!title || typeof title !== 'string' || title.trim() === '') {
+    errors.title = 'Title is required and must be a non-empty string.';
+  }
 
   if (Object.keys(errors).length > 0) {
-   return next(new AppError('Validation Error', 400, 'VALIDATION_ERROR', errors));
+    return next(
+      new AppError('Validation Error', 400, 'VALIDATION_ERROR', errors),
+    );
   }
 
   next();
-  };
+};
+// Validation for exams
+const validateExamInput = (req, res, next) => {
+  const {examId, title, description} = req.body; //examID
+  const errors = {};
 
+  if (!examId || typeof examId !== 'string' || examId.trim() === '') {
+    errors.examId = 'Exam ID is required and must be a non-empty string.';
+  }
+  if (!title || typeof title !== 'string' || title.trim() === '') {
+    errors.title = 'Title is required and must be a non-empty string.';
+  }
+  if (description && typeof description !== 'string') {
+    // Optional description check
+    errors.description = 'Description must be a string.';
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return next(
+      new AppError('Validation Error', 400, 'VALIDATION_ERROR', errors),
+    );
+  }
+
+  next();
+};
 
 app.post('/user/:userId/module/start', async (req, res, next) => {
   try {
@@ -208,7 +219,7 @@ app.post('/user/:userId/module/start', async (req, res, next) => {
     // Check if user exists.
     const userDoc = await userRef.get();
     if (!userDoc.exists) {
-        throw new AppError('User not found', 404);
+      throw new AppError('User not found', 404);
     }
 
     await userRef.collection('progress').doc(`${moduleId}_start`).set({
@@ -223,10 +234,9 @@ app.post('/user/:userId/module/start', async (req, res, next) => {
   }
 });
 
-
-
 // Create a Google Doc and save to Firestore
-app.post('/create-doc', validateModuleInput, async (req, res, next) => {  // Added Input Validation
+app.post('/create-doc', validateModuleInput, async (req, res, next) => {
+  // Added Input Validation
   try {
     const {moduleId, title, content = 'No content provided'} = req.body;
     const auth = await authenticateGoogleDocs();
@@ -235,8 +245,9 @@ app.post('/create-doc', validateModuleInput, async (req, res, next) => {  // Add
     const document = await docs.documents.create({requestBody: {title}});
     const documentId = document.data.documentId;
 
-    if (!documentId) { // Simplified check (already validated type in validateModuleInput)
-        throw new AppError('No documentId returned', 500, 'DOC_CREATION_FAILED');
+    if (!documentId) {
+      // Simplified check (already validated type in validateModuleInput)
+      throw new AppError('No documentId returned', 500, 'DOC_CREATION_FAILED');
     }
     console.log('BatchUpdate params:', {documentId, content}); // Debug log
 
@@ -254,17 +265,22 @@ app.post('/create-doc', validateModuleInput, async (req, res, next) => {  // Add
     let docId = null;
 
     if (moduleId) {
-        collection = 'modules';
-        docId = moduleId;
+      collection = 'modules';
+      docId = moduleId;
     } else if (req.body.examId) {
-        collection = 'exams';
-        docId = req.body.examId;
+      collection = 'exams';
+      docId = req.body.examId;
     } else {
-        throw new AppError('Either moduleId or examId is required', 400, 'MISSING_ID');
+      throw new AppError(
+        'Either moduleId or examId is required',
+        400,
+        'MISSING_ID',
+      );
     }
-        await db.collection(collection).doc(docId).set({ content: docUrl }, { merge: true });
-
-
+    await db
+      .collection(collection)
+      .doc(docId)
+      .set({content: docUrl}, {merge: true});
 
     res.json({documentId, docUrl});
   } catch (error) {
@@ -275,41 +291,44 @@ app.post('/create-doc', validateModuleInput, async (req, res, next) => {  // Add
 // Create Exam route
 app.post('/create-exam', validateExamInput, async (req, res, next) => {
   try {
-    const { examId, title, content = 'No content provided' } = req.body;
+    const {examId, title, content = 'No content provided'} = req.body;
     const auth = await authenticateGoogleDocs();
-    const docs = google.docs({ version: 'v1', auth });
+    const docs = google.docs({version: 'v1', auth});
 
-    const document = await docs.documents.create({ requestBody: { title } });
+    const document = await docs.documents.create({requestBody: {title}});
     const documentId = document.data.documentId;
 
     if (!documentId) {
       throw new AppError('No documentId returned', 500, 'DOC_CREATION_FAILED');
     }
-    console.log('BatchUpdate params:', { documentId, content }); // Debug log
+    console.log('BatchUpdate params:', {documentId, content}); // Debug log
 
     await docs.documents.batchUpdate({
       documentId,
       requestBody: {
-        requests: [{ insertText: { location: { index: 1 }, text: content } }],
+        requests: [{insertText: {location: {index: 1}, text: content}}],
       },
     });
 
     const docUrl = `https://docs.google.com/document/d/${documentId}/edit`;
 
     // Save to Firestore
-    if (!examId) { // Correctly checking for examId BEFORE attempting to use it
+    if (!examId) {
+      // Correctly checking for examId BEFORE attempting to use it
       throw new AppError('examId is required', 400, 'MISSING_ID');
     }
 
-    await db.collection('exams').doc(examId).set({
-      title,
-      content: docUrl, // Save the URL, not the content itself
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
+    await db.collection('exams').doc(examId).set(
+      {
+        title,
+        content: docUrl, // Save the URL, not the content itself
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      {merge: true},
+    );
 
-    res.json({ examId, docUrl }); // Consistent response
-
+    res.json({examId, docUrl}); // Consistent response
   } catch (error) {
     next(error);
   }
@@ -321,7 +340,7 @@ app.get('/get-doc-content/:docId', async (req, res, next) => {
     const {docId} = req.params;
 
     if (!docId || typeof docId !== 'string' || docId.trim() === '') {
-        throw new AppError('Invalid document ID', 400, 'INVALID_DOC_ID'); // Use AppError
+      throw new AppError('Invalid document ID', 400, 'INVALID_DOC_ID'); // Use AppError
     }
 
     const auth = await authenticateGoogleDocs();
@@ -329,17 +348,19 @@ app.get('/get-doc-content/:docId', async (req, res, next) => {
 
     const response = await docs.documents.get({documentId: docId});
 
-      if (!response.data || !response.data.body) {
-        throw new AppError('Document content not found', 404, 'CONTENT_NOT_FOUND'); // Use AppError
+    if (!response.data || !response.data.body) {
+      throw new AppError(
+        'Document content not found',
+        404,
+        'CONTENT_NOT_FOUND',
+      ); // Use AppError
     }
-
 
     res.json(response.data.body?.content || []);
   } catch (error) {
-      next(error);
+    next(error);
   }
 });
-
 
 // List all modules with pagination
 app.get('/list-modules', async (req, res, next) => {
@@ -348,7 +369,7 @@ app.get('/list-modules', async (req, res, next) => {
     const parsedLimit = parseInt(limit, 10);
 
     if (isNaN(parsedLimit) || parsedLimit <= 0) {
-        throw new AppError('Invalid limit value', 400, 'INVALID_LIMIT');
+      throw new AppError('Invalid limit value', 400, 'INVALID_LIMIT');
     }
 
     let query = db
@@ -361,8 +382,12 @@ app.get('/list-modules', async (req, res, next) => {
       if (lastDoc.exists) {
         query = query.startAfter(lastDoc);
       } else {
-          // Handle the case where the lastId provided doesn't exist.
-          throw new AppError('Invalid lastId provided for pagination', 400, 'INVALID_LAST_ID');
+        // Handle the case where the lastId provided doesn't exist.
+        throw new AppError(
+          'Invalid lastId provided for pagination',
+          400,
+          'INVALID_LAST_ID',
+        );
       }
     }
 
@@ -375,7 +400,7 @@ app.get('/list-modules', async (req, res, next) => {
       duration: doc.data().duration,
       quizzes: doc.data().quizzes || [],
       prerequisites: doc.data().prerequisites || [],
-      createdAt: doc.data().createdAt?.toDate(),  // Convert Firestore Timestamp to Date
+      createdAt: doc.data().createdAt?.toDate(), // Convert Firestore Timestamp to Date
       updatedAt: doc.data().updatedAt?.toDate(),
     }));
 
@@ -393,13 +418,13 @@ app.get('/list-modules', async (req, res, next) => {
 app.get('/module/:id', async (req, res, next) => {
   try {
     const moduleId = req.params.id;
-    if(!moduleId || typeof moduleId !== 'string') {
-        throw new AppError('Invalid module ID', 400, 'INVALID_MODULE_ID');
+    if (!moduleId || typeof moduleId !== 'string') {
+      throw new AppError('Invalid module ID', 400, 'INVALID_MODULE_ID');
     }
     const moduleDoc = await db.collection('modules').doc(moduleId).get();
 
     if (!moduleDoc.exists) {
-        throw new AppError('Module not found', 404, 'MODULE_NOT_FOUND');
+      throw new AppError('Module not found', 404, 'MODULE_NOT_FOUND');
     }
 
     const moduleData = moduleDoc.data();
@@ -419,19 +444,18 @@ app.get('/module/:id', async (req, res, next) => {
   }
 });
 
-
 // Get sections for a module
 app.get('/module/:id/sections', async (req, res, next) => {
   try {
     const moduleId = req.params.id;
-    if(!moduleId || typeof moduleId !== 'string') {
-        throw new AppError('Invalid module ID', 400, 'INVALID_MODULE_ID');
+    if (!moduleId || typeof moduleId !== 'string') {
+      throw new AppError('Invalid module ID', 400, 'INVALID_MODULE_ID');
     }
 
-     // Check if the module exists
+    // Check if the module exists
     const moduleDoc = await db.collection('modules').doc(moduleId).get();
-    if(!moduleDoc.exists){
-       throw new AppError('Module not found', 404, 'MODULE_NOT_FOUND');
+    if (!moduleDoc.exists) {
+      throw new AppError('Module not found', 404, 'MODULE_NOT_FOUND');
     }
 
     const sectionsSnapshot = await db
@@ -461,7 +485,7 @@ app.get('/module/:id/sections', async (req, res, next) => {
 // Get user settings
 app.get('/user/:userId/settings', async (req, res, next) => {
   try {
-    const { userId } = req.params;
+    const {userId} = req.params;
     console.log('GET /user/:userId/settings - User ID:', userId);
 
     if (!userId) {
@@ -477,15 +501,15 @@ app.get('/user/:userId/settings', async (req, res, next) => {
 
     const userData = userDoc.data();
     const settings = userData.settings || {
-      notificationsEnabled: true,
-      darkMode: false,
-      emailUpdates: true,
-      syncData: true,
-      soundEffects: true,
+      notificationsEnabled: userData.notificationsEnabled,
+      darkMode: userData.darkMode,
+      emailUpdates: userData.emailUpdates,
+      syncData: userData.syncData,
+      soundEffects: userData.soundEffects,
     };
 
     console.log('GET /user/:userId/settings - Settings:', settings);
-    res.json({ settings });
+    res.json({settings});
   } catch (error) {
     console.error('GET /user/:userId/settings - Error:', error);
     next(error);
@@ -494,8 +518,8 @@ app.get('/user/:userId/settings', async (req, res, next) => {
 // Update user settings
 app.put('/user/:userId/settings', async (req, res, next) => {
   try {
-    const { userId } = req.params;
-    const { settings } = req.body;
+    const {userId} = req.params;
+    const {settings} = req.body;
 
     if (!userId) {
       throw new AppError('User ID is required', 400, 'MISSING_USER_ID');
@@ -506,14 +530,157 @@ app.put('/user/:userId/settings', async (req, res, next) => {
     }
 
     const userRef = db.collection('users').doc(userId);
-    await userRef.update({ settings });
+    await userRef.update({settings});
 
-    res.json({ message: 'Settings updated successfully' });
+    res.json({message: 'Settings updated successfully'});
+  } catch (error) {
+    next(error);
+  }
+});
+app.get('/user/:userId/certifications', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      throw new AppError('User ID is required', 400, 'MISSING_USER_ID');
+    }
+
+    const userDoc = await db.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    const certificationsSnapshot = await db
+      .collection('users')
+      .doc(userId)
+      .collection('certifications')
+      .get();
+    const certifications = certificationsSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    res.json({ certifications });
+  } catch (error) {
+    next(error);
+  }
+});
+// Middleware to validate Firebase Storage URLs
+const isValidFirebaseStorageUrl = (url) => {
+  return url.includes('firebasestorage.googleapis.com') || 
+         url.startsWith('https://storage.googleapis.com/');
+};
+
+// Route to fetch profile image with multiple fallback mechanisms
+app.get('/user/:userId/profile-image', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const userRef = admin.firestore().collection('users').doc(userId);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    const userData = userDoc.data();
+    const photoURL = userData?.photoURL;
+
+    // Default placeholder image URL
+    const DEFAULT_PROFILE_IMAGE = 'https://storage.googleapis.com/your-bucket/default-profile.png';
+
+    // No photo URL scenario
+    if (!photoURL) {
+      return res.redirect(DEFAULT_PROFILE_IMAGE);
+    }
+
+    // Validate Firebase Storage URL
+    if (!isValidFirebaseStorageUrl(photoURL)) {
+      console.warn(`Invalid Firebase Storage URL: ${photoURL}`);
+      return res.redirect(DEFAULT_PROFILE_IMAGE);
+    }
+
+    try {
+      // Generate a signed URL for secure image retrieval
+      const bucket = admin.storage().bucket();
+      const [signedUrl] = await bucket
+        .file(photoURL.split('/o/')[1].split('?')[0])
+        .getSignedUrl({
+          version: 'v4',
+          action: 'read',
+          expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+        });
+
+      // Fetch the image with the signed URL
+      const imageResponse = await axios({
+        method: 'get',
+        url: signedUrl,
+        responseType: 'arraybuffer',
+        timeout: 5000, // 5-second timeout
+      });
+
+      res.set('Content-Type', imageResponse.headers['content-type'] || 'image/jpeg');
+      res.send(imageResponse.data);
+    } catch (fetchError) {
+      console.error('Image fetch error:', fetchError);
+      res.redirect(DEFAULT_PROFILE_IMAGE);
+    }
   } catch (error) {
     next(error);
   }
 });
 
+// Enhanced profile update route with image validation
+app.put('/user/:userId/profile', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { photoURL, displayName, bio } = req.body;
+
+    if (!userId) {
+      throw new AppError('User ID is required', 400, 'MISSING_USER_ID');
+    }
+
+    const userRef = admin.firestore().collection('users').doc(userId);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    // Validate photoURL if provided
+    const updateData = {};
+    if (photoURL) {
+      if (!isValidFirebaseStorageUrl(photoURL)) {
+        throw new AppError('Invalid photo URL', 400, 'INVALID_PHOTO_URL');
+      }
+      updateData.photoURL = photoURL;
+    }
+
+    // Optional field updates
+    if (displayName) updateData.displayName = displayName;
+    if (bio) updateData.bio = bio;
+
+    // Perform atomic update
+    await userRef.update(updateData);
+
+    // Fetch and return updated profile
+    const updatedUserDoc = await userRef.get();
+    const updatedUserData = updatedUserDoc.data();
+
+    res.json({
+      message: 'Profile updated successfully',
+      profile: {
+        uid: updatedUserData?.uid,
+        displayName: updatedUserData?.displayName,
+        email: updatedUserData?.email,
+        photoURL: updatedUserData?.photoURL,
+        bio: updatedUserData?.bio,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 //Create reusable controller functions
 const controllers = {
@@ -527,7 +694,7 @@ const controllers = {
       } = req.body;
 
       if (!moduleId) {
-        return res.status(400).json({ message: 'moduleId is required.' });
+        return res.status(400).json({message: 'moduleId is required.'});
       }
 
       // Get module data
@@ -535,7 +702,7 @@ const controllers = {
       const moduleDoc = await moduleRef.get();
 
       if (!moduleDoc.exists) {
-        return res.status(404).json({ message: 'Module not found.' });
+        return res.status(404).json({message: 'Module not found.'});
       }
 
       const moduleData = moduleDoc.data();
@@ -570,22 +737,23 @@ const controllers = {
 
       // Make API call with retry and timeout
       const result = await executeWithRetry(
-        () => hf.textGeneration({
-          model: 'mistralai/Mistral-7B-Instruct-v0.2',
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 1200,
-            temperature: 0.7,
-          },
-        }),
+        () =>
+          hf.textGeneration({
+            model: 'mistralai/Mistral-7B-Instruct-v0.2',
+            inputs: prompt,
+            parameters: {
+              max_new_tokens: 1200,
+              temperature: 0.7,
+            },
+          }),
         3, // Max 3 retries
-        5000 // 5-second timeout
+        5000, // 5-second timeout
       );
 
       // Parse response
       const quizData = parseQuizFromAIResponse(result.generated_text);
 
-      res.json({ quiz: quizData });
+      res.json({quiz: quizData});
     } catch (error) {
       handleApiError(error, res, next);
     }
@@ -637,21 +805,23 @@ const controllers = {
       if (userDoc.exists) {
         // Update existing user
         batch.update(userRef, {
-          'learningProgress.completedQuizzes': admin.firestore.FieldValue.arrayUnion({
-            moduleId,
-            quizId: quizId || quizResultRef.id,
-            score: (score / totalQuestions) * 100,
-            completedAt: admin.firestore.Timestamp.fromDate(
-              typeof timestamp === 'string' ? new Date(timestamp) : timestamp
-            ),
-          }),
+          'learningProgress.completedQuizzes':
+            admin.firestore.FieldValue.arrayUnion({
+              moduleId,
+              quizId: quizId || quizResultRef.id,
+              score: (score / totalQuestions) * 100,
+              completedAt: admin.firestore.Timestamp.fromDate(
+                typeof timestamp === 'string' ? new Date(timestamp) : timestamp,
+              ),
+            }),
           lastActivity: admin.firestore.Timestamp.now(),
         });
 
         // Check if module should be marked as completed (70% passing threshold)
         if (score / totalQuestions >= 0.7) {
           batch.update(userRef, {
-            'learningProgress.completedModules': admin.firestore.FieldValue.arrayUnion(moduleId),
+            'learningProgress.completedModules':
+              admin.firestore.FieldValue.arrayUnion(moduleId),
           });
         }
       } else {
@@ -690,10 +860,10 @@ const controllers = {
   // Get quiz history for a user
   async getQuizHistory(req, res, next) {
     try {
-      const { userId } = req.params;
+      const {userId} = req.params;
 
       if (!userId) {
-        return res.status(400).json({ error: 'User ID is required' });
+        return res.status(400).json({error: 'User ID is required'});
       }
 
       const quizResultsSnapshot = await db
@@ -708,7 +878,7 @@ const controllers = {
         timestamp: doc.data().timestamp.toDate(),
       }));
 
-      res.json({ quizHistory });
+      res.json({quizHistory});
     } catch (error) {
       next(error);
     }
@@ -717,11 +887,11 @@ const controllers = {
   // Track module reading progress
   async trackProgress(req, res, next) {
     try {
-      const { userId } = req.params;
-      const { moduleId, action, timestamp } = req.body;
+      const {userId} = req.params;
+      const {moduleId, action, timestamp} = req.body;
 
       if (!userId || !moduleId || !action) {
-        return res.status(400).json({ error: 'Missing required fields' });
+        return res.status(400).json({error: 'Missing required fields'});
       }
 
       const userRef = db.collection('users').doc(userId);
@@ -730,24 +900,29 @@ const controllers = {
       if (action === 'start') {
         batch.set(userRef.collection('progress').doc(`${moduleId}_start`), {
           moduleId,
-          startedAt: timestamp ? new Date(timestamp) : admin.firestore.FieldValue.serverTimestamp(),
+          startedAt: timestamp
+            ? new Date(timestamp)
+            : admin.firestore.FieldValue.serverTimestamp(),
           status: 'in_progress',
         });
       } else if (action === 'complete') {
         batch.set(userRef.collection('progress').doc(`${moduleId}_content`), {
           moduleId,
-          completedAt: timestamp ? new Date(timestamp) : admin.firestore.FieldValue.serverTimestamp(),
+          completedAt: timestamp
+            ? new Date(timestamp)
+            : admin.firestore.FieldValue.serverTimestamp(),
           status: 'content_completed',
         });
 
         batch.update(userRef, {
-          'learningProgress.completedModules': admin.firestore.FieldValue.arrayUnion(moduleId),
+          'learningProgress.completedModules':
+            admin.firestore.FieldValue.arrayUnion(moduleId),
           lastActivity: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
 
       await batch.commit();
-      res.status(200).json({ success: true });
+      res.status(200).json({success: true});
     } catch (error) {
       next(error);
     }
@@ -756,10 +931,10 @@ const controllers = {
   // Get user progress
   async getUserProgress(req, res, next) {
     try {
-      const { userId } = req.params;
+      const {userId} = req.params;
 
       if (!userId) {
-        return res.status(400).json({ error: 'User ID is required' });
+        return res.status(400).json({error: 'User ID is required'});
       }
 
       // Get all data in parallel for better performance
@@ -774,13 +949,21 @@ const controllers = {
         db.collection('users').doc(userId).get(),
         db.collection('users').doc(userId).collection('progress').get(),
         db.collection('modules').get(),
-        db.collection('quizResults').where('userId', '==', userId).orderBy('timestamp', 'desc').get(),
-        db.collection('examResults').where('userId', '==', userId).orderBy('timestamp', 'desc').get(),
+        db
+          .collection('quizResults')
+          .where('userId', '==', userId)
+          .orderBy('timestamp', 'desc')
+          .get(),
+        db
+          .collection('examResults')
+          .where('userId', '==', userId)
+          .orderBy('timestamp', 'desc')
+          .get(),
         db.collection('exams').get(),
       ]);
 
       if (!userDoc.exists) {
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(404).json({error: 'User not found'});
       }
 
       const userData = userDoc.data() || {};
@@ -802,8 +985,12 @@ const controllers = {
           score: data.score || 0,
           totalQuestions: data.totalQuestions || 0,
           status: data.status || '',
-          startedAt: data.startedAt ? data.startedAt.toDate().toISOString() : null,
-          completedAt: data.completedAt ? data.completedAt.toDate().toISOString() : null,
+          startedAt: data.startedAt
+            ? data.startedAt.toDate().toISOString()
+            : null,
+          completedAt: data.completedAt
+            ? data.completedAt.toDate().toISOString()
+            : null,
         };
       });
 
@@ -821,7 +1008,9 @@ const controllers = {
           score: data.score || 0,
           totalQuestions: data.totalQuestions || 0,
           percentage: data.percentage || 0,
-          timestamp: data.timestamp ? data.timestamp.toDate().toISOString() : null,
+          timestamp: data.timestamp
+            ? data.timestamp.toDate().toISOString()
+            : null,
         };
       });
 
@@ -833,7 +1022,9 @@ const controllers = {
           score: data.score || 0,
           totalQuestions: data.totalQuestions || 0,
           percentage: data.percentage || 0,
-          timestamp: data.timestamp ? data.timestamp.toDate().toISOString() : null,
+          timestamp: data.timestamp
+            ? data.timestamp.toDate().toISOString()
+            : null,
         };
       });
 
@@ -858,10 +1049,10 @@ const controllers = {
   // Complete exam
   async completeExam(req, res, next) {
     try {
-      const { userId } = req.params;
-      const { moduleId, examId, quizId, score } = req.body;
+      const {userId} = req.params;
+      const {moduleId, examId, quizId, score} = req.body;
 
-      await db.runTransaction(async (transaction) => {
+      await db.runTransaction(async transaction => {
         const userRef = db.collection('users').doc(userId);
         const userDoc = await transaction.get(userRef);
 
@@ -881,113 +1072,127 @@ const controllers = {
 
         // Update user document
         transaction.update(userRef, {
-          'learningProgress.completedExams': admin.firestore.FieldValue.arrayUnion(examId),
-          'learningProgress.completedModules': admin.firestore.FieldValue.arrayUnion(moduleId),
-          'learningProgress.completedQuizzes': admin.firestore.FieldValue.arrayUnion(quizId),
+          'learningProgress.completedExams':
+            admin.firestore.FieldValue.arrayUnion(examId),
+          'learningProgress.completedModules':
+            admin.firestore.FieldValue.arrayUnion(moduleId),
+          'learningProgress.completedQuizzes':
+            admin.firestore.FieldValue.arrayUnion(quizId),
           'learningProgress.score': admin.firestore.FieldValue.increment(score),
         });
 
         // Update module start status
-        const moduleStartRef = userRef.collection('progress').doc(`${moduleId}_start`);
+        const moduleStartRef = userRef
+          .collection('progress')
+          .doc(`${moduleId}_start`);
         transaction.update(moduleStartRef, {
           status: 'completed',
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       });
 
-      res.status(200).send({ message: 'Exam completed' });
+      res.status(200).send({message: 'Exam completed'});
     } catch (error) {
       next(error);
     }
   },
 
-    // Get exam progress for a user
-    async getExamProgress(req, res, next) {
-      try {
-        const { userId } = req.params;
+  // Get exam progress for a user
+  async getExamProgress(req, res, next) {
+    try {
+      const {userId} = req.params;
 
-        if (!userId) {
-          return res.status(400).json({ error: 'User ID is required' });
-        }
-
-        const examResultsSnapshot = await db
-          .collection('examResults')
-          .where('userId', '==', userId)
-          .orderBy('timestamp', 'desc')
-          .get();
-
-        const examProgress = examResultsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            examId: data.examId || '',
-            score: data.score || 0,
-            timestamp: data.timestamp ? data.timestamp.toDate().toISOString() : null,
-          };
-        });
-
-        res.json(examProgress);
-      } catch (error) {
-        next(error);
+      if (!userId) {
+        return res.status(400).json({error: 'User ID is required'});
       }
-    },
-        // Save exam results
-    async saveExamResult(req, res, next) {
-      try {
-        const { userId, examId, result } = req.body;
 
-        if (!userId || !examId || !result) {
-          return res.status(400).json({
-            error: 'Missing required fields',
-            message: 'userId, examId, and result are required',
-          });
-        }
-        const { totalQuestions, correctAnswers, score, isPassed, answeredQuestions } = result;
-        const percentage = (score).toFixed(1);
+      const examResultsSnapshot = await db
+        .collection('examResults')
+        .where('userId', '==', userId)
+        .orderBy('timestamp', 'desc')
+        .get();
 
-        const examResultRef = db.collection('examResults').doc();
-        const examResultData = {
-          userId,
-          examId,
-          totalQuestions,
-          score: correctAnswers,
-          percentage,
-          isPassed,
-          answeredQuestions,
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      const examProgress = examResultsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          examId: data.examId || '',
+          score: data.score || 0,
+          timestamp: data.timestamp
+            ? data.timestamp.toDate().toISOString()
+            : null,
         };
+      });
 
-        await examResultRef.set(examResultData);
+      res.json(examProgress);
+    } catch (error) {
+      next(error);
+    }
+  },
+  // Save exam results
+  async saveExamResult(req, res, next) {
+    try {
+      const {userId, examId, result} = req.body;
 
-        // Update user progress
-        const userRef = db.collection('users').doc(userId);
-        const userDoc = await userRef.get();
-
-        if (userDoc.exists) {
-          await userRef.update({
-            'learningProgress.completedExams': admin.firestore.FieldValue.arrayUnion(examId),
-            lastActivity: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        } else {
-          await userRef.set({
-            userId,
-            completedExams: [examId],
-            lastActivity: admin.firestore.FieldValue.serverTimestamp(),
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        }
-
-        res.status(201).json({
-          success: true,
-          message: 'Exam result saved successfully',
-          resultId: examResultRef.id,
+      if (!userId || !examId || !result) {
+        return res.status(400).json({
+          error: 'Missing required fields',
+          message: 'userId, examId, and result are required',
         });
-      } catch (error) {
-        next(error);
       }
-    },
+      const {
+        totalQuestions,
+        correctAnswers,
+        score,
+        isPassed,
+        answeredQuestions,
+      } = result;
+      const percentage = score.toFixed(1);
 
-    // Generate exam
-    async generateExam(req, res, next) {
+      const examResultRef = db.collection('examResults').doc();
+      const examResultData = {
+        userId,
+        examId,
+        totalQuestions,
+        score: correctAnswers,
+        percentage,
+        isPassed,
+        answeredQuestions,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await examResultRef.set(examResultData);
+
+      // Update user progress
+      const userRef = db.collection('users').doc(userId);
+      const userDoc = await userRef.get();
+
+      if (userDoc.exists) {
+        await userRef.update({
+          'learningProgress.completedExams':
+            admin.firestore.FieldValue.arrayUnion(examId),
+          lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        await userRef.set({
+          userId,
+          completedExams: [examId],
+          lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      res.status(201).json({
+        success: true,
+        message: 'Exam result saved successfully',
+        resultId: examResultRef.id,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Generate exam
+  async generateExam(req, res, next) {
     try {
       const {
         examId,
@@ -996,7 +1201,7 @@ const controllers = {
       } = req.body;
 
       if (!examId) {
-        return res.status(400).json({ message: 'examId is required.' });
+        return res.status(400).json({message: 'examId is required.'});
       }
 
       // Get exam data
@@ -1014,7 +1219,9 @@ const controllers = {
       const content = await getExamContent(examId);
 
       // Generate questions using Hugging Face API with retry mechanism
-      const prompt = `Generate ${numberOfQuestions} questions for a ${examData.title} certification exam. 
+      const prompt = `Generate ${numberOfQuestions} questions for a ${
+        examData.title
+      } certification exam. 
         The questions should cover the following topics: ${content}
         The questions should be only of the types: ${questionTypes.join(', ')}.
         Format the questions and answers as follows:
@@ -1035,22 +1242,23 @@ const controllers = {
         Return only the questions and answers with explanations, do not add any extra information.`;
 
       const result = await executeWithRetry(
-        () => hf.textGeneration({
-          model: 'mistralai/Mistral-7B-Instruct-v0.2',
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 4000,
-            temperature: 0.7,
-          },
-        }),
+        () =>
+          hf.textGeneration({
+            model: 'mistralai/Mistral-7B-Instruct-v0.2',
+            inputs: prompt,
+            parameters: {
+              max_new_tokens: 4000,
+              temperature: 0.7,
+            },
+          }),
         3, // Max 3 retries
-        20000 // 20-second timeout for larger content
+        20000, // 20-second timeout for larger content
       );
 
       // Parse questions
       const questions = parseQuizFromAIResponse(result.generated_text);
 
-      res.json({ questions });
+      res.json({questions});
     } catch (error) {
       handleApiError(error, res, next);
     }
@@ -1058,7 +1266,7 @@ const controllers = {
 
   // Health check
   healthCheck(req, res) {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.status(200).json({status: 'ok', timestamp: new Date().toISOString()});
   },
 };
 
@@ -1068,12 +1276,16 @@ function parseQuizFromAIResponse(text) {
 
   // First try to identify individual questions in the text
   // This pattern looks for numbered questions or "Question:" prefix
-  const questionBlocks = text.split(/(?:\n|\r\n)\s*(?:(?:\d+\.)|(?:Question:))\s*/i)
+  const questionBlocks = text
+    .split(/(?:\n|\r\n)\s*(?:(?:\d+\.)|(?:Question:))\s*/i)
     .filter(block => block && block.trim().length > 0);
 
   questionBlocks.forEach((block, questionIndex) => {
     try {
-      const lines = block.trim().split(/\n|\r\n/).filter(line => line.trim());
+      const lines = block
+        .trim()
+        .split(/\n|\r\n/)
+        .filter(line => line.trim());
 
       // Extract the question text (first line or after "Question:" prefix)
       let questionText = lines[0].trim();
@@ -1083,7 +1295,9 @@ function parseQuizFromAIResponse(text) {
         .replace(/\*\*(.*?)\*\*/g, '$1')
         .trim();
 
-      if (!questionText) {return;} // Skip if no question text found
+      if (!questionText) {
+        return;
+      } // Skip if no question text found
 
       // Initialize question object
       const questionObj = {
@@ -1126,7 +1340,9 @@ function parseQuizFromAIResponse(text) {
         }
 
         // Check for correct answer
-        const correctMatch = line.match(/^(?:correct\s+answer|answer):\s*(.+)$/i);
+        const correctMatch = line.match(
+          /^(?:correct\s+answer|answer):\s*(.+)$/i,
+        );
         if (correctMatch) {
           let correctAnswer = correctMatch[1].trim();
 
@@ -1137,23 +1353,32 @@ function parseQuizFromAIResponse(text) {
           } else if (correctAnswer.match(/^[a-d][)\.]?\s+/i)) {
             // Answer with letter and formatting (e.g., "a) text")
             questionObj.correctAnswer = correctAnswer.charAt(0).toLowerCase();
-          } else if (correctAnswer.toLowerCase() === 'true' || correctAnswer.toLowerCase() === 'false') {
+          } else if (
+            correctAnswer.toLowerCase() === 'true' ||
+            correctAnswer.toLowerCase() === 'false'
+          ) {
             // True/False answer
             questionObj.correctAnswer = correctAnswer.toLowerCase();
           } else {
             // Try to extract letter from answer text if provided in various formats
-            const letterMatch = correctAnswer.match(/(?:option|answer)?\s*['"(]?([a-d])['")\.]?/i);
+            const letterMatch = correctAnswer.match(
+              /(?:option|answer)?\s*['"(]?([a-d])['")\.]?/i,
+            );
             if (letterMatch) {
               questionObj.correctAnswer = letterMatch[1].toLowerCase();
             } else {
-              console.warn(`Couldn't parse correct answer format: "${correctAnswer}"`);
+              console.warn(
+                `Couldn't parse correct answer format: "${correctAnswer}"`,
+              );
             }
           }
           continue;
         }
 
         // Check for explanation
-        const explanationMatch = line.match(/^(?:explanation|rationale|reason):\s*(.+)$/i);
+        const explanationMatch = line.match(
+          /^(?:explanation|rationale|reason):\s*(.+)$/i,
+        );
         if (explanationMatch) {
           questionObj.explanation = explanationMatch[1].trim();
           inExplanation = true;
@@ -1162,22 +1387,28 @@ function parseQuizFromAIResponse(text) {
       }
 
       // If it's a true/false question but no options were found, add them
-      if (questionObj.correctAnswer &&
-          (questionObj.correctAnswer.toLowerCase() === 'true' ||
-           questionObj.correctAnswer.toLowerCase() === 'false') &&
-          questionObj.answers.length === 0) {
-
+      if (
+        questionObj.correctAnswer &&
+        (questionObj.correctAnswer.toLowerCase() === 'true' ||
+          questionObj.correctAnswer.toLowerCase() === 'false') &&
+        questionObj.answers.length === 0
+      ) {
         questionObj.answers = [
-          { letter: 'true', answer: 'True', uniqueKey: `q${questionIndex}-true` },
-          { letter: 'false', answer: 'False', uniqueKey: `q${questionIndex}-false` },
+          {letter: 'true', answer: 'True', uniqueKey: `q${questionIndex}-true`},
+          {
+            letter: 'false',
+            answer: 'False',
+            uniqueKey: `q${questionIndex}-false`,
+          },
         ];
       }
 
       // Only add valid questions that have question text, some answers, and a correct answer
-      if (questionObj.question &&
-          questionObj.answers.length > 0 &&
-          questionObj.correctAnswer) {
-
+      if (
+        questionObj.question &&
+        questionObj.answers.length > 0 &&
+        questionObj.correctAnswer
+      ) {
         // Ensure explanation is not empty
         if (!questionObj.explanation) {
           questionObj.explanation = `The correct answer is ${questionObj.correctAnswer.toUpperCase()}.`;
@@ -1185,8 +1416,12 @@ function parseQuizFromAIResponse(text) {
 
         questions.push(questionObj);
       } else {
-        console.warn(`Skipping invalid question at index ${questionIndex}: missing required fields`);
-        console.warn(`Question text: ${questionObj.question.substring(0, 50)}...`);
+        console.warn(
+          `Skipping invalid question at index ${questionIndex}: missing required fields`,
+        );
+        console.warn(
+          `Question text: ${questionObj.question.substring(0, 50)}...`,
+        );
         console.warn(`Answers count: ${questionObj.answers.length}`);
         console.warn(`Correct answer: ${questionObj.correctAnswer}`);
       }
@@ -1198,10 +1433,13 @@ function parseQuizFromAIResponse(text) {
 
   // If we found no valid questions using the above approach, try alternate parsing
   if (questions.length === 0) {
-    console.warn('No questions found with primary parsing method, trying alternate approach');
+    console.warn(
+      'No questions found with primary parsing method, trying alternate approach',
+    );
 
     // Look for questions in the format "Question 1: ..." or "1. ..."
-    const altQuestionPattern = /(?:question\s+(\d+)[:.]\s*|^(\d+)[:.]\s+)(.+?)(?=(?:\n|\r\n)(?:question\s+\d+[:.]\s*|^\d+[:.]\s+|$))/gims;
+    const altQuestionPattern =
+      /(?:question\s+(\d+)[:.]\s*|^(\d+)[:.]\s+)(.+?)(?=(?:\n|\r\n)(?:question\s+\d+[:.]\s*|^\d+[:.]\s+|$))/gims;
 
     let match;
     let questionIndex = 0;
@@ -1210,7 +1448,9 @@ function parseQuizFromAIResponse(text) {
       try {
         const questionNum = match[1] || match[2] || questionIndex + 1;
         const questionBlock = match[0].trim();
-        const lines = questionBlock.split(/\n|\r\n/).filter(line => line.trim());
+        const lines = questionBlock
+          .split(/\n|\r\n/)
+          .filter(line => line.trim());
 
         // Extract question text
         let questionText = (match[3] || lines[0]).trim();
@@ -1219,7 +1459,9 @@ function parseQuizFromAIResponse(text) {
           .replace(/^\d+\.\s+/, '')
           .trim();
 
-        if (!questionText) {continue;}
+        if (!questionText) {
+          continue;
+        }
 
         // Similar processing as above, but with some adaptations for alternate format
         const questionObj = {
@@ -1259,7 +1501,9 @@ function parseQuizFromAIResponse(text) {
             continue;
           }
 
-          const correctMatch = line.match(/^(?:correct\s+answer|answer):\s*(.+)$/i);
+          const correctMatch = line.match(
+            /^(?:correct\s+answer|answer):\s*(.+)$/i,
+          );
           if (correctMatch) {
             let correctAnswer = correctMatch[1].trim();
 
@@ -1267,10 +1511,15 @@ function parseQuizFromAIResponse(text) {
               questionObj.correctAnswer = correctAnswer.toLowerCase();
             } else if (correctAnswer.match(/^[a-d][)\.]?\s+/i)) {
               questionObj.correctAnswer = correctAnswer.charAt(0).toLowerCase();
-            } else if (correctAnswer.toLowerCase() === 'true' || correctAnswer.toLowerCase() === 'false') {
+            } else if (
+              correctAnswer.toLowerCase() === 'true' ||
+              correctAnswer.toLowerCase() === 'false'
+            ) {
               questionObj.correctAnswer = correctAnswer.toLowerCase();
             } else {
-              const letterMatch = correctAnswer.match(/(?:option|answer)?\s*['"(]?([a-d])['")\.]?/i);
+              const letterMatch = correctAnswer.match(
+                /(?:option|answer)?\s*['"(]?([a-d])['")\.]?/i,
+              );
               if (letterMatch) {
                 questionObj.correctAnswer = letterMatch[1].toLowerCase();
               }
@@ -1278,7 +1527,9 @@ function parseQuizFromAIResponse(text) {
             continue;
           }
 
-          const explanationMatch = line.match(/^(?:explanation|rationale|reason):\s*(.+)$/i);
+          const explanationMatch = line.match(
+            /^(?:explanation|rationale|reason):\s*(.+)$/i,
+          );
           if (explanationMatch) {
             questionObj.explanation = explanationMatch[1].trim();
             inExplanation = true;
@@ -1287,22 +1538,32 @@ function parseQuizFromAIResponse(text) {
         }
 
         // Handle True/False questions
-        if (questionObj.correctAnswer &&
-            (questionObj.correctAnswer.toLowerCase() === 'true' ||
-             questionObj.correctAnswer.toLowerCase() === 'false') &&
-            questionObj.answers.length === 0) {
-
+        if (
+          questionObj.correctAnswer &&
+          (questionObj.correctAnswer.toLowerCase() === 'true' ||
+            questionObj.correctAnswer.toLowerCase() === 'false') &&
+          questionObj.answers.length === 0
+        ) {
           questionObj.answers = [
-            { letter: 'true', answer: 'True', uniqueKey: `q${questionObj.id}-true` },
-            { letter: 'false', answer: 'False', uniqueKey: `q${questionObj.id}-false` },
+            {
+              letter: 'true',
+              answer: 'True',
+              uniqueKey: `q${questionObj.id}-true`,
+            },
+            {
+              letter: 'false',
+              answer: 'False',
+              uniqueKey: `q${questionObj.id}-false`,
+            },
           ];
         }
 
         // Validate and add question
-        if (questionObj.question &&
-            questionObj.answers.length > 0 &&
-            questionObj.correctAnswer) {
-
+        if (
+          questionObj.question &&
+          questionObj.answers.length > 0 &&
+          questionObj.correctAnswer
+        ) {
           if (!questionObj.explanation) {
             questionObj.explanation = `The correct answer is ${questionObj.correctAnswer.toUpperCase()}.`;
           }
@@ -1332,7 +1593,7 @@ function parseQuizFromAIResponse(text) {
   return questions;
 }
 
- async function getExamContent(examId) {
+async function getExamContent(examId) {
   console.log(`Fetching content for examId: ${examId}`);
 
   // 1. Try to get exam-specific content first
@@ -1346,7 +1607,9 @@ function parseQuizFromAIResponse(text) {
 
   // 2. If no exam-specific content, fall back to module content
   if (!content) {
-    console.warn(`No exam-specific content found for examId: ${examId}. Falling back to module content.`);
+    console.warn(
+      `No exam-specific content found for examId: ${examId}. Falling back to module content.`,
+    );
 
     // Fetch all modules
     const modulesSnapshot = await db.collection('modules').get();
@@ -1360,7 +1623,11 @@ function parseQuizFromAIResponse(text) {
       modulesSnapshot.forEach(doc => {
         content += doc.data().description + ' '; // Add module description
         // Fetch section content for each module
-        const sectionsPromise = db.collection('modules').doc(doc.id).collection('sections').get();
+        const sectionsPromise = db
+          .collection('modules')
+          .doc(doc.id)
+          .collection('sections')
+          .get();
         sectionPromises.push(sectionsPromise);
       });
 
@@ -1377,7 +1644,6 @@ function parseQuizFromAIResponse(text) {
   console.log(`Content found: ${content}`); // Log the content
   return content.trim();
 }
-
 
 // Utility function for retrying API calls with exponential backoff
 async function executeWithRetry(fn, maxRetries = 3, timeout = 10000) {
@@ -1401,7 +1667,11 @@ async function executeWithRetry(fn, maxRetries = 3, timeout = 10000) {
         error.message.includes('Too Many Requests') ||
         error.message.includes('timeout')
       ) {
-        console.log(`Attempt ${attempt + 1} failed, retrying in ${2 ** attempt * 1000}ms...`);
+        console.log(
+          `Attempt ${attempt + 1} failed, retrying in ${
+            2 ** attempt * 1000
+          }ms...`,
+        );
         await new Promise(resolve => setTimeout(resolve, 2 ** attempt * 1000)); // Exponential backoff
         continue;
       }
@@ -1421,11 +1691,11 @@ function handleApiError(error, res, next) {
   console.error('API Error Details:', error.response?.data || error.message); // Log more details
 
   if (error.name === 'AbortError' || error.message.includes('timeout')) {
-    return res.status(504).json({ error: 'Request timed out' });
+    return res.status(504).json({error: 'Request timed out'});
   }
 
   if (error.message && error.message.includes('auth')) {
-    return res.status(403).json({ error: 'Invalid Hugging Face API Key' });
+    return res.status(403).json({error: 'Invalid Hugging Face API Key'});
   }
 
   if (error.status === 429 || error.message.includes('RESOURCE_EXHAUSTED')) {

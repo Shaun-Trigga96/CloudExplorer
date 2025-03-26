@@ -12,6 +12,8 @@ import SettingsScreen from '../screens/SettingsScreen';
 import ModuleDetailScreen from '../screens/ModuleDetailScreen';
 import { RootStackParamList } from './RootNavigator';
 import QuizzesDetailScreen from '../screens/QuizzesDetailScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import CertificationsScreen from '../screens/CertificationsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator<RootStackParamList>(); // Create a StackNavigator
@@ -40,6 +42,46 @@ function QuizzesStackNavigator() {
     >
       <Stack.Screen name="QuizzesScreen" component={QuizzesScreen} />
       <Stack.Screen name="QuizzesDetail" component={QuizzesDetailScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Create a Stack Navigator for Dashboard
+function DashboardStackNavigator() {
+  return (
+    <Stack.Navigator
+        screenOptions={{
+        headerShown: false,
+        }}
+    >
+      <Stack.Screen name="DashboardScreen" component={DashboardScreen} />
+    </Stack.Navigator>
+  );
+}
+// Create a Stack Navigator for Exams
+function ExamsStackNavigator() {
+  return (
+    <Stack.Navigator
+        screenOptions={{
+        headerShown: false,
+        }}
+    >
+      <Stack.Screen name="ExamsScreen" component={ExamsScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Create a Stack Navigator for Settings
+function SettingsStackNavigator() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
+      <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+      <Stack.Screen name="CertificationsScreen" component={CertificationsScreen} />
     </Stack.Navigator>
   );
 }
@@ -92,7 +134,7 @@ const TabNavigator = () => {
     >
       <Tab.Screen
         name="Dashboard"
-        component={DashboardScreen}
+        component={DashboardStackNavigator}
         options={{ title: 'Overview' }}
       />
       <Tab.Screen
@@ -107,12 +149,12 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="Exams"
-        component={ExamsScreen}
+        component={ExamsStackNavigator}
         options={{ title: 'Certify' }}
       />
       <Tab.Screen
         name="Settings"
-        component={SettingsScreen}
+        component={SettingsStackNavigator}
         options={{ title: 'Profile' }}
       />
     </Tab.Navigator>
