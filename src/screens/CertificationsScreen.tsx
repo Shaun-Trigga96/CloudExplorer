@@ -55,7 +55,7 @@ const CertificationsScreen: FC = () => {
         return;
       }
 
-      const response = await axios.get(`${BASE_URL}/user/${storedUserId}/certifications`);
+      const response = await axios.get(`${BASE_URL}/api/v1/users/${storedUserId}/certifications`);
       const rawCertifications = response.data.certifications || [];
 
       // Convert Timestamp to string

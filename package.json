@@ -10,10 +10,10 @@
     "test": "jest",
     "start-push-images": "bash ./script-start-push-images.sh",
     "schema": "npm run clean && npm run build-schema && npm run run-schema",
-    "create-modules": "npm run clean && npm run build-schema && node --no-deprecation dist/scripts/create-modules.js",
+    "create-modules": "npm run clean && npm run build-schema && node --no-deprecation dist/scripts/create-schema-content-only.js",
     "clean": "if exist dist rmdir /s /q dist",
     "build-schema": "tsc -p tsconfig.node.json && xcopy /E /I /Y scripts\\content dist\\scripts\\content",
-    "run-schema": "node --no-deprecation dist/scripts/create-schema.js"
+    "run-schema": "node --no-deprecation dist/scripts/create-schema-content-only.js"
   },
   "dependencies": {
     "@huggingface/inference": "^3.5.2",

@@ -1,3 +1,4 @@
+//tsconfig.node.json
 {
     "compilerOptions": {
       "target": "es6",
@@ -11,6 +12,6 @@
       "baseUrl": "./",
       "resolveJsonModule": true
     },
-    "include": ["create-schema.ts", "src/**/*.ts", "scripts/**/*"],
+    "include": ["create-schema-content-only.ts", "src/**/*.ts", "scripts/**/*"],
     "exclude": ["node_modules", "dist"]
   }

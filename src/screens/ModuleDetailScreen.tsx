@@ -108,7 +108,7 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
   useEffect(() => {
     const fetchModuleData = async () => {
       try {
-        const moduleUrl = `${BASE_URL}/module/${moduleId}`;
+        const moduleUrl = `${BASE_URL}/api/v1/modules/{moduleId}`;
         console.log(`Attempting to fetch module from: ${moduleUrl}`);
         const moduleResponse = await axios.get(moduleUrl, { timeout: 10000 });
         setModule(moduleResponse.data);
@@ -120,7 +120,7 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
 
     const fetchSections = async () => {
       try {
-        const sectionsUrl = `${BASE_URL}/module/${moduleId}/sections`;
+        const sectionsUrl = `${BASE_URL}/api/v1/modules/{moduleId}/sections`;
         console.log(`Attempting to fetch sections from: ${sectionsUrl}`);
         const sectionsResponse = await axios.get(sectionsUrl, { timeout: 10000 });
         setSections(sectionsResponse.data);
@@ -191,7 +191,7 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
 
     try {
       // Mark the module as read in the backend
-      await axios.post(`${BASE_URL}/user/${userId}/progress`, {
+      await axios.post(`${BASE_URL}/api/v1/users/{userId}/progress`, {
         moduleId: moduleId,
         action: 'complete',
         timestamp: new Date().toISOString(),

@@ -76,11 +76,11 @@ const QuizzesDetailScreen = ({
       setLoading(true);
       try {
         const moduleResponse = await axios.get(
-          `${BASE_URL}/module/${moduleId}`,
+          `${BASE_URL}/api/v1/modules/{moduleId}`,
         );
         setModuleTitle(moduleResponse.data.title);
 
-        const quizResponse = await axios.post(`${BASE_URL}/generate-quiz`, {
+        const quizResponse = await axios.post(`${BASE_URL}/api/v1/quizzes/generate`, {
           moduleId,
         });
         const formattedQuiz = quizResponse.data.quiz
@@ -196,7 +196,7 @@ const QuizzesDetailScreen = ({
     try {
       const score = calculateScore();
       await AsyncStorage.getItem('userId');
-      await axios.post(`${BASE_URL}/save-quiz-result`, {
+      await axios.post(`${BASE_URL}/api/v1/quizzes/save-result`, {
         userId,
         moduleId,
         quizId: quiz || '',

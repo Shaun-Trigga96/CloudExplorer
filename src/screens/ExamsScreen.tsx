@@ -96,7 +96,7 @@ const ExamsScreen = () => {
       setLoading(true);
       setError(null);
 
-      const response = await axios.get(`${BASE_URL}/user/${userId}/exam-progress`); // Corrected endpoint
+      const response = await axios.get(`${BASE_URL}/api/v1/exams/progress/{userId}`); // Corrected endpoint
 
       if (response.data) {
         const attempts: Record<string, number> = {};

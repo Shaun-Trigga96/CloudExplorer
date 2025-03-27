@@ -70,7 +70,7 @@ const ProfileScreen: FC = () => {
           throw new Error('No authenticated user or stored user ID');
         }
 
-        const profileUrl = `${BASE_URL}/user/${storedUserId}/profile`;
+        const profileUrl = `${BASE_URL}/api/v1/users/${storedUserId}/profile`;
         console.log('Fetching profile from:', profileUrl);
         let profile: UserProfile;
 
@@ -199,7 +199,7 @@ const ProfileScreen: FC = () => {
         displayName: profileData.displayName,
         photoURL: profileData.photoURL,
       });
-      const response = await axios.put(`${BASE_URL}/user/${user.uid}/profile`, profileData);
+      const response = await axios.put(`${BASE_URL}/api/v1/users/${user.uid}/profile-image`, profileData);
       const updatedProfile = {
         ...response.data.profile,
         photoURL: profileData.photoURL,

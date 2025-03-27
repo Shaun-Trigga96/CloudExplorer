@@ -55,7 +55,7 @@ const SettingsScreen: FC = () => {
         auth().currentUser?.uid || (await AsyncStorage.getItem('userId'));
       if (!userId) throw new Error('User ID not found');
 
-      const response = await axios.get(`${BASE_URL}/user/${userId}/settings`);
+      const response = await axios.get(`${BASE_URL}/api/v1/users/{userId}/settings`);
       const settings = response.data.settings || {};
       setUserSettings({...userSettings, ...settings});
       await AsyncStorage.setItem('userSettings', JSON.stringify(settings));
@@ -80,7 +80,7 @@ const SettingsScreen: FC = () => {
         auth().currentUser?.uid || (await AsyncStorage.getItem('userId'));
       if (!userId) throw new Error('User ID not found');
 
-      await axios.put(`${BASE_URL}/user/${userId}/settings`, {
+      await axios.put(`${BASE_URL}/api/v1/users/{userId}/settings`, {
         settings: updatedSettings,
       });
       const newSettings = {...userSettings, ...updatedSettings};

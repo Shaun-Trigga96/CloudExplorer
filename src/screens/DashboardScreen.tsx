@@ -250,7 +250,7 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
           return;
         }
 
-        const response = await axios.get(`${BASE_URL}/user/${storedUserId}/progress`);
+        const response = await axios.get(`${BASE_URL}/api/v1/users/${storedUserId}/progress`);
         setLearningProgress(response.data.learningProgress || null);
         setProgress(response.data.progress || []);
         setModules(response.data.modules || []);

@@ -79,7 +79,7 @@ const ModulesScreen = () => {
     }
 
     try {
-      const response = await axios.get(`${BASE_URL}/user/${userId}/progress`);
+      const response = await axios.get(`${BASE_URL}/api/v1/users/{userId}/progress`);
       const { learningProgress, modules: apiModules } = response.data;
 
       const progress: Record<string, number> = {};

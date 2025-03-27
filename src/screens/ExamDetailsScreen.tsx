@@ -81,7 +81,7 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
       setError(null);
 
       // Fetch exam questions from your API
-      const response = await axios.post(`${BASE_URL}/generate-exam`, {
+      const response = await axios.post(`${BASE_URL}/api/v1/exams/generate`, {
         examId,
         numberOfQuestions: 25, // Typical for certification practice exams
         questionTypes: ['multiple choice', 'true or false'],
@@ -219,7 +219,7 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
 
       try {
         // Save exam results to your backend
-        const saveResultUrl = `${BASE_URL}/save-exam-result`;
+        const saveResultUrl = `${BASE_URL}/api/v1/exams/save-result`;
         console.log('processExamSubmission: Saving results to backend:', saveResultUrl, result);
         await axios.post(saveResultUrl, {
           examId,
