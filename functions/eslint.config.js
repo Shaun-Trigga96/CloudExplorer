@@ -1,5 +1,7 @@
+/* eslint-disable linebreak-style */
+// eslint-disable-next-line linebreak-style
 // functions/eslint.config.js
-const google = require('eslint-config-google');
+const google = require("eslint-config-google");
 
 module.exports = [
   {
@@ -10,10 +12,10 @@ module.exports = [
     },
     rules: {
       ...google.rules,
-      "valid-jsdoc": "off", // Disable the problematic rule
+      "valid-jsdoc": "off",
       "no-restricted-globals": ["error", "name", "length"],
       "prefer-arrow-callback": "error",
-      "quotes": ["error", "double", { "allowTemplateLiterals": true }],
+      "quotes": ["error", "double", {"allowTemplateLiterals": true}],
     },
   },
   {

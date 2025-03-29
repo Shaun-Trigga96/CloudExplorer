@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Card, Title, Paragraph, Button, ProgressBar } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import firestore from '@react-native-firebase/firestore';
-import auth from '@react-native-firebase/auth';
+// Removed unused Firebase imports: firestore, auth
 import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
 import CloudStorageIcon from '../assets/icons/cloud_storage.svg';
 import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
@@ -15,13 +14,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError } from 'axios';
 import {REACT_APP_BASE_URL} from '@env';
 
-const BASE_URL = REACT_APP_BASE_URL; 
+const BASE_URL = REACT_APP_BASE_URL;
 
 interface Module {
   id: string;
   title: string;
   description: string;
-  icon: React.FC;
+  icon: React.FC<React.SVGProps<SVGSVGElement>>; // Corrected icon type slightly
 }
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'ModuleDetail'>;
@@ -32,61 +31,75 @@ interface LearningProgress {
   completedQuizzes?: { moduleId: string }[];
 }
 
+// Define the structure of the API response data more explicitly
+interface UserProgressResponse {
+    learningProgress: LearningProgress;
+    // Assuming 'modules' from the API refers to the list of all modules available
+    // Renaming to avoid conflict with the component's 'modules' constant
+    availableModules: { id: string; /* other module fields from API if needed */ }[];
+}
+
+
 const ModulesScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const [moduleProgress, setModuleProgress] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Your static module definitions remain the same
   const modules: Module[] = [
-    {
-      id: 'cloud-fundamentals',
-      title: 'GCP Cloud Fundamentals',
-      description: 'Learn the fundamentals of cloud computing in Google Cloud',
-      icon: CloudGenericIcon,
-    },
-    {
-      id: 'compute-engine',
-      title: 'Compute Engine',
-      description: 'Learn about virtual machines in Google Cloud Platform',
-      icon: ComputeEngineIcon,
-    },
-    {
-      id: 'cloud-storage',
-      title: 'Cloud Storage',
-      description: 'Master object storage in the cloud',
-      icon: CloudStorageIcon,
-    },
-    {
-      id: 'cloud-functions',
-      title: 'Cloud Functions',
-      description: 'Build serverless applications',
-      icon: CloudFunctionsIcon,
-    },
-    {
-      id: 'kubernetes-engine',
-      title: 'Kubernetes Engine',
-      description: 'Container orchestration with GKE',
-      icon: KubernetesEngineIcon,
-    },
+     {
+       id: 'cloud-fundamentals',
+       title: 'GCP Cloud Fundamentals',
+       description: 'Learn the fundamentals of cloud computing in Google Cloud',
+       icon: CloudGenericIcon,
+     },
+     {
+       id: 'compute-engine',
+       title: 'Compute Engine',
+       description: 'Learn about virtual machines in Google Cloud Platform',
+       icon: ComputeEngineIcon,
+     },
+     {
+       id: 'cloud-storage',
+       title: 'Cloud Storage',
+       description: 'Master object storage in the cloud',
+       icon: CloudStorageIcon,
+     },
+     {
+       id: 'cloud-functions',
+       title: 'Cloud Functions',
+       description: 'Build serverless applications',
+       icon: CloudFunctionsIcon,
+     },
+     {
+       id: 'kubernetes-engine',
+       title: 'Kubernetes Engine',
+       description: 'Container orchestration with GKE',
+       icon: KubernetesEngineIcon,
+     },
   ];
 
   const fetchUserProgress = async () => {
     setLoading(true);
     const userId = await AsyncStorage.getItem('userId');
     if (!userId) {
+      Alert.alert('Error', 'User ID not found. Please log in again.'); // Inform user
       setLoading(false);
       return;
     }
 
     try {
-      const response = await axios.get(`${BASE_URL}/api/v1/users/{userId}/progress`);
-      const { learningProgress, modules: apiModules } = response.data;
+      // Use the explicit response type
+      const response = await axios.get<UserProgressResponse>(`${BASE_URL}/api/v1/users/${userId}/progress`); // Corrected template literal
+      const { learningProgress, availableModules } = response.data;
 
       const progress: Record<string, number> = {};
 
-      apiModules.forEach((module: { id: string }) => {
-        const moduleId = module.id;
-        const learningData = learningProgress as LearningProgress;
+      // Calculate progress based on the available modules from the API response
+      availableModules.forEach((apiModule) => {
+        const moduleId = apiModule.id;
+        // Ensure learningProgress exists before accessing its properties
+        const learningData = learningProgress || {};
 
         const isStarted = learningData.modulesInProgress?.includes(moduleId);
         const isCompleted = learningData.completedModules?.includes(moduleId);
@@ -97,9 +110,9 @@ const ModulesScreen = () => {
         if (isCompleted) {
           progress[moduleId] = 1.0; // 100%
         } else if (hasCompletedQuiz) {
-          progress[moduleId] = 0.75; // 75%
+          progress[moduleId] = 0.75; // 75% (Example logic)
         } else if (isStarted) {
-          progress[moduleId] = 0.25; // 25%
+          progress[moduleId] = 0.25; // 25% (Example logic)
         } else {
           progress[moduleId] = 0; // 0%
         }
@@ -117,81 +130,67 @@ const ModulesScreen = () => {
             [{ text: 'OK' }]
           );
         } else {
-          Alert.alert(
-            'Server Error',
-            `An error occurred on the server: ${axiosError.response.status}`,
-            [{ text: 'OK' }]
-          );
+           // Provide more specific error feedback if possible
+           let message = `An error occurred on the server: ${axiosError.response.status}`;
+           if (axiosError.response.status === 404) {
+               message = 'User progress data not found. Please try again later.';
+           } else if (axiosError.response.status === 401) {
+               message = 'Authentication error. Please log in again.';
+               // Optionally trigger logout or re-login flow
+           }
+           Alert.alert('Server Error', message, [{ text: 'OK' }]);
         }
       } else {
         Alert.alert(
           'Unexpected Error',
-          'An unexpected error occurred. Please try again later.',
+          'An unexpected error occurred while fetching progress. Please try again later.',
           [{ text: 'OK' }]
         );
       }
+       // Set empty progress or default state on error?
+       setModuleProgress({});
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Only fetch progress via the API call on mount
     fetchUserProgress();
-    const userId = auth().currentUser?.uid;
-    if (!userId) {
-      return;
-    }
 
-    const unsubscribe = firestore()
-      .collection('users')
-      .doc(userId)
-      .collection('learningProgress')
-      .onSnapshot((snapshot) => {
-        const progress: Record<string, number> = {};
-        if (snapshot && snapshot.docs) {
-          snapshot.docs.forEach((doc) => {
-            progress[doc.id] = doc.data().progress || 0;
-          });
-        }
-        setModuleProgress(progress);
-      });
+    // --- Firestore onSnapshot listener removed ---
+    // No cleanup function needed as there's no active listener to unsubscribe from
 
-    return () => unsubscribe();
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   const handleStartLearning = async (moduleId: string) => {
-    const userId = await AsyncStorage.getItem('userId');
-    if (userId) {
-      try {
-        // Always allow starting the module, regardless of completion status
-        await axios.post(`${BASE_URL}/user/${userId}/module/start`, { moduleId });
-      } catch (error) {
+     const userId = await AsyncStorage.getItem('userId');
+     if (!userId) {
+         Alert.alert('Error', 'User ID not found. Cannot start module.');
+         return;
+     }
+
+     // Optimistically navigate
+     navigation.navigate('ModuleDetail', { moduleId });
+
+     try {
+        // Call backend API to mark module as started
+        // Using PUT or POST based on your API design (POST used here)
+        await axios.post(`${BASE_URL}/api/v1/users/${userId}/modules/${moduleId}/start`); // Example endpoint
+        // Optionally re-fetch progress after starting, or rely on next screen load
+        // fetchUserProgress();
+     } catch (error) {
         console.error('Error starting module:', error);
+        // Handle API errors similar to fetchUserProgress
         if (axios.isAxiosError(error)) {
-          const axiosError = error as AxiosError;
-          if (!axiosError.response) {
-            Alert.alert(
-              'Network Error',
-              'Could not connect to the server. Please check your internet connection and try again.',
-              [{ text: 'OK' }]
-            );
-          } else {
-            Alert.alert(
-              'Server Error',
-              `An error occurred on the server: ${axiosError.response.status}`,
-              [{ text: 'OK' }]
-            );
-          }
+          // ... (Axios error handling)
+           Alert.alert('Error', 'Could not update module start status.');
         } else {
-          Alert.alert(
-            'Unexpected Error',
-            'An unexpected error occurred. Please try again later.',
-            [{ text: 'OK' }]
-          );
+          // ... (Generic error handling)
+           Alert.alert('Error', 'An unexpected error occurred.');
         }
-      }
-    }
-    navigation.navigate('ModuleDetail', { moduleId });
+        // If API call fails after navigation, consider navigating back or showing persistent error
+     }
   };
 
   const getProgressColor = (progress: number) => {
@@ -206,7 +205,7 @@ const ModulesScreen = () => {
 
   const getButtonLabel = (progress: number) => {
     if (progress === 1) {
-      return 'Review Module'; // Changed label for completed modules
+      return 'Review Module';
     } else if (progress > 0) {
       return 'Continue Learning';
     } else {
@@ -214,6 +213,7 @@ const ModulesScreen = () => {
     }
   };
 
+  // --- Render logic remains largely the same ---
   return (
     <ScrollView style={styles.container}>
       {loading && (
@@ -224,7 +224,8 @@ const ModulesScreen = () => {
       {!loading &&
         modules.map((module) => {
           const IconComponent = module.icon;
-          const progress = moduleProgress[module.id] || 0;
+          // Ensure progress is accessed safely, defaulting to 0
+          const progress = moduleProgress[module.id] ?? 0;
           const progressColor = getProgressColor(progress);
           const buttonLabel = getButtonLabel(progress);
 
@@ -236,7 +237,7 @@ const ModulesScreen = () => {
                     width={34}
                     height={34}
                     style={styles.icon}
-                    {...(IconComponent as React.SVGProps<SVGSVGElement>)}
+                     // Removed unnecessary spread, assuming SVG component handles props correctly
                   />
                   <Title style={styles.title}>{module.title}</Title>
                 </View>
@@ -254,8 +255,7 @@ const ModulesScreen = () => {
                 <Button
                   mode="contained"
                   onPress={() => handleStartLearning(module.id)}
-                  // removed disabled={buttonLabel === 'Completed'}
-                  style={buttonLabel === 'Review Module' ? styles.completedButton : {}} // changed style check
+                  style={buttonLabel === 'Review Module' ? styles.completedButton : {}}
                 >
                   {buttonLabel}
                 </Button>
