@@ -88,3 +88,5 @@ script-start-push-images.sh
 /backend/src/config/credentials.json
 functions/firebase-debug.log
 functions/.env.cloud-explorer-c3d98
+firebase-debug.log
+*.log
