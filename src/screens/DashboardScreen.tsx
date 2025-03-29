@@ -306,11 +306,11 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
   // Map module IDs to icons, colors, and titles
   const getModuleDetails = (moduleId: string) => {
     const moduleMap: { [key: string]: { icon: React.FC<React.SVGProps<SVGSVGElement>>; color: string; title: string } } = {
-      'cloud-fundamentals': { icon: CloudGenericIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#0000', title: 'GCP Cloud Fundamentals' },
-      'compute-engine': { icon: ComputeEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#0000', title: 'Compute Engine' },
-      'cloud-storage': { icon: CloudStorageIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#0000', title: 'Cloud Storage' },
-      'cloud-functions': { icon: CloudFunctionsIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#0000', title: 'Cloud Functions' },
-      'kubernetes-engine': { icon: KubernetesEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#0000', title: 'Kubernetes Engine' },
+      'cloud-fundamentals': { icon: CloudGenericIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: 'blue', title: 'GCP Cloud Fundamentals' },
+      'compute-engine': { icon: ComputeEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: 'green', title: 'Compute Engine' },
+      'cloud-storage': { icon: CloudStorageIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: '#tellow', title: 'Cloud Storage' },
+      'cloud-functions': { icon: CloudFunctionsIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: 'purple', title: 'Cloud Functions' },
+      'kubernetes-engine': { icon: KubernetesEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>, color: 'violet', title: 'Kubernetes Engine' },
     };
 
     const module = modules.find((m) => m.id === moduleId);
