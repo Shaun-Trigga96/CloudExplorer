@@ -85,6 +85,10 @@ images:
   - 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA'
   - 'gcr.io/$PROJECT_ID/cloud-explorer-frontend-dev:$COMMIT_SHA'
 
+# Add this options section at the end of the file
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 # Optional: Specify timeout for the build
 # timeout: 1200s
 
