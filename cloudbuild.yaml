@@ -1,41 +1,92 @@
-# cloudbuild.yaml
+# cloudbuild.yaml (Improved Version)
 steps:
-  # Build and push the frontend development image
-  - name: 'gcr.io/cloud-builders/docker'
-    id: Build Frontend Dev Image
-    entrypoint: 'sh'
-    args:
-      - '-c'
-      - |
-        docker build -t gcr.io/cloud-explorer-c3d98/cloud-explorer-frontend-dev:$COMMIT_SHA -f Dockerfile.dev .
-        docker push gcr.io/cloud-explorer-c3d98/cloud-explorer-frontend-dev:$COMMIT_SHA
+  # 1. Install Functions Dependencies & Lint (Optional but Recommended)
+  - name: 'node:20' # Use a specific Node.js version matching your functions/package.json engine
+    id: Install Functions Dependencies & Lint
+    entrypoint: 'npm'
+    args: ['install']
+    dir: 'functions' # Specify the directory
+  - name: 'node:20' # Use the same Node.js version
+    id: Lint Functions Code
+    entrypoint: 'npm'
+    args: ['run', 'lint'] # Assumes 'lint' script exists in functions/package.json
+    dir: 'functions'
 
-  # Build and push the backend production image
+  # 2. Deploy Firebase Cloud Functions
+  # Uses the Google Cloud SDK image which includes gcloud and firebase
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: Deploy Cloud Functions
+    entrypoint: 'firebase'
+    args:
+      - 'deploy'
+      - '--only'
+      - 'functions'
+      - '--project'
+      - '$PROJECT_ID' # Use the build-in variable
+      - '--non-interactive' # Ensure it doesn't prompt
+      - '--force' # Consider using --force if needed, otherwise remove
+
+  # 3. Deploy Firestore Rules & Indexes (Optional but Recommended)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: Deploy Firestore Rules and Indexes
+    entrypoint: 'firebase'
+    args:
+      - 'deploy'
+      - '--only'
+      - 'firestore:rules,firestore:indexes' # Deploy both rules and indexes
+      - '--project'
+      - '$PROJECT_ID'
+      - '--non-interactive'
+      - '--force' # Consider using --force if needed, otherwise remove
+
+  # 4. Build and push the backend production image
+  # *** NOTE: Changed directory to backend_app/ based on your Dev Guide ***
   - name: 'gcr.io/cloud-builders/docker'
     id: Build Backend Prod Image
     entrypoint: 'sh'
     args:
       - '-c'
       - |
-        docker build -t gcr.io/cloud-explorer-c3d98/cloud-explorer-backend-prod:$COMMIT_SHA -f backend/Dockerfile backend/
-        docker push gcr.io/cloud-explorer-c3d98/cloud-explorer-backend-prod:$COMMIT_SHA
-        
-  #deploy in cloud run (backend)
+        # Use $PROJECT_ID variable for image name
+        # Use backend_app/ directory based on your guide
+        docker build -t gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA -f backend_app/Dockerfile backend_app/
+        docker push gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA
+
+  # 5. Deploy Backend to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: Deploy Backend to Cloud Run
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
-      - 'cloud-explorer-backend'
+      - 'cloud-explorer-backend' # Your Cloud Run service name
       - '--image'
-      - 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA' # Use $PROJECT_ID variable
       - '--region'
-      - 'us-central1' # Change if needed
+      - 'us-central1' # Or your preferred region
       - '--platform'
       - 'managed'
-      - '--allow-unauthenticated' # if you need public access
+      - '--allow-unauthenticated' # Keep if public access is needed, otherwise remove for authenticated access
 
+  # 6. Build Frontend Image (Purpose needs clarification)
+  # Builds the dev image as per your original file. Consider if you need a prod build/deploy.
+  - name: 'gcr.io/cloud-builders/docker'
+    id: Build Frontend Dev Image
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        # Use $PROJECT_ID variable for image name
+        docker build -t gcr.io/$PROJECT_ID/cloud-explorer-frontend-dev:$COMMIT_SHA -f Dockerfile.dev .
+        docker push gcr.io/$PROJECT_ID/cloud-explorer-frontend-dev:$COMMIT_SHA
+
+# List images built by this pipeline (uses $PROJECT_ID)
 images:
-  - 'gcr.io/cloud-explorer-c3d98/cloud-explorer-frontend-dev:$COMMIT_SHA'
-  - 'gcr.io/cloud-explorer-c3d98/cloud-explorer-backend-prod:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/cloud-explorer-frontend-dev:$COMMIT_SHA'
+
+# Optional: Specify timeout for the build
+# timeout: 1200s
+
+# Optional: Specify service account with necessary permissions
+# serviceAccount: 'projects/your-project-id/serviceAccounts/your-cloud-build-sa@your-project-id.iam.gserviceaccount.com'

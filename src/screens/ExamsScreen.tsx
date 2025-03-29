@@ -6,9 +6,9 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { REACT_APP_BASE_URL } from '@env';
 
-const BASE_URL = 'http://10.0.2.2:5000';
-console.log('BASE_URL:', BASE_URL);
+const BASE_URL = REACT_APP_BASE_URL; 
 
 type ExamsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ExamDetail'>;
 
@@ -47,7 +47,7 @@ const ExamsScreen = () => {
     },
     {
       id: 'cloud-engineer-exam',
-      title: 'Proffesional Data Engineer',
+      title: 'Professional Data Engineer',
       description: 'Professional Data Engineer Certification Practice Exam',
       duration: '2 hours',
       icon: require('../assets/images/data-engineer.png'),
@@ -96,7 +96,7 @@ const ExamsScreen = () => {
       setLoading(true);
       setError(null);
 
-      const response = await axios.get(`${BASE_URL}/user/${userId}/exam-progress`); // Corrected endpoint
+      const response = await axios.get(`${BASE_URL}/api/v1/exams/progress/{userId}`); // Corrected endpoint
 
       if (response.data) {
         const attempts: Record<string, number> = {};

@@ -10,10 +10,10 @@
     "test": "jest",
     "start-push-images": "bash ./script-start-push-images.sh",
     "schema": "npm run clean && npm run build-schema && npm run run-schema",
-    "create-modules": "npm run clean && npm run build-schema && node --no-deprecation dist/scripts/create-modules.js",
+    "create-modules": "npm run clean && npm run build-schema && node --no-deprecation dist/scripts/create-schema-content-only.js",
     "clean": "if exist dist rmdir /s /q dist",
     "build-schema": "tsc -p tsconfig.node.json && xcopy /E /I /Y scripts\\content dist\\scripts\\content",
-    "run-schema": "node --no-deprecation dist/scripts/create-schema.js"
+    "run-schema": "node --no-deprecation dist/scripts/create-schema-content-only.js"
   },
   "dependencies": {
     "@huggingface/inference": "^3.5.2",
@@ -23,6 +23,7 @@
     "@react-native-firebase/auth": "^21.12.2",
     "@react-native-firebase/firestore": "^21.12.2",
     "@react-native-firebase/messaging": "^21.12.2",
+    "@react-native-firebase/storage": "^21.12.2",
     "@react-native-google-signin/google-signin": "^13.1.0",
     "@react-native-masked-view/masked-view": "^0.3.2",
     "@react-navigation/bottom-tabs": "^6.5.11",
@@ -41,6 +42,7 @@
     "react-native": "0.77.0",
     "react-native-dotenv": "^3.4.11",
     "react-native-gesture-handler": "^2.22.0",
+    "react-native-image-picker": "^8.2.0",
     "react-native-markdown-display": "^7.0.2",
     "react-native-paper": "^5.13.1",
     "react-native-reanimated": "^3.16.7",
@@ -72,6 +74,7 @@
     "@types/jest": "^29.5.13",
     "@types/node": "^20.14.10",
     "@types/react": "^18.2.6",
+    "@types/react-native": "^0.72.8",
     "@types/react-native-dotenv": "^0.2.2",
     "@types/react-native-vector-icons": "^6.4.18",
     "@types/react-test-renderer": "^18.0.0",

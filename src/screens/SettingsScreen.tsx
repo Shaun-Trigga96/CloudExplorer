@@ -16,10 +16,11 @@ import auth from '@react-native-firebase/auth';
 import messaging from '@react-native-firebase/messaging';
 import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
-import {RootStackParamList} from '../navigation/RootNavigator'; // Adjust path as needed
-import {useTheme} from '../context/ThemeContext'; // Adjust path as needed
+import {RootStackParamList} from '../navigation/RootNavigator'; 
+import {useTheme} from '../context/ThemeContext'; 
+import {REACT_APP_BASE_URL} from '@env';
 
-const BASE_URL = process.env.REACT_APP_BASE_URL || 'http://10.0.2.2:5000'; // Use react-native-dotenv
+const BASE_URL = REACT_APP_BASE_URL; 
 
 interface UserSettings {
   notificationsEnabled: boolean;
@@ -54,7 +55,7 @@ const SettingsScreen: FC = () => {
         auth().currentUser?.uid || (await AsyncStorage.getItem('userId'));
       if (!userId) throw new Error('User ID not found');
 
-      const response = await axios.get(`${BASE_URL}/user/${userId}/settings`);
+      const response = await axios.get(`${BASE_URL}/api/v1/users/{userId}/settings`);
       const settings = response.data.settings || {};
       setUserSettings({...userSettings, ...settings});
       await AsyncStorage.setItem('userSettings', JSON.stringify(settings));
@@ -79,7 +80,7 @@ const SettingsScreen: FC = () => {
         auth().currentUser?.uid || (await AsyncStorage.getItem('userId'));
       if (!userId) throw new Error('User ID not found');
 
-      await axios.put(`${BASE_URL}/user/${userId}/settings`, {
+      await axios.put(`${BASE_URL}/api/v1/users/{userId}/settings`, {
         settings: updatedSettings,
       });
       const newSettings = {...userSettings, ...updatedSettings};
@@ -251,7 +252,7 @@ const SettingsScreen: FC = () => {
           description: 'View detailed learning statistics',
           icon: 'chart-line',
           iconColor: '#F09819',
-          onPress: () => navigation.navigate('MainApp'),
+          onPress: () => navigation.navigate('DashboardScreen'),
           actionable: true,
         },
         {

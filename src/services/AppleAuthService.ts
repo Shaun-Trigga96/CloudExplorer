@@ -1,26 +1,7 @@
 import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
-import { appleAuth, AppleRequestResponseFullName } from '@invertase/react-native-apple-authentication';
+import { appleAuth } from '@invertase/react-native-apple-authentication';
 
-interface UserData {
-  userId: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  createdAt: FirebaseFirestoreTypes.FieldValue;
-  learningProgress: {
-    completedModules: Record<string, any>;
-    completedQuizzes: Record<string, any>;
-    completedExams: Record<string, any>;
-    score: number,
-  };
-  settings: {
-    notificationsEnabled: boolean;
-    darkMode: boolean;
-  };
-}
 
 export class AppleAuthService {
   private static instance: AppleAuthService;
@@ -54,11 +35,7 @@ export class AppleAuthService {
     }
   }
 
-  async signIn(): Promise<FirebaseAuthTypes.UserCredential> {
-    if (!this.isInitialized) {
-      throw new Error('Apple Sign-In service not initialized');
-    }
-
+  async signIn(): Promise<any> {
     try {
       console.log('Attempting Apple Sign-In');
       // Perform Apple sign-in request
@@ -68,27 +45,12 @@ export class AppleAuthService {
       });
 
       // Get credentials
-      const { identityToken, nonce } = appleAuthResponse;
+      const { identityToken } = appleAuthResponse;
 
       if (!identityToken) {
         throw new Error('No identity token returned from Apple Sign-In');
       }
 
-      // Create Firebase credential
-      console.log('Creating Firebase credential with Apple identity token');
-      const credential = auth.AppleAuthProvider.credential(identityToken, nonce);
-
-      // Sign in to Firebase
-      console.log('Signing in with Firebase credential');
-      const userCredential = await auth().signInWithCredential(credential);
-
-      // If this is a new user, create their profile
-      if (userCredential.additionalUserInfo?.isNewUser) {
-        console.log('New user detected, creating profile');
-        await this.createUserProfile(userCredential, appleAuthResponse.fullName);
-      }
-
-      return userCredential;
     } catch (error: any) {
       console.error('Apple Sign-In error:', error);
 
@@ -106,50 +68,7 @@ export class AppleAuthService {
     }
   }
 
-  private async createUserProfile(
-    userCredential: FirebaseAuthTypes.UserCredential,
-    fullName?: AppleRequestResponseFullName | null
-  ): Promise<void> {
-    try {
-      let displayName = userCredential.user.displayName;
-      // If we have fullName from Apple response, construct display name
-      if (fullName) {
-        displayName = [fullName.givenName, fullName.familyName]
-          .filter(Boolean)
-          .join(' ');
-      }
-
-      const userData: UserData = {
-        userId: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: displayName,
-        photoURL: userCredential.user.photoURL,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-        learningProgress: {
-          completedModules: {},
-          completedQuizzes: {},
-          completedExams: {},
-          score: 0,
-         },
-          settings: {
-          notificationsEnabled: true,
-          darkMode: false,
-        },
-      };
-
-      console.log('Saving user profile to Firestore');
-      await firestore()
-        .collection('users')
-        .doc(userCredential.user.uid)
-        .set(userData);
-
-      console.log('User profile created successfully');
-    } catch (error) {
-      console.error('Failed to create user profile:', error);
-      throw new Error('Failed to create user profile. Some features might not work properly.');
-    }
-  }
-
+  
   async signOut(): Promise<void> {
     try {
       console.log('Attempting Firebase Sign-Out');

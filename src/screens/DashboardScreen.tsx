@@ -12,8 +12,11 @@ import CloudStorageIcon from '../assets/icons/cloud_storage.svg';
 import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
 import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
 import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
+import {REACT_APP_BASE_URL} from '@env';
+import { RootStackParamList } from '../navigation/RootNavigator';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-const BASE_URL = 'http://10.0.2.2:5000';
+const BASE_URL = REACT_APP_BASE_URL; 
 
 interface LearningProgress {
   completedModules: string[];
@@ -78,19 +81,30 @@ interface ErrorInfo {
   indexUrl?: string;
 }
 
+// Update the GridLayout component to accept navigation prop
+interface GridLayoutProps {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'DashboardScreen'>;
+}
+
 // GridLayout component moved to the top
-const GridLayout: FC = () => {
+const GridLayout: FC<GridLayoutProps> = ({ navigation }) => {
   const gridItems = [
-    { icon: 'book-open', title: 'Learning Modules', description: 'Interactive GCP concepts with AI-powered content', color: '#3b82f6' },
-    { icon: 'activity', title: 'Progress Tracking', description: 'Real-time progress monitoring across modules', color: '#22c55e' },
-    { icon: 'award', title: 'Certifications', description: 'Comprehensive exam preparation paths', color: '#a855f7' },
-    { icon: 'bell', title: 'Smart Notifications', description: 'AI-driven learning reminders and updates', color: '#f97316' },
-    { icon: 'settings', title: 'Settings', description: 'Customize your learning experience and preferences', color: '#ef4444' },
-    { icon: 'users', title: 'Community', description: 'Connect with other cloud learners', color: '#0ea5e9' },
+    { icon: 'book-open', title: 'Learning Modules', description: 'Interactive GCP concepts with AI-powered content', color: '#3b82f6', screen: 'Modules' },
+    { icon: 'activity', title: 'Progress Tracking', description: 'Real-time progress monitoring across modules', color: '#22c55e', screen: 'Dashboard' }, // You can navigate to the same screen or a different one
+    { icon: 'award', title: 'Certifications', description: 'Comprehensive exam preparation paths', color: '#a855f7', screen: 'Exams' },
+    { icon: 'bell', title: 'Smart Notifications', description: 'AI-driven learning reminders and updates', color: '#f97316', screen: 'Dashboard' }, // You can navigate to the same screen or a different one
+    { icon: 'settings', title: 'Settings', description: 'Customize your learning experience and preferences', color: '#ef4444', screen: 'Settings' },
+    { icon: 'users', title: 'Community', description: 'Connect with other cloud learners', color: '#0ea5e9', screen: 'Dashboard' }, // You can navigate to the same screen or a different one
   ];
 
   const screenWidth = Dimensions.get('window').width;
   const itemWidth = (screenWidth - 48) / 2;
+
+  const handleGridItemPress = (screen: string) => {
+    if (screen) {
+      navigation.navigate(screen as never);
+    }
+  };
 
   return (
     <View style={styles.gridWrapper}>
@@ -102,17 +116,20 @@ const GridLayout: FC = () => {
             entering={FadeIn.duration(800).delay(gridItems.indexOf(item) * 100)}
             style={[styles.gridItem, { width: itemWidth }]}
           >
-            <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
-              <Icon name={item.icon} size={24} color="#ffffff" />
-            </View>
-            <Text style={styles.itemTitle}>{item.title}</Text>
-            <Text style={styles.itemDescription}>{item.description}</Text>
+            <TouchableOpacity onPress={() => handleGridItemPress(item.screen)} style={{ width: '100%', alignItems: 'center' }}>
+              <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
+                <Icon name={item.icon} size={24} color="#ffffff" />
+              </View>
+              <Text style={styles.itemTitle}>{item.title}</Text>
+              <Text style={styles.itemDescription}>{item.description}</Text>
+            </TouchableOpacity>
           </Animated.View>
         ))}
       </View>
     </View>
   );
 };
+
 
 // Implement the ProgressItem component with support for both SVG and Image icons
 const ProgressItem: FC<ProgressItemProps> = ({ title, status, percentage, color, icon: IconComponent, imageIcon, isImage = false }) => (
@@ -233,7 +250,7 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
           return;
         }
 
-        const response = await axios.get(`${BASE_URL}/user/${storedUserId}/progress`);
+        const response = await axios.get(`${BASE_URL}/api/v1/users/${storedUserId}/progress`);
         setLearningProgress(response.data.learningProgress || null);
         setProgress(response.data.progress || []);
         setModules(response.data.modules || []);
@@ -382,7 +399,7 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
         )}
 
         {/* GridLayout placed at the top */}
-        <GridLayout />
+        <GridLayout navigation={navigation} />
 
         <Animated.View entering={FadeIn.duration(1200)} style={styles.card}>
           <Text style={styles.cardTitle}>Learning Progress</Text>

@@ -1,40 +1,26 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const sgMail = require('@sendgrid/mail');
+/* eslint-disable linebreak-style */
+/* eslint-disable max-len */
+/* eslint-disable linebreak-style */
+// functions/index.js
 
-admin.initializeApp();
-sgMail.setApiKey(functions.config().sendgrid.key);
+/**
+ * This file acts as the main entry point for Cloud Functions.
+ * It loads functions defined in other files (like src/auth/auth.js, src/email/email.js)
+ * and exports them so Firebase can discover and deploy them.
+ */
 
-exports.updateEmailSubscription = functions.https.onCall(async (data, context) => {
-  const { enabled } = data;
-  const userId = context.auth?.uid;
+// Load the functions exported from your source files
+// Make sure the paths are correct relative to index.js
+const authFunctions = require("./src/auth/auth"); // Loads exports from auth.js [cite: uploaded:src/auth/auth.js]
+const emailFunctions = require("./src/email/email"); // Loads exports from email.js [cite: uploaded:src/email/email.js]
+// If you add more function groups (e.g., ./src/payments/payments.js), require them here:
+// const paymentFunctions = require("./src/payments/payments");
 
-  if (!userId) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
-  }
+// Export all the loaded functions together.
+// Firebase CLI will look at the exports of this file.
+module.exports = {
+  ...authFunctions, // This includes initializeNewUser as exported by auth.js
+  ...emailFunctions, // This includes updateEmailSubscription as exported by email.js
+  // ...paymentFunctions, // Include other groups if you add them
+};
 
-  const userRef = admin.firestore().collection('users').doc(userId);
-  const userDoc = await userRef.get();
-
-  if (!userDoc.exists) {
-    throw new functions.https.HttpsError('not-found', 'User not found.');
-  }
-
-  const user = userDoc.data();
-  const email = user.email;
-
-  if (enabled) {
-    const msg = {
-      to: email,
-      from: 'cloudexplorer1996@gmail.com', // Replace with your verified SendGrid sender
-      subject: 'Welcome to CloudExplorer Updates',
-      text: 'You’ve subscribed to receive progress reports and tips!',
-    };
-    await sgMail.send(msg);
-    await userRef.update({ 'settings.emailUpdates': true });
-    return { message: 'Subscribed to email updates' };
-  } else {
-    await userRef.update({ 'settings.emailUpdates': false });
-    return { message: 'Unsubscribed from email updates' };
-  }
-});

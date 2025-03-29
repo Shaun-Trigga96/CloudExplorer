@@ -15,6 +15,7 @@ module.exports = {
           'FIREBASE_STORAGE_BUCKET',
           'FIREBASE_MESSAGING_SENDER_ID',
           'FIREBASE_APP_ID',
+          'REACT_APP_BASE_URL'
         ],
       },
     ],

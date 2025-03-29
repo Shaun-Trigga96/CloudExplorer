@@ -1,29 +1,10 @@
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 
 interface GoogleSignInConfig {
   webClientId: string;
   offlineAccess: boolean;
-}
-interface UserData {
-  userId: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  createdAt: FirebaseFirestoreTypes.FieldValue;
-  learningProgress: {
-    completedModules: Record<string, any>;
-    completedQuizzes: Record<string, any>;
-    completedExams: Record<string, any>;
-    score: number,
-  };
-  settings: {
-    notificationsEnabled: boolean;
-    darkMode: boolean;
-  };
 }
 
 export class GoogleAuthService {
@@ -82,14 +63,6 @@ export class GoogleAuthService {
       console.log('Creating Firebase credential with ID token');
       const credential = auth.GoogleAuthProvider.credential(idToken);
 
-      console.log('Signing in with Firebase credential');
-      const userCredential = await auth().signInWithCredential(credential);
-
-      if (userCredential.additionalUserInfo?.isNewUser) {
-        console.log('New user detected, creating profile');
-        await this.createUserProfile(userCredential);
-      }
-
       return auth().signInWithCredential(credential);
     } catch (error: any) {
       console.error('Google Sign-In error:', error);
@@ -105,39 +78,6 @@ export class GoogleAuthService {
       }
 
       throw new Error('Authentication failed. Please try again.');
-    }
-  }
-
-  private async createUserProfile(userCredential: FirebaseAuthTypes.UserCredential): Promise<void> {
-    try {
-      const userData: UserData = {
-        userId: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: userCredential.user.displayName,
-        photoURL: userCredential.user.photoURL,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-        learningProgress: {
-          completedModules: {},
-          completedQuizzes: {},
-          completedExams: {},
-          score: 0,
-        },
-        settings: {
-          notificationsEnabled: true,
-          darkMode: false,
-        },
-      };
-
-      console.log('Saving user profile to Firestore');
-      await firestore()
-        .collection('users')
-        .doc(userCredential.user.uid)
-        .set(userData);
-
-      console.log('User profile created successfully');
-    } catch (error) {
-      console.error('Failed to create user profile:', error);
-      throw new Error('Failed to create user profile. Some features might not work properly.');
     }
   }
 

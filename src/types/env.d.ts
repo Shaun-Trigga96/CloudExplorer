@@ -1,8 +1,20 @@
 declare module '@env' {
-    export const FIREBASE_API_KEY: string;
-    export const FIREBASE_AUTH_DOMAIN: string;
-    export const FIREBASE_PROJECT_ID: string;
-    export const FIREBASE_STORAGE_BUCKET: string;
-    export const FIREBASE_MESSAGING_SENDER_ID: string;
-    export const FIREBASE_APP_ID: string;
-  }
+  export const FIREBASE_API_KEY: string;
+  export const FIREBASE_AUTH_DOMAIN: string;
+  export const FIREBASE_PROJECT_ID: string;
+  export const FIREBASE_STORAGE_BUCKET: string;
+  export const FIREBASE_MESSAGING_SENDER_ID: string;
+  export const FIREBASE_APP_ID: string;
+  export const REACT_APP_BASE_URL: string;
+  export const FIREBASE_SERVICE_ACCOUNT_PATH: string;
+  export const FIREBASE_PRIVATE_KEY: string;
+  export const FIREBASE_CLIENT_EMAIL: string;
+  export const GOOGLE_CLOUD_CREDENTIALS_PATH: string;
+  export const GOOGLE_CLIENT_ID: string;
+  export const GOOGLE_CLIENT_SECRET: string;
+  export const FIREBASE_DATABASE_URL: string;
+  export const BASE_URL: string;
+  export const HUGGINGFACE_API_KEY: string;
+  export const NODE_ENV: string;
+  export const SENDGRID_API_KEY: string;
+}
