@@ -1,12 +1,12 @@
 # cloudbuild.yaml (Improved Version)
 steps:
   # 1. Install Functions Dependencies & Lint (Optional but Recommended)
-  - name: 'node:22' # Use a specific Node.js version matching your functions/package.json engine
+  - name: 'node:20' # Use a specific Node.js version matching your functions/package.json engine
     id: Install Functions Dependencies & Lint
     entrypoint: 'npm'
     args: ['install']
     dir: 'functions' # Specify the directory
-  - name: 'node:22' # Use the same Node.js version
+  - name: 'node:20' # Use the same Node.js version
     id: Lint Functions Code
     entrypoint: 'npm'
     args: ['run', 'lint'] # Assumes 'lint' script exists in functions/package.json
