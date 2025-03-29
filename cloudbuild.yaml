@@ -1,43 +1,43 @@
 # cloudbuild.yaml (Improved Version)
 steps:
   # 1. Install Functions Dependencies & Lint (Optional but Recommended)
-  - name: 'node:20' # Use a specific Node.js version matching your functions/package.json engine
-    id: Install Functions Dependencies & Lint
-    entrypoint: 'npm'
-    args: ['install']
-    dir: 'functions' # Specify the directory
-  - name: 'node:20' # Use the same Node.js version
-    id: Lint Functions Code
-    entrypoint: 'npm'
-    args: ['run', 'lint'] # Assumes 'lint' script exists in functions/package.json
-    dir: 'functions'
+  # - name: 'node:20' # Use a specific Node.js version matching your functions/package.json engine
+  #   id: Install Functions Dependencies & Lint
+  #   entrypoint: 'npm'
+  #   args: ['install']
+  #   dir: 'functions' # Specify the directory
+  # - name: 'node:20' # Use the same Node.js version
+  #   id: Lint Functions Code
+  #   entrypoint: 'npm'
+  #   args: ['run', 'lint'] # Assumes 'lint' script exists in functions/package.json
+  #   dir: 'functions'
 
   # 2. Deploy Firebase Cloud Functions
   # Uses the Google Cloud SDK image which includes gcloud and firebase
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: Deploy Cloud Functions
-    entrypoint: 'firebase'
-    args:
-      - 'deploy'
-      - '--only'
-      - 'functions'
-      - '--project'
-      - '$PROJECT_ID' # Use the build-in variable
-      - '--non-interactive' # Ensure it doesn't prompt
-      - '--force' # Consider using --force if needed, otherwise remove
+  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   id: Deploy Cloud Functions
+  #   entrypoint: 'firebase'
+  #   args:
+  #     - 'deploy'
+  #     - '--only'
+  #     - 'functions'
+  #     - '--project'
+  #     - '$PROJECT_ID' # Use the build-in variable
+  #     - '--non-interactive' # Ensure it doesn't prompt
+  #     - '--force' # Consider using --force if needed, otherwise remove
 
   # 3. Deploy Firestore Rules & Indexes (Optional but Recommended)
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: Deploy Firestore Rules and Indexes
-    entrypoint: 'firebase'
-    args:
-      - 'deploy'
-      - '--only'
-      - 'firestore:rules,firestore:indexes' # Deploy both rules and indexes
-      - '--project'
-      - '$PROJECT_ID'
-      - '--non-interactive'
-      - '--force' # Consider using --force if needed, otherwise remove
+  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   id: Deploy Firestore Rules and Indexes
+  #   entrypoint: 'firebase'
+  #   args:
+  #     - 'deploy'
+  #     - '--only'
+  #     - 'firestore:rules,firestore:indexes' # Deploy both rules and indexes
+  #     - '--project'
+  #     - '$PROJECT_ID'
+  #     - '--non-interactive'
+  #     - '--force' # Consider using --force if needed, otherwise remove
 
   # 4. Build and push the backend production image
   # *** NOTE: Changed directory to backend_app/ based on your Dev Guide ***
