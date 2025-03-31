@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Card, Title, Paragraph, Button, ProgressBar } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-// Removed unused Firebase imports: firestore, auth
 import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
 import CloudStorageIcon from '../assets/icons/cloud_storage.svg';
 import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
@@ -20,7 +19,7 @@ interface Module {
   id: string;
   title: string;
   description: string;
-  icon: React.FC<React.SVGProps<SVGSVGElement>>; // Corrected icon type slightly
+  icon: React.FC;
 }
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'ModuleDetail'>;
@@ -31,12 +30,16 @@ interface LearningProgress {
   completedQuizzes?: { moduleId: string }[];
 }
 
-// Define the structure of the API response data more explicitly
+interface ApiModule {
+  id: string;
+  title: string;
+  description: string;
+  // Add other fields if needed
+}
+
 interface UserProgressResponse {
     learningProgress: LearningProgress;
-    // Assuming 'modules' from the API refers to the list of all modules available
-    // Renaming to avoid conflict with the component's 'modules' constant
-    availableModules: { id: string; /* other module fields from API if needed */ }[];
+    availableModules: ApiModule[];
 }
 
 
@@ -44,8 +47,8 @@ const ModulesScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const [moduleProgress, setModuleProgress] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
+  const [availableModules, setAvailableModules] = useState<ApiModule[]>([]);
 
-  // Your static module definitions remain the same
   const modules: Module[] = [
      {
        id: 'cloud-fundamentals',
@@ -82,45 +85,54 @@ const ModulesScreen = () => {
   const fetchUserProgress = async () => {
     setLoading(true);
     const userId = await AsyncStorage.getItem('userId');
+    console.log('fetchUserProgress: User ID:', userId); // Log the user ID
     if (!userId) {
-      Alert.alert('Error', 'User ID not found. Please log in again.'); // Inform user
+      Alert.alert('Error', 'User ID not found. Please log in again.');
       setLoading(false);
       return;
     }
 
     try {
-      // Use the explicit response type
-      const response = await axios.get<UserProgressResponse>(`${BASE_URL}/api/v1/users/${userId}/progress`); // Corrected template literal
+      const response = await axios.get<UserProgressResponse>(`${BASE_URL}/api/v1/users/${userId}/progress`);
+      console.log('fetchUserProgress: Raw API Response:', response.data); // Log the raw response
       const { learningProgress, availableModules } = response.data;
+
+      setAvailableModules(availableModules);
 
       const progress: Record<string, number> = {};
 
-      // Calculate progress based on the available modules from the API response
-      availableModules.forEach((apiModule) => {
-        const moduleId = apiModule.id;
-        // Ensure learningProgress exists before accessing its properties
-        const learningData = learningProgress || {};
+      if (availableModules) {
+        availableModules.forEach((apiModule) => {
+          const moduleId = apiModule.id;
+          const learningData = learningProgress || {};
+          const isStarted = learningData.modulesInProgress?.includes(moduleId);
+          const isCompleted = learningData.completedModules?.includes(moduleId);
+          const hasCompletedQuiz = learningData.completedQuizzes?.some(
+            (quiz) => quiz.moduleId === moduleId
+          );
+          console.log(`fetchUserProgress: Module ID: ${moduleId}`);
+          console.log(`fetchUserProgress: isStarted: ${isStarted}, isCompleted: ${isCompleted}, hasCompletedQuiz: ${hasCompletedQuiz}`);
 
-        const isStarted = learningData.modulesInProgress?.includes(moduleId);
-        const isCompleted = learningData.completedModules?.includes(moduleId);
-        const hasCompletedQuiz = learningData.completedQuizzes?.some(
-          (quiz) => quiz.moduleId === moduleId
-        );
-
-        if (isCompleted) {
-          progress[moduleId] = 1.0; // 100%
-        } else if (hasCompletedQuiz) {
-          progress[moduleId] = 0.75; // 75% (Example logic)
-        } else if (isStarted) {
-          progress[moduleId] = 0.25; // 25% (Example logic)
-        } else {
-          progress[moduleId] = 0; // 0%
-        }
-      });
+          // Determine the progress status based on the following logic:
+          // 1. If the module is completed, progress is 100% (1.0).
+          // 2. If a quiz for the module is completed, progress is 75% (0.75).
+          // 3. If the module is started (but not completed or quiz completed), progress is 25% (0.25).
+          // 4. Otherwise, progress is 0% (0).
+          if (isCompleted) {
+            progress[moduleId] = 1.0;
+          } else if (hasCompletedQuiz) {
+            progress[moduleId] = 0.75;
+          } else if (isStarted) {
+            progress[moduleId] = 0.25;
+          } else {
+            progress[moduleId] = 0;
+          }
+        });
+      }
 
       setModuleProgress(progress);
     } catch (error) {
-      console.error('Error fetching user progress:', error);
+      console.error('fetchUserProgress: Error fetching user progress:', error);
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;
         if (!axiosError.response) {
@@ -130,13 +142,11 @@ const ModulesScreen = () => {
             [{ text: 'OK' }]
           );
         } else {
-           // Provide more specific error feedback if possible
            let message = `An error occurred on the server: ${axiosError.response.status}`;
            if (axiosError.response.status === 404) {
                message = 'User progress data not found. Please try again later.';
            } else if (axiosError.response.status === 401) {
                message = 'Authentication error. Please log in again.';
-               // Optionally trigger logout or re-login flow
            }
            Alert.alert('Server Error', message, [{ text: 'OK' }]);
         }
@@ -147,7 +157,6 @@ const ModulesScreen = () => {
           [{ text: 'OK' }]
         );
       }
-       // Set empty progress or default state on error?
        setModuleProgress({});
     } finally {
       setLoading(false);
@@ -155,51 +164,45 @@ const ModulesScreen = () => {
   };
 
   useEffect(() => {
-    // Only fetch progress via the API call on mount
+    console.log('useEffect: Component mounted, fetching user progress.');
     fetchUserProgress();
-
-    // --- Firestore onSnapshot listener removed ---
-    // No cleanup function needed as there's no active listener to unsubscribe from
-
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
   const handleStartLearning = async (moduleId: string) => {
      const userId = await AsyncStorage.getItem('userId');
+     console.log(`handleStartLearning: Attempting to start module ${moduleId} for user ${userId}`);
      if (!userId) {
          Alert.alert('Error', 'User ID not found. Cannot start module.');
          return;
      }
 
-     // Optimistically navigate
      navigation.navigate('ModuleDetail', { moduleId });
 
      try {
-        // Call backend API to mark module as started
-        // Using PUT or POST based on your API design (POST used here)
-        await axios.post(`${BASE_URL}/api/v1/users/${userId}/modules/${moduleId}/start`); // Example endpoint
-        // Optionally re-fetch progress after starting, or rely on next screen load
-        // fetchUserProgress();
+        await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, {
+          resourceType: 'module',
+          resourceId: moduleId,
+          action: 'start'
+        });
+        console.log(`handleStartLearning: Successfully marked module ${moduleId} as started for user ${userId}`);
+        fetchUserProgress(); // Refresh progress after starting the module
      } catch (error) {
-        console.error('Error starting module:', error);
-        // Handle API errors similar to fetchUserProgress
+        console.error(`handleStartLearning: Error starting module ${moduleId} for user ${userId}:`, error);
         if (axios.isAxiosError(error)) {
-          // ... (Axios error handling)
            Alert.alert('Error', 'Could not update module start status.');
         } else {
-          // ... (Generic error handling)
            Alert.alert('Error', 'An unexpected error occurred.');
         }
-        // If API call fails after navigation, consider navigating back or showing persistent error
      }
   };
 
   const getProgressColor = (progress: number) => {
     if (progress === 1) {
-      return '#4CAF50'; // Green for completed
+      return '#4CAF50';
     } else if (progress > 0) {
-      return '#FFC107'; // Yellow for in progress
+      return '#FFC107';
     } else {
-      return '#e0e0e0'; // Light gray for not started
+      return '#e0e0e0';
     }
   };
 
@@ -213,7 +216,6 @@ const ModulesScreen = () => {
     }
   };
 
-  // --- Render logic remains largely the same ---
   return (
     <ScrollView style={styles.container}>
       {loading && (
@@ -224,7 +226,6 @@ const ModulesScreen = () => {
       {!loading &&
         modules.map((module) => {
           const IconComponent = module.icon;
-          // Ensure progress is accessed safely, defaulting to 0
           const progress = moduleProgress[module.id] ?? 0;
           const progressColor = getProgressColor(progress);
           const buttonLabel = getButtonLabel(progress);
@@ -233,12 +234,10 @@ const ModulesScreen = () => {
             <Card key={module.id} style={styles.card}>
               <Card.Content>
                 <View style={styles.headerRow}>
-                  <IconComponent
-                    width={34}
-                    height={34}
-                    style={styles.icon}
-                     // Removed unnecessary spread, assuming SVG component handles props correctly
-                  />
+                  <View style={styles.icon}>
+                    <IconComponent
+                    />
+                  </View>
                   <Title style={styles.title}>{module.title}</Title>
                 </View>
                 <Paragraph>{module.description}</Paragraph>
@@ -301,7 +300,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   completedButton: {
-    backgroundColor: '#4CAF50', // Green for completed
+    backgroundColor: '#4CAF50',
   },
 });
 

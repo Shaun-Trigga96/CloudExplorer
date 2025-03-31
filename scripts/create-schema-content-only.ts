@@ -85,10 +85,10 @@ async function executeWithRetry(fn: () => Promise<any>, maxRetries = 3, timeout 
       const isRetryable = error.message?.includes('RESOURCE_EXHAUSTED') || error.status === 429 || error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('Too Many Requests');
       if (isRetryable && attempt < maxRetries - 1) {
         const delay = initialDelay * (2 ** attempt);
-        console.warn(`      !! Attempt ${attempt + 1} failed: ${error.message}. Retrying in ${delay}ms...`);
+        console.warn(`!! Attempt ${attempt + 1} failed: ${error.message}. Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
-        console.error(`      !! Attempt ${attempt + 1} failed permanently: ${error.message}`);
+        console.error(`!! Attempt ${attempt + 1} failed permanently: ${error.message}`);
         throw error;
       }
     }
@@ -97,7 +97,7 @@ async function executeWithRetry(fn: () => Promise<any>, maxRetries = 3, timeout 
 }
 
 function parseQuizFromAIResponse(text: string): Question[] {
-  console.log(`      >> Parsing AI response (${(text || '').length} chars)...`);
+  console.log(`>> Parsing AI response (${(text || '').length} chars)...`);
   // *** PASTE your updated parseQuizFromAIResponse code here ***
   // Ensure it returns an array matching the Question interface
   if (!text) return [];
@@ -107,14 +107,14 @@ function parseQuizFromAIResponse(text: string): Question[] {
 }
 
 async function getExamContent(examId: string, dbInstance: admin.firestore.Firestore): Promise<string> {
-  console.log(`      >> Fetching content context for examId: ${examId}`);
+  console.log(`>> Fetching content context for examId: ${examId}`);
   // *** PASTE your updated getExamContent code here (ensure it uses dbInstance) ***
   // It should query 'exams' and potentially 'modules'/'sections' based on associatedModules
   const examDoc = await dbInstance.collection('exams').doc(examId).get();
   if (!examDoc.exists) return "Exam definition not found.";
   let content = examDoc.data()?.description || "";
   // Add logic to fetch associated module content if needed...
-  console.log(`      >> Context length: ${content.length} chars`);
+  console.log(`>> Context length: ${content.length} chars`);
   return content.trim() || "Default exam context.";
 }
 
@@ -416,9 +416,9 @@ async function seedModules(moduleDefinitions: ReturnType<typeof defineModules>) 
         }
       });
       await batch.commit();
-      console.log(`  -> Module '${moduleId}' metadata updated/set with ${sectionsToUpload.length} sections.`);
+      console.log(`-> Module '${moduleId}' metadata updated/set with ${sectionsToUpload.length} sections.`);
     } catch (error: any) {
-      console.error(`  !! Error processing module '${moduleId}':`, error.message);
+      console.error(`!! Error processing module '${moduleId}':`, error.message);
     }
   }
 }
@@ -438,9 +438,9 @@ async function seedExamMetadata(examDefinitions: ReturnType<typeof defineExams>)
     };
     try {
       await examRef.set(examDocData, { merge: true });
-      console.log(`  -> Exam metadata for '${examId}' updated/set.`);
+      console.log(`-> Exam metadata for '${examId}' updated/set.`);
     } catch (error: any) {
-      console.error(`  !! Error setting metadata for exam '${examId}':`, error.message);
+      console.error(`!! Error setting metadata for exam '${examId}':`, error.message);
     }
   }
 }
@@ -454,7 +454,7 @@ async function generateAndSaveQuizQuestions(quizDefinitions: ReturnType<typeof d
     const quizId = quizInfo.quizId;
     const moduleId = quizInfo.moduleId;
     const quizRef = quizCollection.doc(quizId);
-    console.log(`  Processing quiz: ${quizId} for module: ${moduleId}`);
+    console.log(`Processing quiz: ${quizId} for module: ${moduleId}`);
 
     // Fetch module content context
     let moduleContentContext = '';
@@ -468,7 +468,7 @@ async function generateAndSaveQuizQuestions(quizDefinitions: ReturnType<typeof d
       moduleContentContext = moduleContentContext.trim();
       if (!moduleContentContext) throw new Error(`No content context found for module ${moduleId}.`);
     } catch (fetchError: any) {
-      console.error(`  !! Error fetching context for quiz '${quizId}':`, fetchError.message);
+      console.error(`!! Error fetching context for quiz '${quizId}':`, fetchError.message);
       continue; // Skip this quiz
     }
 
@@ -494,12 +494,12 @@ async function generateAndSaveQuizQuestions(quizDefinitions: ReturnType<typeof d
       };
       // Use set with merge to create or overwrite the quiz with this ID
       await quizRef.set(quizData, { merge: true });
-      console.log(`    -> Saved/Updated generated quiz ${quizId}.`);
+      console.log(`-> Saved/Updated generated quiz ${quizId}.`);
       // Update module with quizId link (idempotent using merge + arrayUnion if FieldValue imported)
       await moduleCollection.doc(moduleId).set({ quizIds: FieldValue.arrayUnion(quizId) }, { merge: true });
 
     } catch (error: any) {
-      console.error(`  !! Error generating/saving quiz '${quizId}':`, error.message);
+      console.error(`!! Error generating/saving quiz '${quizId}':`, error.message);
     }
     // Optional delay
     await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 sec delay
@@ -525,7 +525,7 @@ async function generateAndSaveExamQuestions(examDefinitions: ReturnType<typeof d
         console.warn(`  !! Insufficient content context for exam ${examId}. Generation might be less accurate.`);
       }
     } catch (fetchError: any) {
-      console.error(`  !! Error fetching context for exam '${examId}':`, fetchError.message);
+      console.error(`!! Error fetching context for exam '${examId}':`, fetchError.message);
       continue; // Skip this exam
     }
 
@@ -535,7 +535,7 @@ async function generateAndSaveExamQuestions(examDefinitions: ReturnType<typeof d
     const prompt = `Generate exactly ${numQuestions} challenging exam questions for "${examTitle}" based on: """${examContentContext}"""... [rest of your standard exam prompt]`;
 
     try {
-      console.log(`    Generating ${numQuestions} questions for '${examTitle}'...`);
+      console.log(`Generating ${numQuestions} questions for '${examTitle}'...`);
       const result = await executeWithRetry(() => hf.textGeneration({
         model: process.env.HF_MODEL_EXAM || 'mistralai/Mistral-7B-Instruct-v0.2',
         inputs: prompt, parameters: { max_new_tokens: 350 * numQuestions, temperature: 0.5 }

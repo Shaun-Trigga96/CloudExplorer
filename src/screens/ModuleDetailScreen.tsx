@@ -9,19 +9,33 @@ import {REACT_APP_BASE_URL} from '@env';
 
 const BASE_URL = REACT_APP_BASE_URL; 
 
-// This tracks scroll progress and visibility of content
+interface Answer {
+  letter: string;
+  answer: string;
+  uniqueKey: string;
+}
+
+interface QuestionType {
+  question: string;
+  answers: Answer[];
+  correctAnswer: string;
+  explanation: string;
+}
+
+interface Quiz extends QuestionType {
+  id: number;
+}
+
 const useIsContentRead = (sectionRefs: React.RefObject<View>[]) => {
   const [sectionsRead, setSectionsRead] = useState<boolean[]>([]);
   const [allContentRead, setAllContentRead] = useState(false);
 
   useEffect(() => {
-    // Initialize the array with false values for each section
     if (sectionRefs.length > 0 && sectionsRead.length === 0) {
       setSectionsRead(new Array(sectionRefs.length).fill(false));
     }
   }, [sectionRefs.length, sectionsRead.length]);
 
-  // Function to mark a section as read
   const markSectionAsRead = (index: number) => {
     setSectionsRead(prev => {
       const updated = [...prev];
@@ -30,7 +44,6 @@ const useIsContentRead = (sectionRefs: React.RefObject<View>[]) => {
     });
   };
 
-  // Check if all sections have been read
   useEffect(() => {
     if (sectionsRead.length > 0 && sectionsRead.every(read => read)) {
       setAllContentRead(true);
@@ -86,15 +99,12 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Create refs for each section
   const sectionRefs = useRef<React.RefObject<View>[]>([]);
   const scrollViewRef = useRef<ScrollView>(null);
   const [, setVisibleSections] = useState<Set<number>>(new Set());
 
-  // Track read progress
   const { sectionsRead, markSectionAsRead, allContentRead } = useIsContentRead(sectionRefs.current);
 
-  // Load the user ID
   useEffect(() => {
     const loadUserId = async () => {
       const id = await AsyncStorage.getItem('userId');
@@ -108,7 +118,7 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
   useEffect(() => {
     const fetchModuleData = async () => {
       try {
-        const moduleUrl = `${BASE_URL}/api/v1/modules/{moduleId}`;
+        const moduleUrl = `${BASE_URL}/api/v1/modules/${moduleId}`; // Corrected URL
         console.log(`Attempting to fetch module from: ${moduleUrl}`);
         const moduleResponse = await axios.get(moduleUrl, { timeout: 10000 });
         setModule(moduleResponse.data);
@@ -120,14 +130,12 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
 
     const fetchSections = async () => {
       try {
-        const sectionsUrl = `${BASE_URL}/api/v1/modules/{moduleId}/sections`;
+        const sectionsUrl = `${BASE_URL}/api/v1/modules/${moduleId}/sections`; // Corrected URL
         console.log(`Attempting to fetch sections from: ${sectionsUrl}`);
         const sectionsResponse = await axios.get(sectionsUrl, { timeout: 10000 });
         setSections(sectionsResponse.data);
 
-        // Initialize refs for each section
         sectionRefs.current = sectionsResponse.data.map(() => React.createRef<View>());
-      // eslint-disable-next-line no-catch-shadow, @typescript-eslint/no-shadow
       } catch (error) {
         console.error('Fetch sections error:', error);
         setError(`Failed to load sections: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -143,32 +151,24 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
     }).start();
   }, [moduleId, fadeAnim]);
 
-  // Handle the scroll event to detect visible sections
   const handleScroll = ({ nativeEvent }: { nativeEvent: any }) => {
     const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
     const paddingToBottom = 20;
 
-    // Check if user has scrolled to the bottom
     if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
       console.log('User has scrolled to the bottom of content');
-      // Mark all sections as read when user reaches bottom
       sectionRefs.current.forEach((_, index) => markSectionAsRead(index));
     }
 
-    // Track visible sections using IntersectionObserver-like logic
-    // This is simplified and would need to be expanded with a proper visibility detection
     const visibleStart = contentOffset.y;
     const visibleEnd = visibleStart + layoutMeasurement.height;
     const newVisibleSections = new Set<number>();
 
-    // Very simple approximation - you would need a more robust solution
     sections.forEach((section, index) => {
-      // Assuming each section has roughly the same height for simplicity
       const approximateSectionHeight = contentSize.height / sections.length;
       const sectionStart = index * approximateSectionHeight;
       const sectionEnd = sectionStart + approximateSectionHeight;
 
-      // Check if section is visible
       if (
         (sectionStart >= visibleStart && sectionStart <= visibleEnd) ||
         (sectionEnd >= visibleStart && sectionEnd <= visibleEnd)
@@ -190,16 +190,14 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
     setIsLoading(true);
 
     try {
-      // Mark the module as read in the backend
-      await axios.post(`${BASE_URL}/api/v1/users/{userId}/progress`, {
-        moduleId: moduleId,
+      await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, { // Corrected URL
+        resourceType: 'module',
+        resourceId: moduleId,
         action: 'complete',
         timestamp: new Date().toISOString(),
       });
 
-      // Navigate to the quiz screen
       navigation.navigate('QuizzesScreen', { moduleId });
-    // eslint-disable-next-line no-catch-shadow, @typescript-eslint/no-shadow
     } catch (error) {
       console.error('Failed to mark module as complete:', error);
       setError('Failed to save progress. Please try again.');
@@ -231,7 +229,7 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
         contentContainerStyle={styles.contentContainer}
         ref={scrollViewRef}
         onScroll={handleScroll}
-        scrollEventThrottle={400} // Adjust throttle as needed
+        scrollEventThrottle={400}
       >
         <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
           <Text style={styles.title}>{module.title || 'No title'}</Text>
@@ -265,7 +263,6 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
               }
             });
 
-            // Apply different styling based on whether section has been read
             const sectionStyle = [
               styles.sectionCard,
               { opacity: fadeAnim },
@@ -297,7 +294,6 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
         )}
       </ScrollView>
 
-      {/* Fixed complete button at the bottom */}
       <View style={styles.completeButtonContainer}>
         <Button
           mode="contained"
@@ -323,7 +319,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
-    paddingBottom: 80, // Extra padding for the fixed button
+    paddingBottom: 80,
   },
   header: {
     backgroundColor: '#ffffff',
@@ -362,7 +358,7 @@ const styles = StyleSheet.create({
   },
   readSection: {
     borderLeftWidth: 4,
-    borderLeftColor: '#34a853', // Google green color to indicate read
+    borderLeftColor: '#34a853',
   },
   noContent: {
     fontSize: 16,
@@ -409,10 +405,10 @@ const styles = StyleSheet.create({
     borderTopColor: '#e0e0e0',
   },
   completeButton: {
-    backgroundColor: '#1a73e8', // Google blue
+    backgroundColor: '#1a73e8',
   },
   disabledButton: {
-    backgroundColor: '#9aa0a6', // Google gray
+    backgroundColor: '#9aa0a6',
   },
 });
 

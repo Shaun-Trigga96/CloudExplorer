@@ -45,11 +45,12 @@ exports.startModuleProgress = async (req, res, next) => {
 
     await userRef.collection('progress').doc(moduleId).set(
       {
+        
         // Use moduleId as doc ID for easier querying
         moduleId, // Store moduleId for reference if needed
         startedAt: serverTimestamp(),
         status: 'in_progress',
-        // lastAccessed: serverTimestamp(), // Could add this too
+        lastAccessed: serverTimestamp(), // Could add this too
       },
       {merge: true},
     ); // Merge in case progress already exists
@@ -461,22 +462,6 @@ exports.updateUserProfile = async (req, res, next) => {
   }
 };
 
-exports.getUserSettings = async (req, res, next) => {
-  /* ... existing ... */
-};
-exports.updateUserSettings = async (req, res, next) => {
-  /* ... existing ... */
-};
-exports.getUserCertifications = async (req, res, next) => {
-  /* ... existing ... */
-};
-exports.getUserProfileImage = async (req, res, next) => {
-  /* ... existing ... */
-};
-exports.updateUserProfile = async (req, res, next) => {
-  /* ... existing ... */
-};
-
 // --- NEW: Track Generic Progress (Start/Complete Content) ---
 // POST /progress
 exports.trackProgress = async (req, res, next) => {
@@ -543,18 +528,6 @@ exports.trackProgress = async (req, res, next) => {
       // Mark specific resource as completed
       progressData.completedAt = progressTimestamp;
       progressData.status = 'completed';
-
-      // Additionally, update the main user document's learningProgress array
-      // We use resourceId here. Assuming module completion is the main one tracked this way.
-      // If completing a section, it might not directly complete the module.
-      if (resourceType === 'module') {
-        batch.update(userRef, {
-          'learningProgress.completedModules':
-            admin.firestore.FieldValue.arrayUnion(resourceId),
-          // Also remove from 'in_progress' if tracked there? Maybe not necessary.
-        });
-      }
-      // Add logic for other resource types if needed (e.g., completing all sections -> complete module)
     }
 
     // Update general user lastActivity
@@ -576,10 +549,7 @@ exports.trackProgress = async (req, res, next) => {
           userId,
           learningProgress: {
             // Initialize structure
-            completedModules:
-              action === 'complete' && resourceType === 'module'
-                ? [resourceId]
-                : [],
+            completedModules: [],
             completedQuizzes: [],
             completedExams: [],
           },
@@ -588,6 +558,16 @@ exports.trackProgress = async (req, res, next) => {
         },
         {merge: true},
       ); // Merge avoids race condition if created elsewhere
+    } else {
+        // If user exists, update the learningProgress based on the action and resourceType
+        const userLearningProgress = userDoc.data().learningProgress || {};
+        const completedModules = new Set(userLearningProgress.completedModules || []);
+        if (action === 'complete' && resourceType === 'module') {
+            completedModules.add(resourceId);
+        }
+        batch.update(userRef, {
+            'learningProgress.completedModules': Array.from(completedModules),
+        });
     }
 
     await batch.commit();
@@ -625,7 +605,10 @@ exports.getUserProgress = async (req, res, next) => {
   try {
     const {userId} = req.params;
 
+    console.log(`[getUserProgress] Starting progress fetch for user: ${userId}`); // Log 1: Start of function
+
     if (!userId || typeof userId !== 'string') {
+      console.error(`[getUserProgress] Invalid userId: ${userId}`); // Log 2: Invalid user ID
       return next(
         new AppError(
           'Valid User ID parameter is required',
@@ -641,9 +624,8 @@ exports.getUserProgress = async (req, res, next) => {
       progressSnapshot, // Detailed start/complete status per resource
       quizResultsSnapshot,
       examResultsSnapshot,
-      // Optionally fetch all modules/exams definitions for context if needed
-      // modulesSnapshot,
-      // examsSnapshot,
+      modulesSnapshot,
+      examsSnapshot,
     ] = await Promise.all([
       db.collection('users').doc(userId).get(),
       db.collection('users').doc(userId).collection('progress').get(), // Get all progress docs
@@ -657,15 +639,15 @@ exports.getUserProgress = async (req, res, next) => {
         .where('userId', '==', userId)
         .orderBy('timestamp', 'desc')
         .get(),
-      // db.collection('modules').get(), // Uncomment if needed
-      // db.collection('exams').get(), // Uncomment if needed
+      db.collection('modules').get(),
+      db.collection('exams').get(),
     ]);
 
+    console.log(`[getUserProgress] Data fetched from Firestore for user: ${userId}`); // Log 3: Data fetch complete
+
     if (!userDoc.exists) {
-      // If user doc doesn't exist, return empty/default progress
-      console.log(
-        `User ${userId} not found when getting progress. Returning default structure.`,
-      );
+      console.warn(`[getUserProgress] User ${userId} not found.`); // Log 4: User not found
+      console.log(`[getUserProgress] Returning default progress structure.`);
       return res.json({
         // Return a structure indicating user not found or default state
         userExists: false,
@@ -673,27 +655,38 @@ exports.getUserProgress = async (req, res, next) => {
           completedModules: [],
           completedQuizzes: [],
           completedExams: [],
+          modulesInProgress: [],
           score: 0,
         },
         detailedProgress: [],
         quizResults: [],
         examResults: [],
+        availableModules: [],
+        exams: [],
       });
       // OR: return next(new AppError('User not found', 404, 'USER_NOT_FOUND')); // If user must exist
     }
 
     const userData = userDoc.data() || {};
+    console.log(`[getUserProgress] User data:`, userData); // Log 5: User data
+
     // Provide defaults for learningProgress structure if missing
     const learningProgress = {
       completedModules: userData.learningProgress?.completedModules || [],
       completedQuizzes: userData.learningProgress?.completedQuizzes || [], // This might be summary, not full history
       completedExams: userData.learningProgress?.completedExams || [], // This might be summary, not full history
+      modulesInProgress: [],
       score: userData.learningProgress?.score || 0, // Example overall score
     };
+    console.log(`[getUserProgress] Initial learningProgress:`, learningProgress); // Log 6: Initial learningProgress
 
     // Process detailed progress snapshot (start/complete actions)
     const detailedProgress = progressSnapshot.docs.map(doc => {
       const data = doc.data();
+      console.log(`[getUserProgress] Detailed progress doc data:`, data); // Log 7: Detailed progress data
+      if(data.status === 'in_progress' && data.resourceType === 'module'){
+        learningProgress.modulesInProgress.push(data.resourceId);
+      }
       return {
         id: doc.id, // e.g., "module_mod123"
         resourceType: data.resourceType,
@@ -705,9 +698,13 @@ exports.getUserProgress = async (req, res, next) => {
       };
     });
 
+    console.log(`[getUserProgress] Detailed progress processed:`, detailedProgress); // Log 8: Detailed progress processed
+    console.log(`[getUserProgress] learningProgress after detailed progress:`, learningProgress); // Log 9: learningProgress after detailed progress
+
     // Process quiz results (full history)
     const quizResults = quizResultsSnapshot.docs.map(doc => {
       const data = doc.data();
+      console.log(`[getUserProgress] Quiz result data:`, data); // Log 10: Quiz result data
       return {
         id: doc.id,
         moduleId: data.moduleId,
@@ -720,9 +717,12 @@ exports.getUserProgress = async (req, res, next) => {
       };
     });
 
+    console.log(`[getUserProgress] Quiz results processed:`, quizResults); // Log 11: Quiz results processed
+
     // Process exam results (full history)
     const examResults = examResultsSnapshot.docs.map(doc => {
       const data = doc.data();
+      console.log(`[getUserProgress] Exam result data:`, data); // Log 12: Exam result data
       return {
         id: doc.id,
         examId: data.examId,
@@ -734,21 +734,24 @@ exports.getUserProgress = async (req, res, next) => {
       };
     });
 
+    console.log(`[getUserProgress] Exam results processed:`, examResults); // Log 13: Exam results processed
+
     // --- Construct Response ---
     // Return a comprehensive object
+    console.log(`[getUserProgress] Final learningProgress:`, learningProgress); // Log 14: Final learningProgress
+    console.log(`[getUserProgress] Sending response to client.`); // Log 15: Sending response
     res.json({
       userExists: true,
       learningProgress, // Summary data from user doc
       detailedProgress, // Start/complete status for individual resources
       quizResults, // Full history of quiz attempts
       examResults, // Full history of exam attempts
-      // Include modules/exams definitions if fetched and needed by frontend
-      // modules: modulesSnapshot ? modulesSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) : undefined,
-      // exams: examsSnapshot ? examsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) : undefined,
+      availableModules: modulesSnapshot ? modulesSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) : [],
+      exams: examsSnapshot ? examsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) : [],
     });
   } catch (error) {
     console.error(
-      `Error fetching overall progress for user ${req.params.userId}:`,
+      `[getUserProgress] Error fetching overall progress for user ${req.params.userId}:`,
       error,
     );
     next(
