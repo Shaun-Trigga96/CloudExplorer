@@ -87,7 +87,7 @@ steps:
       - 'gcr.io/$PROJECT_ID/react-native-builder:latest'
       - '-f'
       - 'android/Dockerfile.builder' # Assumes this path is correct
-      - './android'                  # Assumes this context is correct
+      - './android'                  # Assumes this context is corrects
 
   - name: 'gcr.io/$PROJECT_ID/react-native-builder:latest' # Use the image just built
     id: 'build-android-app'
