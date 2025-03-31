@@ -1,86 +1,125 @@
-# cloudbuild.yaml (Improved Version)
+# cloudbuild.yaml for Cloud Explorer
 steps:
-  # 1. Install Functions Dependencies & Lint (Optional but Recommended)
-  - name: 'node:20' # Use a specific Node.js version matching your functions/package.json engine
-    id: Install Functions Dependencies & Lint
+  # 1. Install dependencies and run tests
+  - name: 'node:20'
+    id: 'install-dependencies'
     entrypoint: 'npm'
     args: ['install']
-    dir: 'functions' # Specify the directory
-  - name: 'node:20' # Use the same Node.js version
-    id: Lint Functions Code
+    
+  - name: 'node:20'
+    id: 'run-tests'
     entrypoint: 'npm'
-    args: ['run', 'lint'] # Assumes 'lint' script exists in functions/package.json
+    args: ['test']
+    
+  # 2. Build and deploy Firebase functions
+  - name: 'node:20'
+    id: 'install-functions-dependencies'
+    entrypoint: 'npm'
+    args: ['install']
     dir: 'functions'
-
-   # 2. Deploy Firebase Cloud Functions using cloud-sdk image + install
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk' # Use the cloud-sdk image
-   id: Deploy Cloud Functions
-   entrypoint: bash                         # <--- Specify bash as the entrypoint
-   args:                                    # <--- Args for bash
-     - -c                                    # <--- Tell bash to execute the command string that follows
-     - |                                     # <--- Start multi-line command string
-         # Install firebase-tools globally first
-         npm install -g firebase-tools && \
-         # Then run firebase deploy
-         firebase deploy --only functions --project $PROJECT_ID --non-interactive --token $FIREBASE_TOKEN
-         # Note: Using --token might be required. Generate token via 'firebase login:ci'
-         # Store the token in Secret Manager and substitute $FIREBASE_TOKEN via build substitutions.
-         # If default gcloud auth works, you might not need --token. Test carefully.
-
-# 3. Build and push the backend production image
- - name: 'gcr.io/cloud-builders/docker'
-   id: Build Backend Prod Image
-   args:
-     - 'build'
-     - '-t'
-     - 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA'
-     - '-f'
-     - 'Dockerfile.prod' # Use Dockerfile from the root
-     - './backend'    # Set build context to the backend_app directory
- # Push the image (can be a separate step or combined if preferred)
- - name: 'gcr.io/cloud-builders/docker'
-   id: Push Backend Prod Image
-   args: ['push', 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA']
-
-  # 4. Deploy Backend to Cloud Run
+    
+  - name: 'node:20'
+    id: 'lint-functions'
+    entrypoint: 'npm'
+    args: ['run', 'lint']
+    dir: 'functions'
+    
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: Deploy Backend to Cloud Run
+    id: 'deploy-firebase-functions'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        npm install -g firebase-tools
+        firebase deploy --only functions --project $PROJECT_ID --non-interactive
+  
+  # 3. Build and push backend container
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-backend'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
+      - '-f'
+      - 'backend/Dockerfile'
+      - './backend'
+      
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-backend'
+    args: 
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
+  
+  # 4. Deploy backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-backend'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
-      - 'cloud-explorer-backend' # Your Cloud Run service name
+      - 'cloud-explorer-backend'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA' # Use $PROJECT_ID variable
+      - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
       - '--region'
-      - 'us-central1' # Or your preferred region
+      - 'us-central1'
       - '--platform'
       - 'managed'
-      - '--allow-unauthenticated' # Keep if public access is needed, otherwise remove for authenticated access
-
-  # 5. Build Frontend Image (Purpose needs clarification)
-  # Builds the dev image as per your original file. Consider if you need a prod build/deploy.
+      - '--allow-unauthenticated'
+  
+  # 5. Build React Native app for Android
   - name: 'gcr.io/cloud-builders/docker'
-    id: Build Frontend Dev Image
-    entrypoint: 'sh'
+    id: 'build-android'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/react-native-builder:latest'
+      - '-f'
+      - 'android/Dockerfile.builder'
+      - './android'
+      
+  - name: 'gcr.io/$PROJECT_ID/react-native-builder:latest'
+    id: 'build-android-app'
+    entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Use $PROJECT_ID variable for image name
-        docker build -t gcr.io/$PROJECT_ID/cloud-explorer-frontend-dev:$COMMIT_SHA -f Dockerfile.dev .
-        docker push gcr.io/$PROJECT_ID/cloud-explorer-frontend-dev:$COMMIT_SHA
+        cd android
+        ./gradlew assembleRelease
+  
+  # 6. Upload APK to Google Cloud Storage
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'upload-apk'
+    entrypoint: 'gsutil'
+    args:
+      - 'cp'
+      - 'android/app/build/outputs/apk/release/app-release.apk'
+      - 'gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk'
+  
+  # 7. Update Firestore with new app version info
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'update-app-version'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        npm install -g firebase-tools
+        firebase firestore:set --project $PROJECT_ID /appVersions/latest --data '{"version": "$COMMIT_SHA", "buildDate": "'$(date -u +'%Y-%m-%dT%H:%M:%SZ')'", "downloadUrl": "gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk"}'
 
-# List images built by this pipeline (uses $PROJECT_ID)
+# Images to be pushed to Container Registry
 images:
-  - 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/cloud-explorer-frontend-dev:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/react-native-builder:latest'
 
-# Add this options section at the end of the file
+# Additional options
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'  # More resources for React Native builds
 
-# Optional: Specify timeout for the build
-# timeout: 1200s
+# Timeout increased for mobile app builds
+timeout: '3600s'
 
-# Optional: Specify service account with necessary permissions
-# serviceAccount: 'projects/your-project-id/serviceAccounts/your-cloud-build-sa@your-project-id.iam.gserviceaccount.com'
+# Artifacts configuration to store build outputs
+artifacts:
+  objects:
+    location: 'gs://$PROJECT_ID-builds/'
+    paths: ['android/app/build/outputs/apk/release/app-release.apk']
