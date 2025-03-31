@@ -1,4 +1,4 @@
-# cloudbuild.yaml for Cloud Explorer (Dev/Test Build)
+# cloudbuild.yaml for Cloud Explorer (Dev/Test Build - Corrected)
 steps:
   # 1. Install dependencies (Test step commented out)
   - name: 'node:20'
@@ -18,13 +18,13 @@ steps:
     id: 'install-functions-dependencies'
     entrypoint: 'npm'
     args: ['install']
-    dir: 'functions'
+    dir: 'functions' # Run in functions directory
 
   - name: 'node:20'
     id: 'lint-functions'
     entrypoint: 'npm'
     args: ['run', 'lint'] # Assumes 'lint' script passes
-    dir: 'functions'
+    dir: 'functions' # Run in functions directory
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-firebase-functions'
@@ -33,10 +33,11 @@ steps:
       - '-c'
       - |
           npm install -g firebase-tools && \
-          firebase deploy --only functions --project $PROJECT_ID --non-interactive --token $_FIREBASE_TOKEN # <-- Use $_ prefix
-          # Note: $_FIREBASE_TOKEN is substituted by Cloud Build via trigger config
+          firebase deploy --only functions --project $PROJECT_ID --non-interactive --token $_FIREBASE_TOKEN
+          # Note: $_FIREBASE_TOKEN is substituted by Cloud Build via trigger config.
+          # Runtime auth errors might still occur if token/permissions are wrong.
 
-  # 3. Build and push backend container (Paths corrected based on previous info)
+  # 3. Build and push backend container (Corrected Paths)
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-backend'
     args:
@@ -44,8 +45,8 @@ steps:
       - '-t'
       - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
       - '-f'
-      - 'Dockerfile.prod'  # <-- Assumes Dockerfile.prod is at the root. Verify!
-      - './backend'     # <-- Assumes backend code is in backend/. Verify!
+      - 'Dockerfile.prod'  # <--- CORRECTED: Assumes Dockerfile.prod is at the root
+      - './backend'     # <--- CORRECTED: Assumes backend code is in backend_app/
 
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-backend'
@@ -64,14 +65,14 @@ steps:
       - '--image'
       - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
       - '--region'
-      - 'us-central1' # Or your preferred region
+      - 'us-central1' # Or your preferred/newly configured build region
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
 
   # 5. Build React Native app for Android
   - name: 'gcr.io/cloud-builders/docker'
-    id: 'build-android-builder-image' # Renamed ID for clarity
+    id: 'build-android-builder-image'
     args:
       - 'build'
       - '-t'
@@ -88,7 +89,8 @@ steps:
       - |
           # Ensure gradlew is executable if necessary: chmod +x ./gradlew
           cd android && ./gradlew assembleRelease
-          # Check exit code: if [ $$? -ne 0 ]; then exit 1; fi
+          # Optional: Check exit code to fail build if gradle fails
+          # if [ $$? -ne 0 ]; then echo "Gradle build failed!"; exit 1; fi
 
   # 6. Upload APK to Google Cloud Storage
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -108,23 +110,23 @@ steps:
   #     - '-c'
   #     - |
   #       npm install -g firebase-tools && \
-  #       firebase firestore:set --project $PROJECT_ID /appVersions/latest --data '{"version": "$COMMIT_SHA", "buildDate": "'$(date -u +'%Y-%m-%dT%H:%M:%SZ')'", "downloadUrl": "gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk"}' --token $FIREBASE_TOKEN
+  #       firebase firestore:set --project $PROJECT_ID /appVersions/latest --data '{"version": "$COMMIT_SHA", "buildDate": "'$(date -u +'%Y-%m-%dT%H:%M:%SZ')'", "downloadUrl": "gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk"}' --token $_FIREBASE_TOKEN
   #       # WARNING: Might fail with auth errors. Use --token if needed.
 
 # Images to be pushed to Container Registry
 images:
   - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/react-native-builder:latest' # Builder image, might not need listing if only intermediate
+  - 'gcr.io/$PROJECT_ID/react-native-builder:latest' # Builder image, consider if needed here
 
 # Additional options
 options:
   logging: CLOUD_LOGGING_ONLY
   # machineType: 'N1_HIGHCPU_8' # Removed based on previous quota error
-  # Increased timeout for mobile app builds
+# Increased timeout for mobile app builds
 timeout: '3600s'
 
 # Artifacts configuration to store build outputs
 artifacts:
   objects:
-    location: 'gs://$PROJECT_ID-builds/'
+    location: 'gs://$PROJECT_ID-builds/' # Make sure this bucket exists
     paths: ['android/app/build/outputs/apk/release/app-release.apk']
