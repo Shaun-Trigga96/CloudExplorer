@@ -240,7 +240,7 @@ function defineModules(): ScriptModuleDef[] {
       duration: 75, // Example duration
       prerequisites: ['cloud-fundamentals', 'compute-engine'], // Example prerequisites
       sections: [
-        { title: 'Introduction to Kubernetes & Containers', contentPath: 'kubernetesNotes.md', order: 1 },
+        { title: 'Introduction to Kubernetes & Containers', contentPath: 'kubernetes.md', order: 1 },
         { title: 'Container Orchestration with GKE', contentPath: 'containerOrchestrationNotes.md', order: 2 } // Fixed Order
       ]
     },

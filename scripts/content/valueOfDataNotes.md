@@ -155,7 +155,7 @@ The data value chain describes the full lifecycle of data from collection to ana
 
 The data value chain is essential for transforming raw data into actionable insights that drive decision-making and business value.
 
-### The Role of Google Cloud
+### **The Role of Google Cloud**
 
 Google Cloud provides a suite of tools and services to help organizations manage their data effectively:
 

@@ -492,60 +492,82 @@ exports.getExamProgress = async (req, res, next) => {
   }
 };
 
-// --- DEPRECATED? Review 'completeExam' ---
-// This seems like a specific update triggered after an exam, potentially redundant
-// with saveExamResult or should be part of a larger "complete module" flow.
-// For now, commenting out but keeping for reference. If needed, refactor significantly.
-/*
-// POST /user/:userId/exam (Old route, seems complex and maybe redundant)
-exports.completeExam = async (req, res, next) => {
+// --- NEW: List Exams ---
+// GET /list
+exports.listExams = async (req, res, next) => {
   try {
-    const { userId } = req.params;
-    // These params seem odd for just "completing" an exam - score usually comes from saving result
-    const { moduleId, examId, quizId, score } = req.body;
+    const {
+      limit = 10,
+      lastId,
+      orderBy = 'updatedAt',
+      orderDir = 'desc',
+    } = req.query;
+    const parsedLimit = parseInt(limit, 10);
 
-    // Input validation needed here...
+    if (isNaN(parsedLimit) || parsedLimit <= 0 || parsedLimit > 50) {
+      // Sensible max limit
+      return next(
+        new AppError(
+          'Invalid limit value (must be 1-50)',
+          400,
+          'INVALID_LIMIT',
+        ),
+      );
+    }
+    const validOrderBy = ['title', 'createdAt', 'updatedAt']; // Allowed sort fields
+    const validOrderDir = ['asc', 'desc'];
+    if (!validOrderBy.includes(orderBy) || !validOrderDir.includes(orderDir)) {
+      return next(
+        new AppError(
+          'Invalid orderBy or orderDir parameter',
+          400,
+          'INVALID_SORT',
+        ),
+      );
+    }
 
-    console.warn(`Executing 'completeExam' for user ${userId}, exam ${examId}. Review if this logic is still required.`);
+    let query = db
+      .collection('exams')
+      .orderBy(orderBy, orderDir)
+      .limit(parsedLimit);
 
-    await db.runTransaction(async transaction => {
-      const userRef = db.collection('users').doc(userId);
-      const userDoc = await transaction.get(userRef);
-
-      if (!userDoc.exists) {
-        throw new AppError('User not found', 404, 'USER_NOT_FOUND_TX');
+    if (lastId) {
+      const lastDocSnapshot = await db.collection('exams').doc(lastId).get();
+      if (lastDocSnapshot.exists) {
+        query = query.startAfter(lastDocSnapshot); // Use snapshot for pagination cursor
+      } else {
+        // Don't throw error, just ignore invalid lastId and start from beginning
+        console.warn(
+          `Pagination lastId '${lastId}' not found. Starting from beginning.`,
+        );
+        // return next(new AppError('Invalid lastId provided for pagination', 400, 'INVALID_LAST_ID'));
       }
+    }
 
-      const timestamp = serverTimestamp();
-
-      // Update user document - THIS SEEMS VERY AGGRESSIVE / POTENTIALLY INCORRECT
-      const updates = {
-          lastActivity: timestamp, // Sensible update
+    const examsSnapshot = await query.get();
+    const exams = examsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        title: data.title,
+        content: data.content, // Google Doc URL or other content identifier
+        createdAt: data.createdAt?.toDate() || null,
+        updatedAt: data.updatedAt?.toDate() || null,
+        // Add other relevant fields like thumbnail URL, tags, etc.
       };
-      if(examId) updates['learningProgress.completedExams'] = admin.firestore.FieldValue.arrayUnion(examId);
-      if(moduleId) updates['learningProgress.completedModules'] = admin.firestore.FieldValue.arrayUnion(moduleId);
-      if(quizId) updates['learningProgress.completedQuizzes'] = admin.firestore.FieldValue.arrayUnion(quizId); // Should this be quiz result object?
-      if(score !== undefined) updates['learningProgress.score'] = admin.firestore.FieldValue.increment(score); // What score is this? Overall?
-
-      transaction.update(userRef, updates);
-
-      // Update separate progress documents? This seems inconsistent with saving results elsewhere.
-      // if (examId) {
-      //     const progressRef = userRef.collection('progress').doc(examId); // Using examId as doc ID?
-      //     transaction.set(progressRef, { examId, moduleId, quizId, score, completedAt: timestamp }, { merge: true });
-      // }
-      // if (moduleId) { // Also updating module start/progress doc?
-      //     const moduleStartRef = userRef.collection('progress').doc(`${moduleId}_start`);
-      //     transaction.set(moduleStartRef, { status: 'completed', completedAt: timestamp }, { merge: true }); // Update status
-      // }
-
     });
 
-    res.status(200).json({ message: 'Exam completion processed (Review Logic)' });
+    // Determine the last ID for the next page request
+    const newLastId =
+      exams.length > 0 ? exams[exams.length - 1].id : null;
 
+    res.json({
+      exams,
+      hasMore: exams.length === parsedLimit, // If we fetched the max limit, there might be more
+      lastId: newLastId,
+    });
   } catch (error) {
-     console.error(`Error in 'completeExam' for user ${req.params.userId}:`, error);
-    next(error); // Pass to global handler
+    console.error('Error listing exams:', error);
+    next(error);
   }
 };
-*/

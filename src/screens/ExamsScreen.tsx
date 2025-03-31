@@ -96,13 +96,13 @@ const ExamsScreen = () => {
       setLoading(true);
       setError(null);
 
-      const response = await axios.get(`${BASE_URL}/api/v1/exams/progress/{userId}`); // Corrected endpoint
+      const response = await axios.get(`${BASE_URL}/api/v1/exams/progress/${userId}`); // Corrected endpoint
 
-      if (response.data) {
+      if (Array.isArray(response.data.examProgress)) {
         const attempts: Record<string, number> = {};
         const scores: Record<string, number> = {};
 
-        response.data.forEach((attempt: any) => {
+        response.data.examProgress.forEach((attempt: any) => {
           attempts[attempt.examId] = (attempts[attempt.examId] || 0) + 1;
           if (!scores[attempt.examId] || attempt.score > scores[attempt.examId]) {
             scores[attempt.examId] = attempt.score;
@@ -111,8 +111,18 @@ const ExamsScreen = () => {
 
         setExamAttempts(attempts);
         setExamScores(scores);
+      } else if (response.data === null || response.data === undefined || response.data.examProgress === null || response.data.examProgress === undefined) {
+        // Handle the case where the response is null or undefined
+        console.warn('No exam progress data found for user:', userId);
+        setExamAttempts({});
+        setExamScores({});
+      } else {
+        // Handle the case where the response is not an array
+        console.error('Unexpected response format:', response.data);
+        setError('Unexpected response format from server.');
+        setExamAttempts({});
+        setExamScores({});
       }
-    // eslint-disable-next-line no-catch-shadow, @typescript-eslint/no-shadow
     } catch (error) {
       console.error('Error fetching exam attempts:', error);
       if (axios.isAxiosError(error)) {

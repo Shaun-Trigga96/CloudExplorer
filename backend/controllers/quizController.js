@@ -292,9 +292,9 @@ exports.saveQuizResult = async (req, res, next) => {
     // This logic might be complex: Does completing one quiz complete the module? Or is there a final exam?
     // Assuming passing *this* quiz contributes to module completion, but might not be the sole condition.
     // Let's just record the quiz completion here. Module completion might be handled elsewhere (e.g., after an exam or all required activities).
-    // if (passed) {
-    //   updateData['learningProgress.completedModules'] = admin.firestore.FieldValue.arrayUnion(moduleId);
-    // }
+     if (passed) {
+       updateData['learningProgress.completedModules'] = admin.firestore.FieldValue.arrayUnion(moduleId);
+     }
 
     if (userDoc.exists) {
       batch.update(userRef, updateData);
