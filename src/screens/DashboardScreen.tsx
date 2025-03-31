@@ -21,6 +21,7 @@ import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
 import CloudStorageIcon from '../assets/icons/cloud_storage.svg';
 import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
 import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
+import StreamingAnalyticsIcon from '../assets/icons/streaming_analytics.svg';
 import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
 import {REACT_APP_BASE_URL} from '@env';
 import {RootStackParamList} from '../navigation/RootNavigator';
@@ -429,6 +430,11 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
       },
       'kubernetes-engine': {
         icon: KubernetesEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>,
+        color: '#0000',
+        title: 'Kubernetes Engine',
+      },
+      'data-transformation': {
+        icon: StreamingAnalyticsIcon as React.FC<React.SVGProps<SVGSVGElement>>,
         color: '#0000',
         title: 'Kubernetes Engine',
       },

@@ -6,7 +6,8 @@ import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
 import CloudStorageIcon from '../assets/icons/cloud_storage.svg';
 import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
 import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
-import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
+import CloudGenericIcon from '../assets/icons/cloud_generic.svg'
+import StreamingAnalyticsIcon from '../assets/icons/streaming_analytics.svg';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -56,6 +57,12 @@ const ModulesScreen = () => {
        description: 'Learn the fundamentals of cloud computing in Google Cloud',
        icon: CloudGenericIcon,
      },
+     {
+      id: 'data-transformation',
+      title: 'Data Transformation',
+      description: 'Learn the value of data in Google Cloud',
+      icon: StreamingAnalyticsIcon,
+    },
      {
        id: 'compute-engine',
        title: 'Compute Engine',

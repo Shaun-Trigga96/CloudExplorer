@@ -245,17 +245,19 @@ function defineModules(): ScriptModuleDef[] {
       ]
     },
     // Add definitions for any other modules you have .md files for...
-    // {
-    //   moduleId: 'networking-vpc',
-    //   title: 'VPC Networking',
-    //   description: 'Understand Virtual Private Cloud (VPC) networks, subnets, firewall rules, and routing in Google Cloud.',
-    //   duration: 90,
-    //   prerequisites: ['cloud-fundamentals'],
-    //   sections: [
-    //     { title: 'VPC Fundamentals', contentPath: 'vpcNetworkingNotes.md', order: 1 },
-    //     { title: 'Firewalls and Routes', contentPath: 'vpcFirewallsRoutesNotes.md', order: 2 }
-    //   ]
-    // },
+    {
+      moduleId: 'data-transformation',
+      title: 'Data Transformation',
+      description: 'Understanding the value of data is essential for leveraging its full potential.',
+      duration: 90,
+      prerequisites: ['cloud-fundamentals'],
+      sections: [
+        { title: 'Value of Data', contentPath: 'valueOfDataNotes.md', order: 1 },
+        { title: 'Data Management Solutions', contentPath: 'dataManagementSolutions.md', order: 2 },
+        { title: 'Make Data Useful and Accessible', contentPath: 'makeDataUseful.md', order: 3 }
+
+      ]
+    },
   ];
 }
 
@@ -361,6 +363,13 @@ function defineQuizzes(): ScriptQuizDef[] {
       passingScore: 70
     },
     // Add entries for other modules that need quizzes...
+    {
+      quizId: 'data-transformation-quiz-1',
+      moduleId: 'data-transformation',
+      title: 'Data Transformation Quiz',
+      numberOfQuestions: 5,
+      passingScore: 70
+    }
   ];
 }
 

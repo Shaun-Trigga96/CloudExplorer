@@ -1,6 +1,6 @@
 # Kubernetes Engine Overview
 
-## Introduction to Kubernetes Engine
+## **Introduction to Kubernetes Engine**
 
 ![icon:google_kubernetes_engine]
 
@@ -17,7 +17,7 @@ Google Kubernetes Engine (GKE) is a managed Kubernetes service for deploying, ma
   - Deploying machine learning models in containers.
   - Managing stateless or stateful applications.
 
-## Kubernetes Basics
+## **Kubernetes Basics**
 
 - **Cluster**: A set of nodes (VMs) running Kubernetes, including a control plane (master) and worker nodes.
 - **Pod**: The smallest deployable unit, containing one or more containers.
@@ -25,7 +25,7 @@ Google Kubernetes Engine (GKE) is a managed Kubernetes service for deploying, ma
 - **Service**: Exposes pods to network traffic (e.g., LoadBalancer, ClusterIP).
 - **ConfigMap/Secret**: Manage configuration and sensitive data.
 
-## Key Concepts
+## **Key Concepts**
 
 - **Nodes**:
   - Worker machines (VMs) running pods, managed by Compute Engine.
@@ -43,7 +43,7 @@ Google Kubernetes Engine (GKE) is a managed Kubernetes service for deploying, ma
   - Pods get unique IPs within the cluster.
   - Use Services for load balancing or external access.
 
-## Getting Started
+## **Getting Started**
 
 1. **Create a Cluster**:
     - Via Console: GKE > Create Cluster.
@@ -110,9 +110,9 @@ Google Kubernetes Engine (GKE) is a managed Kubernetes service for deploying, ma
     kubectl get service nginx-service
     ```
 
-## Advanced Features
+## **Advanced Features**
 
-### Horizontal Pod Autoscaling (HPA)
+## **Horizontal Pod Autoscaling (HPA)**
 
 - Scale pods based on CPU/memory:
 
@@ -120,28 +120,20 @@ Google Kubernetes Engine (GKE) is a managed Kubernetes service for deploying, ma
     kubectl autoscale deployment nginx-deployment --cpu-percent=50 --min=1 --max=10
     ```
 
-### Cluster Autoscaling
+## **Cluster Autoscaling**
 
 - Automatically add/remove nodes based on resource needs.
 
-### GKE Autopilot
+## **GKE Autopilot**
 
 - Fully managed mode with no node management required.
 
-## Best Practices
+## **Best Practices**
 
 - Use namespaces to organize resources (e.g., dev, prod).
 - Define resource requests/limits for pods to prevent over-utilization.
 - Enable GKE’s built-in security features (e.g., Workload Identity).
 
-## Further Reading
+## **Further Reading**
 
 - For more details, visit: <https://cloud.google.com/kubernetes-engine/docs>
-
----
-
-### Integration with Your Script
-
-To use these notes in your `scripts/create-schema.ts`, ensure they are saved in the `content` directory (e.g., `content/computeEngine.md`, `content/cloudStorage.md`, etc.). Your script already references these files correctly with `readFileSync`. The updated and new notes will automatically populate the `sections` field in the `modules` array, providing comprehensive study material for your Cloud Explorer app users.
-
-Let me know if you need further adjustments or additional content!

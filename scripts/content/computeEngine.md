@@ -1,6 +1,6 @@
 # Compute Engine Overview
 
-## Introduction to Compute Engine
+## **Introduction to Compute Engine**
 
 ![icon:compute_engine]
 
@@ -20,7 +20,7 @@ Compute Engine is Google Cloud Platform's Infrastructure-as-a-Service (IaaS) off
   - Performing batch processing, such as video rendering or data analysis.
   - Supporting machine learning workloads with GPU-enabled VMs.
 
-## Virtual Machine Types
+## **Virtual Machine Types**
 
 Compute Engine offers a range of VM types tailored to different workloads:
 
@@ -42,7 +42,7 @@ Compute Engine offers a range of VM types tailored to different workloads:
 - **GPU-enabled VMs**:
   - Attach NVIDIA GPUs (e.g., Tesla T4, V100) for graphics rendering, AI/ML training, or simulations.
 
-## Key Concepts
+## **Key Concepts**
 
 - **Zones and Regions**:
   - VMs are deployed in specific zones (e.g., `us-central1-a`) within regions (e.g., `us-central1`).
@@ -64,7 +64,7 @@ Compute Engine offers a range of VM types tailored to different workloads:
 - **Instance Groups**:
   - Managed Instance Groups (MIGs) enable autoscaling and self-healing for groups of identical VMs.
 
-## Getting Started
+## **Getting Started**
 
 1. **Create a VM**:
    - Via GCP Console: Navigate to Compute Engine > VM Instances > Create Instance.
@@ -85,12 +85,12 @@ Compute Engine offers a range of VM types tailored to different workloads:
 
    - Access via the VM’s external IP.
 
-4. Manage VMs:
+4. **Manage VMs:**
 
    - Stop, start, or delete VMs via Console, CLI, or API.
    - Use snapshots for backups or cloning.
 
-## Advanced Features
+## **Advanced Features**
 
 **Autoscaling:**
 
@@ -107,11 +107,10 @@ Compute Engine offers a range of VM types tailored to different workloads:
 - Launch: gcloud compute instances create my-preemptible-vm --preemptible.
 - Handle termination gracefully in your application.
 
-## Best Practices
+## **Best Practices**
 
 - Use labels (e.g., env=prod) for resource organization.
 - Enable auto-restart and live migration for high availability.
 - Monitor VMs with Google Cloud Monitoring for performance insights.
 
 For more details, visit: <https://cloud.google.com/compute/docs>
-

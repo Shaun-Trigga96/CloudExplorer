@@ -1,6 +1,6 @@
 # Cloud Storage Overview
 
-## Introduction to Cloud Storage
+## **Introduction to Cloud Storage**
 
 ![icon:cloud_storage]
 
@@ -18,7 +18,7 @@ Google Cloud Storage (GCS) is a fully managed, scalable object storage service d
   - Archiving data for compliance or disaster recovery.
   - Hosting static websites or distributing software.
 
-## Storage Classes
+## **Storage Classes**
 
 - **Standard**: High-performance storage for frequently accessed data (e.g., website assets).
 - **Nearline**: Low-cost storage for data accessed less than once a month (e.g., backups).
@@ -29,7 +29,7 @@ Google Cloud Storage (GCS) is a fully managed, scalable object storage service d
   - Access cost increases as retrieval frequency decreases.
   - Minimum storage duration applies (e.g., 30 days for Nearline, 365 days for Archive).
 
-## Key Concepts
+## **Key Concepts**
 
 - **Buckets**:
   - Containers for objects, similar to folders but flat (no true hierarchy).
@@ -48,7 +48,7 @@ Google Cloud Storage (GCS) is a fully managed, scalable object storage service d
 - **Lifecycle Management**:
   - Automate transitions between storage classes or deletion (e.g., move to Archive after 90 days).
 
-## Getting Started
+## **Getting Started**
 
 1. **Create a Bucket**:
    - Via Console: Navigate to Storage > Create Bucket.
@@ -81,16 +81,16 @@ Google Cloud Storage (GCS) is a fully managed, scalable object storage service d
 
    - Apply: `gsutil lifecycle set lifecycle.json gs://my-app-bucket`
 
-## Practical Examples
+## **Practical Examples**
 
-### Static Website Hosting
+### **Static Website Hosting**
 
 - Upload HTML/CSS files to a bucket.
 - Set the bucket to public.
 - Configure a main page (e.g., `index.html`).
 - Access via `http://storage.googleapis.com/my-app-bucket/index.html`.
 
-### Backup Automation
+### **Backup Automation**
 
 Use `gsutil` in a cron job to upload daily backups:
 

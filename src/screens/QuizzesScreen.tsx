@@ -6,6 +6,7 @@ import ComputeEngine from '../assets/icons/compute_engine.svg';
 import CloudFunctions from '../assets/icons/cloud_functions.svg';
 import KubernetesEngine from '../assets/icons/google_kubernetes_engine.svg';
 import CloudGeneric from '../assets/icons/cloud_generic.svg'
+import StreamingAnalyticsIcon from '../assets/icons/streaming_analytics.svg';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useNavigation } from '@react-navigation/native';
@@ -30,6 +31,13 @@ const QuizzesScreen = () => {
       description: 'Test your knowledge of basic GCP concepts',
       questionCount: 20,
       icon: CloudGeneric,
+    },
+    {
+      id: 'data-transformation', // Updated IDs
+      title: 'Data Transformation',
+      description: 'Test your knowledge on data transformation concepts',
+      questionCount: 20,
+      icon: StreamingAnalyticsIcon,
     },
     {
       id: 'compute-engine', // Updated IDs
