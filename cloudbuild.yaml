@@ -26,17 +26,17 @@ steps:
     args: ['run', 'lint'] # Assumes 'lint' script passes
     dir: 'functions' # Run in functions directory
 
- - name: 'gcr.io/cloud-builders/firebase' # <--- CORRECTED IMAGE PATH
+  - name: 'gcr.io/cloud-builders/firebase' # <--- CORRECTED IMAGE PATH
     id: 'deploy-firebase-functions'
-    args:                                         # <-- Indent this line (same as 'id:')
-      - 'deploy'                             # <-- Indent items under args (e.g., 2 more spaces)
+    args:
+      - 'deploy'
       - '--only'
       - 'functions'
       - '--project'
       - '$PROJECT_ID'
       - '--non-interactive'
       - '--token'
-      - $_FIREBASE_TOKEN # Uses the token directly
+      - $_FIREBASE_TOKEN
 
   # 3. Build and push backend container (Corrected Paths)
   - name: 'gcr.io/cloud-builders/docker'
