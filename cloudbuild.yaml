@@ -12,18 +12,20 @@ steps:
     args: ['run', 'lint'] # Assumes 'lint' script exists in functions/package.json
     dir: 'functions'
 
-# 2. Deploy Firebase Cloud Functions
- # Uses the official Firebase builder image
- - name: 'gcr.io/google-appengine/firebase' # <-- CHANGE THIS IMAGE NAME
+# 2. Deploy Firebase Cloud Functions using cloud-sdk image + install
+ - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk' # Use the cloud-sdk image
    id: Deploy Cloud Functions
-   args: # <-- REMOVE entrypoint, use args directly for firebase commands
-     - 'deploy'
-     - '--only'
-     - 'functions'
-     - '--project'
-     - '$PROJECT_ID'
-     - '--non-interactive'
-     # - '--force' # Add back if necessary, but often better to avoid unless needed
+   entrypoint: bash                         # <--- Specify bash as the entrypoint
+   args:                                    # <--- Args for bash
+     - -c                                    # <--- Tell bash to execute the command string that follows
+     - |                                     # <--- Start multi-line command string
+         # Install firebase-tools globally first
+         npm install -g firebase-tools && \
+         # Then run firebase deploy
+         firebase deploy --only functions --project $PROJECT_ID --non-interactive --token $FIREBASE_TOKEN
+         # Note: Using --token might be required. Generate token via 'firebase login:ci'
+         # Store the token in Secret Manager and substitute $FIREBASE_TOKEN via build substitutions.
+         # If default gcloud auth works, you might not need --token. Test carefully.
 
 # 3. Build and push the backend production image
  - name: 'gcr.io/cloud-builders/docker'
