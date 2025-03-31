@@ -26,9 +26,9 @@ steps:
     args: ['run', 'lint'] # Assumes 'lint' script passes
     dir: 'functions' # Run in functions directory
 
-  - name: 'gcr.io/google-appengine/firebase' # Step starts here (correct indent relative to 'steps:')
-    id: 'deploy-firebase-functions'          # <-- Indent this line (e.g., 2 spaces)
-    args:                                    # <-- Indent this line (same as 'id:')
+ - name: 'gcr.io/cloud-builders/firebase' # <--- CORRECTED IMAGE PATH
+    id: 'deploy-firebase-functions'
+    args:                                         # <-- Indent this line (same as 'id:')
       - 'deploy'                             # <-- Indent items under args (e.g., 2 more spaces)
       - '--only'
       - 'functions'
