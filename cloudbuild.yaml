@@ -34,7 +34,7 @@ steps:
      - 'gcr.io/$PROJECT_ID/cloud-explorer-backend-prod:$COMMIT_SHA'
      - '-f'
      - 'Dockerfile.prod' # Use Dockerfile from the root
-     - './backend_app'    # Set build context to the backend_app directory
+     - './backend'    # Set build context to the backend_app directory
  # Push the image (can be a separate step or combined if preferred)
  - name: 'gcr.io/cloud-builders/docker'
    id: Push Backend Prod Image
