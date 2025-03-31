@@ -1,4 +1,5 @@
 # cloudbuild.yaml for Cloud Explorer (Dev/Test Build - Corrected)
+
 steps:
   # 1. Install dependencies (Test step commented out)
   - name: 'node:20'
@@ -26,17 +27,18 @@ steps:
     args: ['run', 'lint'] # Assumes 'lint' script passes
     dir: 'functions' # Run in functions directory
 
-  - name: 'gcr.io/cloud-builders/firebase' # <--- CORRECTED IMAGE PATH
+  # Fixed Firebase deployment step - using nodejs image with firebase-tools
+  - name: 'node:20'
     id: 'deploy-firebase-functions'
+    entrypoint: 'bash'
     args:
-      - 'deploy'
-      - '--only'
-      - 'functions'
-      - '--project'
-      - '$PROJECT_ID'
-      - '--non-interactive'
-      - '--token'
-      - $_FIREBASE_TOKEN
+      - '-c'
+      - |
+        npm install -g firebase-tools && \
+        firebase deploy --only functions \
+        --project $PROJECT_ID \
+        --non-interactive \
+        --token $_FIREBASE_TOKEN
 
   # 3. Build and push backend container (Corrected Paths)
   - name: 'gcr.io/cloud-builders/docker'
