@@ -26,16 +26,17 @@ steps:
     args: ['run', 'lint'] # Assumes 'lint' script passes
     dir: 'functions' # Run in functions directory
 
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+ - name: 'gcr.io/google-appengine/firebase' # <--- USE THIS IMAGE
     id: 'deploy-firebase-functions'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-          npm install -g firebase-tools && \
-          firebase deploy --only functions --project $PROJECT_ID --non-interactive --token $_FIREBASE_TOKEN
-          # Note: $_FIREBASE_TOKEN is substituted by Cloud Build via trigger config.
-          # Runtime auth errors might still occur if token/permissions are wrong.
+    args:                                     # <--- NO entrypoint: bash needed
+      - 'deploy'
+      - '--only'
+      - 'functions'
+      - '--project'
+      - '$PROJECT_ID'
+      - '--non-interactive'
+      - '--token'
+      - $_FIREBASE_TOKEN # Uses the token directly
 
   # 3. Build and push backend container (Corrected Paths)
   - name: 'gcr.io/cloud-builders/docker'
