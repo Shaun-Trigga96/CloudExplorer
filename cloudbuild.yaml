@@ -12,8 +12,8 @@ steps:
     args: ['run', 'lint'] # Assumes 'lint' script exists in functions/package.json
     dir: 'functions'
 
-# 2. Deploy Firebase Cloud Functions using cloud-sdk image + install
- - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk' # Use the cloud-sdk image
+   # 2. Deploy Firebase Cloud Functions using cloud-sdk image + install
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk' # Use the cloud-sdk image
    id: Deploy Cloud Functions
    entrypoint: bash                         # <--- Specify bash as the entrypoint
    args:                                    # <--- Args for bash
