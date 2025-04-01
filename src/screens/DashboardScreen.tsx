@@ -14,7 +14,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import Animated, {FadeIn} from 'react-native-reanimated';
-import {Button} from 'react-native-paper';
+import {Button, Card, Title} from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
@@ -26,6 +26,7 @@ import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
 import {REACT_APP_BASE_URL} from '@env';
 import {RootStackParamList} from '../navigation/RootNavigator';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import iconMap from './../utils/iconMap';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -53,6 +54,11 @@ interface Module {
   title: string;
 }
 
+interface Quiz {
+  id: string;
+  title: string;
+  moduleId: string; // Add moduleId to the Quiz interface
+}
 interface QuizResult {
   id: string;
   moduleId: string;
@@ -233,6 +239,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
   const [progress, setProgress] = useState<ProgressEntry[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]); // New state
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [examResults, setExamResults] = useState<ExamResult[]>([]);
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
@@ -254,6 +261,16 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
     'cloud-data-engineer-exam': '#0F9D58', // Google Green
     'cloud-architect-exam': '#DB4437', // Google Red
     'cloud-security-engineer-exam': '#F4B400', // Google Yellow
+  };
+
+   // Define the icon map for the quizzes
+   const iconMap: { [key: string]: React.FC } = {
+    'cloud-storage': CloudStorageIcon,
+    'compute-engine': ComputeEngineIcon,
+    'cloud-functions': CloudFunctionsIcon,
+    'kubernetes-engine': KubernetesEngineIcon,
+    'cloud-fundamentals': CloudGenericIcon,
+    'data-transformation': StreamingAnalyticsIcon,
   };
 
   // Function to toggle the expanded state of a module
@@ -327,14 +344,15 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
         if (!storedUserId) {
           return;
         }
-
         const response = await axios.get(
           `${BASE_URL}/api/v1/users/${storedUserId}/progress`,
         );
+        console.log('API Response:', response.data);
         setLearningProgress(response.data.learningProgress || null);
         setProgress(response.data.detailedProgress || []);
         setModules(response.data.availableModules || []);
         setExams(response.data.exams || []);
+        setQuizzes(response.data.availableQuizzes);
         setQuizResults(response.data.quizResults || []);
         setExamResults(response.data.examResults || []);
         setErrorInfo(null);
@@ -365,6 +383,9 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
           if (err.response?.data?.exams) {
             setExams(err.response.data.exams);
           }
+          if (err.response?.data?.quizzes) {
+            setQuizzes(err.response.data.quizzes);
+          }
         } else {
           setErrorInfo({
             message:
@@ -378,21 +399,36 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
       }
     };
 
+    const fetchAvailableQuizzes = async () => {
+      try {
+        const response = await axios.get(
+          `${BASE_URL}/api/v1/quizzes/list-quizzes`,
+        );
+        console.log('Available Quizzes API Response:', response.data);
+        setQuizzes(response.data.availableQuizzes);
+      } catch (error) {
+        console.error('Error fetching available quizzes:', error);
+      }
+    };
+
     fetchUserData();
+    fetchAvailableQuizzes(); // Fetch available quizzes
   }, [navigation]);
 
   // Calculate overall progress
   const totalModules = modules.length;
   const completedModuleIds = [
     ...new Set([
-       // Get completed module IDs from the summary user data
-    ...(Array.isArray(learningProgress?.completedModules) ? learningProgress.completedModules : []),
-       // Get completed module IDs from the detailed progress data
-    ...progress // Use the 'progress' state (which should contain detailedProgress data)
-          .filter(p => p.moduleId === 'module' && p.status === 'completed') // Filter ONLY completed MODULES
-          .map(entry => entry), // Map to get JUST the resourceId STRING
+      // Get completed module IDs from the summary user data
+      ...(Array.isArray(learningProgress?.completedModules)
+        ? learningProgress.completedModules
+        : []),
+      // Get completed module IDs from the detailed progress data
+      ...progress // Use the 'progress' state (which should contain detailedProgress data)
+        .filter(p => p.moduleId === 'module' && p.status === 'completed') // Filter ONLY completed MODULES
+        .map(entry => entry), // Map to get JUST the resourceId STRING
     ]),
-   ];
+  ];
 
   const progressPercentage =
     totalModules > 0
@@ -436,7 +472,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
       'data-transformation': {
         icon: StreamingAnalyticsIcon as React.FC<React.SVGProps<SVGSVGElement>>,
         color: '#0000',
-        title: 'Kubernetes Engine',
+        title: 'Data Transformation',
       },
     };
 
@@ -448,6 +484,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
     };
     return {...mapped, title: module?.title || mapped.title};
   };
+
 
   // Helper function to format date
   const formatDate = (dateString: string | number | Date) => {
@@ -590,16 +627,35 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
           ) : (
             <Text style={styles.noDataText}>No modules available.</Text>
           )}
+
           <Text style={styles.sectionTitle}>Quizzes</Text>
+        {/* Display Available Quizzes */}
+        {quizzes.length > 0 ? (
+            <View>
+              {quizzes.map(quiz => {
+                const IconComponent = iconMap[quiz.moduleId] || CloudGenericIcon;
+                const status = learningProgress?.completedQuizzes?.includes(quiz.id)
+                ? 'Completed'
+                : 'Not Started';
+                  return (
+                    <ProgressItem
+                    key={quiz.id}
+                    title={quiz.title}
+                    status={status}
+                    color={''}
+                    icon={IconComponent}
+                  />
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={styles.noDataText}>No quizzes available.</Text>
+          )}
           {Object.keys(quizzesByModule).length > 0 ? (
             Object.keys(quizzesByModule).map(moduleId => {
               const {title, color, icon} = getModuleDetails(moduleId);
               const moduleQuizzes = quizzesByModule[moduleId];
-              const completedQuizzes = moduleQuizzes.filter(
-                quiz => quiz.percentage !== undefined && quiz.percentage >= 0,
-              );
-              const isExpanded = expandedModules[moduleId] || false;
-
+              const isExpanded = expandedModules[moduleId] || false; // Removed completedQuizzes filter
               return (
                 <View key={moduleId} style={styles.quizModuleContainer}>
                   {/* Module Header */}
@@ -619,8 +675,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
                     </View>
                     <View style={styles.quizModuleRightSection}>
                       <Text style={styles.quizCountText}>
-                        {completedQuizzes.length}/{moduleQuizzes.length}{' '}
-                        Completed
+                        {moduleQuizzes.length} Quizzes
                       </Text>
                       <Icon
                         name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -659,9 +714,9 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
                                 </Text>
                                 {isCompleted ? (
                                   <Text style={styles.quizItemScore}>
-                                    Score: {quiz.score}/{quiz.totalQuestions}
+                                    Score: {quiz.score}/{quiz.totalQuestions}{' '}
                                     {quiz.percentage !== undefined &&
-                                      ` (${quiz.percentage}%)`}
+                                      `(${quiz.percentage}%)`}
                                   </Text>
                                 ) : (
                                   <Text style={styles.quizItemScore}>
@@ -709,8 +764,6 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
               const status = learningProgress?.completedExams?.includes(exam.id)
                 ? 'Completed'
                 : 'Not Started';
-
-              // Use image icons for exams with explicit key
               return (
                 <ProgressItem
                   key={exam.id}
@@ -733,6 +786,16 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
 };
 
 const styles = StyleSheet.create({
+  quizCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quizIconContainer: {
+    marginRight: 12,
+  },
+  quizTitle: {
+    flex: 1,
+  },
   safeArea: {flex: 1, backgroundColor: '#f8f9fa'},
   container: {flex: 1, padding: 16},
   title: {fontSize: 24, fontWeight: '700', marginBottom: 16, color: '#202124'},

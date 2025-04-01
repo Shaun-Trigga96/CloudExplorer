@@ -626,6 +626,7 @@ exports.getUserProgress = async (req, res, next) => {
       examResultsSnapshot,
       modulesSnapshot,
       examsSnapshot,
+      quizzesSnaphost,
     ] = await Promise.all([
       db.collection('users').doc(userId).get(),
       db.collection('users').doc(userId).collection('progress').get(), // Get all progress docs
@@ -641,6 +642,7 @@ exports.getUserProgress = async (req, res, next) => {
         .get(),
       db.collection('modules').get(),
       db.collection('exams').get(),
+      db.collection('quizzes').get(),
     ]);
 
     console.log(`[getUserProgress] Data fetched from Firestore for user: ${userId}`); // Log 3: Data fetch complete
@@ -663,6 +665,7 @@ exports.getUserProgress = async (req, res, next) => {
         examResults: [],
         availableModules: [],
         exams: [],
+        availableQuizzes: []
       });
       // OR: return next(new AppError('User not found', 404, 'USER_NOT_FOUND')); // If user must exist
     }
@@ -746,6 +749,7 @@ exports.getUserProgress = async (req, res, next) => {
       detailedProgress, // Start/complete status for individual resources
       quizResults, // Full history of quiz attempts
       examResults, // Full history of exam attempts
+      availableQuizzes: quizzesSnaphost ? quizzesSnaphost.docs.map(d => ({ id: d.id, ...d.data() })) : [],
       availableModules: modulesSnapshot ? modulesSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) : [],
       exams: examsSnapshot ? examsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) : [],
     });
