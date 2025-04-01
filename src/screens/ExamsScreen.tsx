@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Image } from 'react-native';
-import { Card, Title, Paragraph, Button, ActivityIndicator, Text } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, Image, ActivityIndicator } from 'react-native';
+import { Card, Title, Paragraph, Button, Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -8,64 +8,26 @@ import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
 
-const BASE_URL = REACT_APP_BASE_URL; 
+const BASE_URL = REACT_APP_BASE_URL;
 
 type ExamsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ExamDetail'>;
 
 interface Exam {
-  id: string;
+  id: string; // Persistent ID
   title: string;
   description: string;
-  duration: string;
-  icon: number;
-  passRate?: number;
-  questionsCount?: number;
+  duration: number | null;
+  prerequisites: string[];
+  associatedModules?: string[]; // For AI context generation
+  passingRate: number;
+  icon: any;
 }
 
 const ExamsScreen = () => {
   const navigation = useNavigation<ExamsScreenNavigationProp>();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [exams] = useState<Exam[]>([
-    {
-      id: 'cloud-digital-leader-exam',
-      title: 'Cloud Digital Leader',
-      description: 'Cloud Digital LeaderCertification Practice Exam',
-      duration: '2 hours',
-      icon: require('../assets/images/cloud-digital-leader.png'),
-      passRate: 70,
-      questionsCount: 50,
-    },
-      {
-      id: 'cloud-architect-exam',
-      title: 'Professional Cloud Architect',
-      description: 'Professional Cloud Architect Certification Practice Exam',
-      duration: '2 hours',
-      icon: require('../assets/images/cloud-architect.png'),
-      passRate: 70,
-      questionsCount: 50,
-    },
-    {
-      id: 'cloud-engineer-exam',
-      title: 'Professional Data Engineer',
-      description: 'Professional Data Engineer Certification Practice Exam',
-      duration: '2 hours',
-      icon: require('../assets/images/data-engineer.png'),
-      passRate: 70,
-      questionsCount: 50,
-    },
-
-    {
-      id: 'cloud-security-engineer-exam',
-      title: 'Security Engineer',
-      description: 'Professional Security Engineer Certification Practice Exam',
-      duration: '2 hours',
-      icon: require('../assets/images/security-engineer.png'),
-      passRate: 70,
-      questionsCount: 50,
-    },
-  ]);
-
+  const [exams, setExams] = useState<Exam[]>([]);
   const [examAttempts, setExamAttempts] = useState<Record<string, number>>({});
   const [examScores, setExamScores] = useState<Record<string, number>>({});
   const [userIdLoading, setUserIdLoading] = useState(true);
@@ -91,6 +53,56 @@ const ExamsScreen = () => {
     fetchUserIdAndExamAttempts();
   }, []);
 
+  useEffect(() => {
+    const fetchExams = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await axios.get(`${BASE_URL}/api/v1/exams/list-exams`);
+        console.log("Exams API Response:", response.data); // Log the API response
+        const formattedExams: Exam[] = response.data.exams.map((exam: any) => {
+          const formattedExam: Exam = {
+            id: exam.id,
+            title: exam.title,
+            description: exam.description,
+            duration: exam.duration,
+            prerequisites: exam.prerequisites,
+            associatedModules: exam.associatedModules,
+            passingRate: exam.passingRate,
+            icon: getIconForExam(exam.examId),
+          };
+          console.log("Formatted Exam:", formattedExam); // Log the formatted exam
+          return formattedExam;
+        });
+        setExams(formattedExams);
+      } catch (err) {
+        if (axios.isAxiosError(err)) {
+          const axiosError = err as AxiosError;
+          if (axiosError.response) {
+            console.error('Server responded with:', axiosError.response.status, axiosError.response.data);
+            setError(
+              `Server Error: ${axiosError.response.status} - ${axiosError.response.data || axiosError.response.statusText}`,
+            );
+          } else if (axiosError.request) {
+            console.error('No response received:', axiosError.request);
+            setError(
+              'Network error: Unable to connect to server. Please check your connection.',
+            );
+          } else {
+            console.error('Error setting up the request:', axiosError.message);
+            setError(`Error: ${axiosError.message}`);
+          }
+        } else {
+          console.error('An unexpected error occurred:', err);
+          setError(`An unexpected error occurred: ${err}`);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchExams();
+  }, []);
   const fetchExamAttempts = async (userId: string) => {
     try {
       setLoading(true);
@@ -174,6 +186,22 @@ const ExamsScreen = () => {
     }
   };
 
+  const getIconForExam = (examId: string) => {
+    // Create a more robust mapping that handles the full exam IDs
+    const iconMap: { [key: string]: any } = {
+      'cloud-digital-leader-exam': require('../assets/images/cloud-digital-leader.png'),
+      'cloud-architect-exam': require('../assets/images/cloud-architect.png'),
+      'cloud-data-engineer': require('../assets/images/data-engineer.png'),
+      'cloud-security-exam': require('../assets/images/security-engineer.png'),
+      // Add more mappings as needed...
+    };
+  
+    // Handle cases where the exam ID is not found in the map
+    const icon = iconMap[examId] || require('../assets/images/cloud_generic.png');
+    return icon;
+  };
+  
+
   if (userIdLoading) {
     return (
       <View style={styles.errorContainer}>
@@ -217,41 +245,34 @@ const ExamsScreen = () => {
           <Card key={exam.id} style={styles.card}>
             <Card.Content>
               <View style={styles.headerRow}>
-                <Image
-                  source={exam.icon}
-                  style={styles.icon}
-                  resizeMode="contain"
-                />
+                <View style={styles.iconContainer}>
+                  <Image
+                    source={exam.icon}
+                    style={styles.icon}
+                    resizeMode="contain"
+                  />
+                </View>
                 <Title style={styles.title}>{exam.title}</Title>
               </View>
-              <Paragraph>{exam.description}</Paragraph>
+              <Paragraph>{exam.description}</Paragraph> {/* Display description */}
 
               <View style={styles.examDetails}>
                 <View style={styles.examDetailItem}>
                   <Text style={styles.detailLabel}>Duration</Text>
-                  <Text style={styles.detailValue}>{exam.duration}</Text>
-                </View>
-
-                <View style={styles.examDetailItem}>
-                  <Text style={styles.detailLabel}>Questions</Text>
-                  <Text style={styles.detailValue}>{exam.questionsCount}</Text>
+                  <Text style={styles.detailValue}>{exam.duration} minutes</Text>
                 </View>
 
                 <View style={styles.examDetailItem}>
                   <Text style={styles.detailLabel}>Pass Rate</Text>
-                  <Text style={styles.detailValue}>{exam.passRate}%</Text>
+                  <Text style={styles.detailValue}>{exam.passingRate}%</Text>
                 </View>
               </View>
 
               {examAttempts[exam.id] > 0 && (
                 <View style={styles.progressContainer}>
-                  <Text style={styles.progressText}>
-                    Previous attempts: {examAttempts[exam.id]}
-                  </Text>
+                  <Text style={styles.progressText}>Previous attempts: {examAttempts[exam.id]}</Text>
                   {examScores[exam.id] && (
-                    <Text style={styles.progressText}>
-                      Best score: {examScores[exam.id].toFixed(1)}%
-                    </Text>
+                    <Text style={styles.progressText}>Best score: {examScores[exam.id].toFixed(1)}%</Text>
                   )}
                 </View>
               )}
@@ -298,10 +319,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  iconContainer: {
+    marginRight: 12,
+    width: 52,
+    height: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   icon: {
     width: 52,
     height: 52,
-    marginRight: 12,
   },
   title: {
     marginLeft: 8,

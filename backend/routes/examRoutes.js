@@ -1,7 +1,7 @@
 const express = require('express');
 const examController = require('../controllers/examController');
 const { validateExamInput } = require('../middleware/validation');
-const { hfApiLimiter } = require('../server'); // Import limiter
+const { hfApiLimiter } = require('../middleware/middleware'); // Import limiter
 // const { protect, adminOnly } = require('../middleware/authMiddleware'); // Auth/Admin checks
 
 const router = express.Router();
@@ -24,7 +24,7 @@ router.post('/save-result', /* protect, */ examController.saveExamResult);
 
 //
 // List exams (optional, depends on requirements) - Protected? Public?
- router.get('/list', /* protect, */ examController.listExams);
+ router.get('/list-exams', /* protect, */ examController.listExams);
 
 
 // --- Dynamic routes ---
@@ -35,7 +35,7 @@ router.get('/progress/:userId', /* protect, */ examController.getExamProgress);
 
 
 // Get a specific exam definition by ID (protect based on user role/enrollment?)
-// router.get('/:examId', /* protect, */ examController.getExamById);
+router.get('/:examId', /* protect, */ examController.getExamById);
 
 // Route for submitting exam attempts (maybe handled by save-result?)
 // router.post('/:examId/attempt', protect, examController.submitExamAttempt);

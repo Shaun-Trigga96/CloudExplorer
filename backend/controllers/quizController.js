@@ -3,7 +3,7 @@ const AppError = require('../utils/appError');
 const {serverTimestamp} = require('../utils/firestoreHelpers');
 const {executeWithRetry} = require('../utils/retryHandler');
 const {parseQuizFromAIResponse} = require('../utils/aiHelpers');
-const {hf} = require('../server'); // Import initialized HF instance from server.js
+const {hf} = require('../middleware/middleware'); // Import initialized HF instance from server.js
 
 const db = admin.firestore();
 
@@ -414,5 +414,56 @@ exports.getQuizHistory = async (req, res, next) => {
     next(
       new AppError('Failed to retrieve quiz history.', 500, 'DB_FETCH_ERROR'),
     );
+  }
+};
+
+// --- NEW: Get Quiz by ID ---
+// GET /:quizId
+exports.getQuizById = async (req, res, next) => {
+  try {
+    const { quizId } = req.params;
+
+    if (!quizId || typeof quizId !== 'string') {
+      return next(
+        new AppError('Invalid quiz ID parameter', 400, 'INVALID_QUIZ_ID'),
+      );
+    }
+
+    const quizDoc = await db.collection('quizzes').doc(quizId).get();
+
+    if (!quizDoc.exists) {
+      return next(
+        new AppError(`Quiz with ID ${quizId} not found`, 404, 'QUIZ_NOT_FOUND'),
+      );
+    }
+
+    const quizData = quizDoc.data();
+    res.json({
+      id: quizDoc.id,
+      ...quizData,
+      // Include other relevant fields from the quiz document
+    });
+  } catch (error) {
+    console.error(`Error getting quiz by ID ${req.params.quizId}:`, error);
+    next(error);
+  }
+};
+
+// --- NEW: Get All Quizzes ---
+// GET /
+exports.getAllQuizzes = async (req, res, next) => {
+  try {
+    const quizzesSnapshot = await db.collection('quizzes').get();
+
+    const quizzes = quizzesSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      // Include other relevant fields from the quiz document
+    }));
+
+    res.json({ quizzes });
+  } catch (error) {
+    console.error('Error getting all quizzes:', error);
+    next(error);
   }
 };

@@ -90,16 +90,17 @@ exports.listModules = async (req, res, next) => {
 // GET /module/:id
 exports.getModuleById = async (req, res, next) => {
   try {
-    const moduleId = req.params.id;
-    if (!moduleId || typeof moduleId !== 'string') {
-      return next(
-        new AppError(
-          'Invalid module ID parameter',
-          400,
-          'INVALID_MODULE_ID_PARAM',
-        ),
-      );
-    }
+    const moduleId = req.params;
+    console.log('moduleId:', moduleId);
+    // if (!moduleId || typeof moduleId !== 'string') {
+    //   return next(
+    //     new AppError(
+    //       'Invalid module ID parameter',
+    //       400,
+    //       'INVALID_MODULE_ID_PARAM',
+    //     ),
+    //   );
+    // }
     const moduleDoc = await db.collection('modules').doc(moduleId).get();
 
     if (!moduleDoc.exists) {

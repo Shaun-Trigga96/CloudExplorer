@@ -7,6 +7,7 @@ const path = require('path');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const {HfInference} = require('@huggingface/inference'); // Import HF Inference
+const { hfApiLimiter } = require('./middleware/middleware'); // Import limiter from middleware.js
 
 // --- Load Environment Variables ---
 dotenv.config({path: path.resolve(__dirname, '..', '.env')});
@@ -97,7 +98,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: 'Too many requests from this IP, please try again after 15 minutes',
 });
-app.use(apiLimiter); // Apply to all routes by default
+app.use(hfApiLimiter); // Apply to all routes by default
 // Body Parsing
 app.use(express.json({limit: '10kb'})); // Limit payload size
 app.use(express.urlencoded({extended: true, limit: '10kb'})); // For form data if needed
@@ -105,20 +106,13 @@ app.use(express.urlencoded({extended: true, limit: '10kb'})); // For form data i
 // Logging (use 'dev' for development, 'combined' for production)
 app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
 
-// Specific Limiter for Hugging Face (more restrictive)
-const hfApiLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: process.env.NODE_ENV === 'development' ? 20 : 5, // Limit AI generation calls per IP
-  message:
-    'Too many AI generation requests from this IP, please try again after a minute',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-// Export limiter so routes can import it
-module.exports.hfApiLimiter = hfApiLimiter;
+
+module.exports.hf = hf;
 
 app.use(express.json({limit: '50kb'})); // Increased limit slightly if quiz/exam answers are large
 app.use(express.urlencoded({extended: true, limit: '50kb'}));
+app.use(apiLimiter); // Apply to all routes by default
+
 
 // --- API Routes --- (Add new routers)
 app.use('/api/v1', appRoutes); // General: /api/v1/health

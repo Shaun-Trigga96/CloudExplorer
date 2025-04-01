@@ -548,8 +548,13 @@ exports.listExams = async (req, res, next) => {
     const exams = examsSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
-        id: doc.id,
+        examId: doc.id,
         title: data.title,
+        description: data.description,
+        duration: data.duration,
+        prerequisites: data.prerequisites,
+        associatedModules: data.associatedModules,
+        passingRate: data.passingRate,
         content: data.content, // Google Doc URL or other content identifier
         createdAt: data.createdAt?.toDate() || null,
         updatedAt: data.updatedAt?.toDate() || null,
@@ -571,3 +576,36 @@ exports.listExams = async (req, res, next) => {
     next(error);
   }
 };
+
+// --- NEW: Get Exam by ID ---
+// GET /:examId
+exports.getExamById = async (req, res, next) => {
+  try {
+    const { examId } = req.params;
+
+    if (!examId || typeof examId !== 'string') {
+      return next(
+        new AppError('Invalid exam ID parameter', 400, 'INVALID_EXAM_ID'),
+      );
+    }
+
+    const examDoc = await db.collection('exams').doc(examId).get();
+
+    if (!examDoc.exists) {
+      return next(
+        new AppError(`Exam with ID ${examId} not found`, 404, 'EXAM_NOT_FOUND'),
+      );
+    }
+
+    const examData = examDoc.data();
+    res.json({
+      id: examDoc.id,
+      ...examData,
+      // Include other relevant fields from the exam document
+    });
+  } catch (error) {
+    console.error(`Error getting exam by ID ${req.params.examId}:`, error);
+    next(error);
+  }
+};
+

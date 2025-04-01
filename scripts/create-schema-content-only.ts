@@ -47,6 +47,7 @@ interface Quiz {
   passingScore: number;
   createdAt?: Timestamp | FieldValue;
   updatedAt?: Timestamp | FieldValue;
+  description: string;
 }
 
 interface Exam {
@@ -60,7 +61,7 @@ interface Exam {
   questionsGeneratedAt?: Timestamp | FieldValue;
   createdAt?: Timestamp | FieldValue;
   updatedAt?: Timestamp | FieldValue;
-  // Removed 'content' field if description + associatedModules provide context
+  passingRate: number;
 }
 
 // --- Load Environment Variables ---
@@ -285,7 +286,8 @@ function defineExams(): ScriptExamDef[] {
       prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions'], // Suggested prerequisite
       // Modules relevant for fundamental understanding for AI context
       associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage'],
-      numberOfQuestions: 30 // Adjusted number of questions for practice CDL
+      numberOfQuestions: 30, // Adjusted number of questions for practice CDL
+      passingRate: 70 // Adjusted passing rate for CDL
     },
     {
       examId: 'cloud-architect-exam',
@@ -296,7 +298,8 @@ function defineExams(): ScriptExamDef[] {
       prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions'], // Add others like networking if available
       // Include all available core modules for broad architect context
       associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'cloud-functions', 'kubernetes-engine'],
-      numberOfQuestions: 50
+      numberOfQuestions: 50,
+      passingRate: 70 // Adjusted passing rate for CDL
     },
     {
       examId: 'cloud-data-engineer', // NOTE: Requires relevant data modules to be defined for optimal generation
@@ -306,7 +309,8 @@ function defineExams(): ScriptExamDef[] {
       prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage'], // Core prerequisites
       // Focus context on modules relevant to data storage, processing, serverless triggers
       associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'cloud-functions'],
-      numberOfQuestions: 50
+      numberOfQuestions: 50,
+      passingRate: 70 // Adjusted passing rate for CDL
     },
     {
       examId: 'cloud-security-exam', // NOTE: Requires relevant security modules to be defined for optimal generation
@@ -316,7 +320,8 @@ function defineExams(): ScriptExamDef[] {
       prerequisites: ['cloud-fundamentals', 'compute-engine'], // Add networking, IAM modules if available
       // Focus context on infrastructure modules that need securing
       associatedModules: ['cloud-fundamentals', 'compute-engine', 'kubernetes-engine'],
-      numberOfQuestions: 50
+      numberOfQuestions: 50,
+      passingRate: 70 // Adjusted passing rate for CDL
     },
     // Add other exam definitions here...
   ];
@@ -332,35 +337,40 @@ function defineQuizzes(): ScriptQuizDef[] {
       moduleId: 'cloud-fundamentals', // Link to the module
       title: 'Cloud Fundamentals Quiz', // Title for the quiz
       numberOfQuestions: 5, // How many questions to generate
-      passingScore: 60 // Required score percentage to pass
+      passingScore: 60, // Required score percentage to pass,
+      description: 'Test your knowledge of core cloud computing concepts and Google Cloud fundamentals.' // Added Description
     },
     {
       quizId: 'compute-engine-quiz-1',
       moduleId: 'compute-engine',
       title: 'Compute Engine Basics Quiz',
       numberOfQuestions: 5,
-      passingScore: 70
+      passingScore: 70,
+      description: 'Test your understanding of Google Cloud Compute Engine basics.' // Added Description
     },
     {
       quizId: 'cloud-storage-quiz-1',
       moduleId: 'cloud-storage',
       title: 'Cloud Storage Quiz',
       numberOfQuestions: 5,
-      passingScore: 70
+      passingScore: 70,
+      description: 'Test your knowledge of Google Cloud Storage concepts and use cases.' // Added Description
     },
     {
       quizId: 'cloud-functions-quiz-1',
       moduleId: 'cloud-functions',
       title: 'Cloud Functions Quiz',
       numberOfQuestions: 5,
-      passingScore: 70
+      passingScore: 70,
+      description: 'Test your understanding of Google Cloud Functions and serverless computing.' // Added Description
     },
     {
       quizId: 'kubernetes-engine-quiz-1',
       moduleId: 'kubernetes-engine',
       title: 'Kubernetes Engine Quiz',
       numberOfQuestions: 5,
-      passingScore: 70
+      passingScore: 70,
+      description: 'Test your knowledge of Google Kubernetes Engine and container orchestration.' // Added Description
     },
     // Add entries for other modules that need quizzes...
     {
@@ -368,7 +378,8 @@ function defineQuizzes(): ScriptQuizDef[] {
       moduleId: 'data-transformation',
       title: 'Data Transformation Quiz',
       numberOfQuestions: 5,
-      passingScore: 70
+      passingScore: 70,
+      description: 'Test your understanding of data transformation and management concepts.' // Added Description
     }
   ];
 }

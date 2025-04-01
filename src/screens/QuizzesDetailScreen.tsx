@@ -40,6 +40,7 @@ const QuizzesDetailScreen = ({
   navigation: any;
 }) => {
   const { moduleId } = route.params;
+  console.log('moduleId:', moduleId);
   const [quiz, setQuiz] = useState<Quiz[] | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
@@ -75,9 +76,7 @@ const QuizzesDetailScreen = ({
     const fetchQuiz = async () => {
       setLoading(true);
       try {
-        const moduleResponse = await axios.get(
-          `${BASE_URL}/api/v1/modules/{moduleId}`,
-        );
+        const moduleResponse = await axios.get(`${BASE_URL}/api/v1/modules/${moduleId}`); // Corrected URL
         setModuleTitle(moduleResponse.data.title);
 
         const quizResponse = await axios.post(`${BASE_URL}/api/v1/quizzes/generate`, {
