@@ -11,7 +11,6 @@ import {
   Platform,
   TextInput,
   KeyboardAvoidingView,
-  Dimensions, // Import Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext'; // Assuming you have this
@@ -93,15 +92,15 @@ const ProfileScreen: FC = () => {
         setLoading(true);
         const user = auth().currentUser;
         const storedUserId = await AsyncStorage.getItem('userId');
-        // console.log('Stored User ID:', storedUserId);
-        // console.log('Firebase User:', user?.uid, user?.displayName, user?.photoURL);
+        console.log('Stored User ID:', storedUserId);
+        console.log('Firebase User:', user?.uid, user?.displayName, user?.photoURL);
 
         if (!user || !storedUserId) {
           throw new Error('No authenticated user or stored user ID');
         }
 
         const profileUrl = `${BASE_URL}/api/v1/users/${storedUserId}/profile`;
-        // console.log('Fetching profile from:', profileUrl);
+        console.log('Fetching profile from:', profileUrl);
         let profile: UserProfile;
 
         try {
@@ -123,8 +122,8 @@ const ProfileScreen: FC = () => {
           };
         }
 
-        // console.log('Fetched profile:', profile);
-        // console.log('Final photoURL:', profile.photoURL);
+        console.log('Fetched profile:', profile);
+        console.log('Final photoURL:', profile.photoURL);
         setUserProfile(profile);
         setEditedProfile(profile); // Initialize edit form
       } catch (error) {
@@ -210,9 +209,7 @@ const ProfileScreen: FC = () => {
   const updateUserProfile = async (profileData: UserProfile, isPhotoUpdateOnly: boolean = false) => {
       const user = auth().currentUser;
       if (!user) { /* ... */ return; }
-
       setLoading(true); // Show loading indicator during save
-
       try {
           // Update Firebase Auth Profile (Display Name & Photo URL)
           const authUpdates: { displayName?: string; photoURL?: string | null } = {};
@@ -235,6 +232,7 @@ const ProfileScreen: FC = () => {
           };
           // Use PUT or PATCH depending on your API design
           const response = await axios.put(`${BASE_URL}/api/v1/users/${user.uid}/profile`, backendPayload);
+          console.log('Backend response:', response.data);
 
           // Update local state with combined data
           const updatedProfile: UserProfile = {
@@ -254,7 +252,7 @@ const ProfileScreen: FC = () => {
           console.error('Error updating user profile:', error);
           handleAxiosError(error);
           // Optional: Revert editedProfile state on error?
-          // if (userProfile) setEditedProfile(userProfile);
+          if (userProfile) setEditedProfile(userProfile);
       } finally {
           setLoading(false);
       }
@@ -262,7 +260,7 @@ const ProfileScreen: FC = () => {
 
   const handleSaveProfile = () => {
       if (!editedProfile.displayName.trim()) { /* ... */ return; }
-      // console.log('Saving profile:', editedProfile);
+      console.log('Saving profile:', editedProfile);
       updateUserProfile(editedProfile); // Pass the entire edited profile
   };
  // --- End Handlers ---

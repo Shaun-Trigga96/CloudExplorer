@@ -74,7 +74,6 @@ module.exports.hf = hf; // Make hf available for import
 
 // --- Utils and Middleware ---
 const AppError = require('./utils/appError');
-const {authenticateGoogleDocs} = require('./utils/googleAuth');
 
 // --- Route Imports ---
 const userRoutes = require('./routes/userRoutes');
@@ -83,6 +82,7 @@ const docRoutes = require('./routes/docRoutes');
 const examRoutes = require('./routes/examRoutes');
 const quizRoutes = require('./routes/quizRoutes'); // Added
 const appRoutes = require('./routes/appRoutes'); // Added
+const emailRoutes = require('./routes/emailRoutes'); // Import email routes
 
 // --- Express App Setup ---
 const app = express();
@@ -121,6 +121,7 @@ app.use('/api/v1/modules', moduleRoutes);
 app.use('/api/v1/docs', docRoutes);
 app.use('/api/v1/quizzes', quizRoutes); // Added: /api/v1/quizzes/...
 app.use('/api/v1/exams', examRoutes); // Added/Updated: /api/v1/exams/...
+app.use('/api/v1/email', emailRoutes); // Mount email routes under /api/v1/email
 
 // --- Health Check Route ---
 app.get('/health', (req, res) => {

@@ -33,8 +33,4 @@ router.post('/:userId/progress', /* protect, */ userController.trackProgress);
 router.get('/:userId/progress', /* protect, */ userController.getUserProgress);
 
 
-// --- Old/Replaced Progress Routes --- (Review and remove if covered by above)
-//router.post('/:userId/module/start', userController.startModuleProgress); // Covered by POST /:userId/progress?
-
-
 module.exports = router;

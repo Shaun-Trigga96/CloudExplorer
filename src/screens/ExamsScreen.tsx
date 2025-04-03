@@ -7,6 +7,8 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
+import strings from '../localization/strings'; // Adjust the path as needed
+
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -201,7 +203,7 @@ const ExamsScreen = () => {
     return icon;
   };
   
-
+  // --- Loading/Error states ---
   if (userIdLoading) {
     return (
       <View style={styles.errorContainer}>
@@ -232,13 +234,13 @@ const ExamsScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Title style={styles.screenTitle}>Certification Practice Exams</Title>
+       {/* Use string keys */}
+      <Title style={styles.screenTitle}>{strings.certificationPracticeExamsTitle}</Title>
       <Paragraph style={styles.screenDescription}>
-        Test your knowledge with full-length practice exams for Google Cloud certifications.
-        Each exam simulates the actual certification experience.
+         {strings.certificationPracticeExamsDescription}
       </Paragraph>
 
-      {loading ? (
+      {loading ? ( // Separate loading indicator for exams list
         <ActivityIndicator style={styles.loader} />
       ) : (
         exams.map((exam) => (
@@ -254,25 +256,31 @@ const ExamsScreen = () => {
                 </View>
                 <Title style={styles.title}>{exam.title}</Title>
               </View>
-              <Paragraph>{exam.description}</Paragraph> {/* Display description */}
+              <Paragraph>{exam.description}</Paragraph>
 
               <View style={styles.examDetails}>
                 <View style={styles.examDetailItem}>
-                  <Text style={styles.detailLabel}>Duration</Text>
-                  <Text style={styles.detailValue}>{exam.duration} minutes</Text>
+                   {/* Use string key */}
+                  <Text style={styles.detailLabel}>{strings.durationLabel}</Text>
+                  {/* Use template literal with string key */}
+                  <Text style={styles.detailValue}>{exam.duration ? `${exam.duration} ${strings.minutesSuffix}`: 'N/A'}</Text>
                 </View>
 
                 <View style={styles.examDetailItem}>
-                  <Text style={styles.detailLabel}>Pass Rate</Text>
-                  <Text style={styles.detailValue}>{exam.passingRate}%</Text>
+                   {/* Use string key */}
+                  <Text style={styles.detailLabel}>{strings.passRateLabel}</Text>
+                   {/* Use template literal with string key */}
+                  <Text style={styles.detailValue}>{exam.passingRate ? `${exam.passingRate}${strings.percentSuffix}` : 'N/A'}</Text>
                 </View>
               </View>
 
               {examAttempts[exam.id] > 0 && (
                 <View style={styles.progressContainer}>
-                  <Text style={styles.progressText}>Previous attempts: {examAttempts[exam.id]}</Text>
-                  {examScores[exam.id] && (
-                    <Text style={styles.progressText}>Best score: {examScores[exam.id].toFixed(1)}%</Text>
+                  {/* Use template literal with string key */}
+                  <Text style={styles.progressText}>{`${strings.previousAttemptsPrefix}${examAttempts[exam.id]}`}</Text>
+                  {examScores[exam.id] !== undefined && ( // Check if score exists
+                     /* Use template literal with string key */
+                    <Text style={styles.progressText}>{`${strings.bestScorePrefix}${examScores[exam.id].toFixed(1)}${strings.percentSuffix}`}</Text>
                   )}
                 </View>
               )}
@@ -283,7 +291,8 @@ const ExamsScreen = () => {
                 onPress={() => handleStartExam(exam)}
                 style={styles.startButton}
               >
-                Start Practice Exam
+                 {/* Use string key */}
+                {strings.startPracticeExam}
               </Button>
             </Card.Actions>
           </Card>

@@ -4,14 +4,13 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Card, Title, Paragraph, Button, Text } from 'react-native-paper';
 import CloudStorage from '../assets/icons/cloud_storage.svg';
 import ComputeEngine from '../assets/icons/compute_engine.svg';
 import CloudFunctions from '../assets/icons/cloud_functions.svg';
 import KubernetesEngine from '../assets/icons/google_kubernetes_engine.svg';
-import CloudGeneric from '../assets/icons/cloud_generic.svg';
+import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
 import StreamingAnalyticsIcon from '../assets/icons/streaming_analytics.svg';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -19,14 +18,15 @@ import { useNavigation } from '@react-navigation/native';
 import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
+import strings from '../localization/strings'; // Adjust the path as needed
 
 const BASE_URL = REACT_APP_BASE_URL;
 
 interface Quiz {
   id: string;
   title: string;
-  description: string; // Added description
-  questionCount: number; // Added questionCount
+  description: string;
+  questionCount: number;
   icon: React.FC;
   moduleId: string;
 }
@@ -37,8 +37,8 @@ const iconMap: { [key: string]: React.FC } = {
   'compute-engine': ComputeEngine,
   'cloud-functions': CloudFunctions,
   'kubernetes-engine': KubernetesEngine,
-  'cloud-generic': CloudGeneric,
-  'streaming-analytics': StreamingAnalyticsIcon,
+  'cloud-generic': CloudGenericIcon,
+  'data-transformation': StreamingAnalyticsIcon,
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'QuizzesDetail'>;
@@ -60,8 +60,6 @@ const QuizzesScreen = () => {
           console.warn(
             'No user ID found in AsyncStorage. User might not be logged in.',
           );
-          // Handle the case where there's no user ID (e.g., redirect to login)
-          // For now, let's redirect to the Auth screen
           navigation.navigate('Auth');
         }
       } catch (e) {
@@ -77,58 +75,29 @@ const QuizzesScreen = () => {
       setLoading(true);
       setError(null);
       try {
-        // Replace with your actual API endpoint
-        const response = await axios.get(`${BASE_URL}/api/v1/quizzes/list-quizzes`); // Corrected URL
-        console.log('API Response:', response.data); // Log the entire API response
+        const response = await axios.get(`${BASE_URL}/api/v1/quizzes/list-quizzes`);
+        console.log('API Response:', response.data);
 
-        // Map the API response to the Quiz interface
-        const formattedQuizzes: Quiz[] = response.data.quizzes.map(
-          (quiz: any) => {
-            console.log('Quiz Data from API:', quiz); // Log each quiz object
-            return {
-              id: quiz.id,
-              title: quiz.title,
-              description: quiz.description, // Added description
-              questionCount: quiz.questions.length, // Added questionCount
-              icon: iconMap[quiz.moduleId] || CloudGeneric, // Default to CloudGeneric if icon not found
-              moduleId: quiz.moduleId,
-            };
-          },
-        );
-        console.log('Formatted Quizzes:', formattedQuizzes); // Log the formatted quizzes
+        if (!response.data || !response.data.quizzes || !Array.isArray(response.data.quizzes)) {
+          setError('Invalid response format from server');
+          return;
+        }
+
+        const formattedQuizzes: Quiz[] = response.data.quizzes.map((quiz: any) => {
+          // Ensure all properties are valid string or number values
+          return {
+            id: String(quiz.id || ''),
+            title: String(quiz.title || ''),
+            description: String(quiz.description || ''),
+            questionCount: quiz.questions && Array.isArray(quiz.questions) ? quiz.questions.length : 0,
+            icon: iconMap[quiz.moduleId] || CloudGenericIcon,
+            moduleId: String(quiz.moduleId || ''),
+          };
+        });
+        
         setQuizzes(formattedQuizzes);
       } catch (err) {
-        if (axios.isAxiosError(err)) {
-          const axiosError = err as AxiosError;
-          if (axiosError.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            console.error(
-              'Server responded with:',
-              axiosError.response.status,
-              axiosError.response.data,
-            );
-            setError(
-              `Server Error: ${axiosError.response.status} - ${
-                axiosError.response.data || axiosError.response.statusText
-              }`,
-            );
-          } else if (axiosError.request) {
-            // The request was made but no response was received
-            console.error('No response received:', axiosError.request);
-            setError(
-              'Network error: Unable to connect to server. Please check your connection.',
-            );
-          } else {
-            // Something happened in setting up the request that triggered an Error
-            console.error('Error setting up the request:', axiosError.message);
-            setError(`Error: ${axiosError.message}`);
-          }
-        } else {
-          // Handle non-Axios errors
-          console.error('An unexpected error occurred:', err);
-          setError(`An unexpected error occurred: ${err}`);
-        }
+        handleError(err);
       } finally {
         setLoading(false);
       }
@@ -137,9 +106,45 @@ const QuizzesScreen = () => {
     fetchQuizzes();
   }, []);
 
+  // Separate function to handle errors
+  const handleError = (err: any) => {
+    if (axios.isAxiosError(err)) {
+      const axiosError = err as AxiosError;
+      if (axiosError.response) {
+        let errorMessage = `Server Error: ${axiosError.response.status}`;
+        
+        // Safely handle response data regardless of type
+        if (axiosError.response.data) {
+          if (typeof axiosError.response.data === 'string') {
+            errorMessage += ` - ${axiosError.response.data}`;
+          } else if (typeof axiosError.response.data === 'object') {
+            try {
+              errorMessage += ` - ${JSON.stringify(axiosError.response.data)}`;
+            } catch (e) {
+              errorMessage += ' - [Complex Error Object]';
+            }
+          }
+        }
+        
+        setError(errorMessage);
+      } else if (axiosError.request) {
+        setError('Network error: Unable to connect to server. Please check your connection.');
+      } else {
+        setError(`Error: ${String(axiosError.message)}`);
+      }
+    } else {
+      setError(`An unexpected error occurred: ${String(err)}`);
+    }
+  };
+
   const handleStartQuiz = (moduleId: string) => {
     if (!userId) {
-      Alert.alert('Error', 'User ID not found. Please log in again.');
+      // Use react-native's Alert instead of directly rendering strings
+      const { Alert } = require('react-native');
+      Alert.alert(
+        strings.errorTitle,
+        strings.errorUserIDNotFound
+      );
       return;
     }
     navigation.navigate('QuizzesDetail', { moduleId: moduleId });
@@ -149,7 +154,7 @@ const QuizzesScreen = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
-        <Text>Loading quizzes...</Text>
+        <Text>{strings.loadingQuizzes || 'Loading...'}</Text>
       </View>
     );
   }
@@ -157,45 +162,52 @@ const QuizzesScreen = () => {
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorText}>{String(error)}</Text>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.container}>
-      {quizzes.map(quiz => {
-        const Icon = quiz.icon;
-        console.log('Quiz Data for UI:', quiz); // Log each quiz object before rendering
-        return (
-          <Card key={quiz.id} style={styles.card}>
-            <Card.Content>
-              <View style={styles.headerRow}>
-                <View style={styles.iconContainer}>
-                  <Icon
-                    width={34}
-                    height={34}
-                    {...(Icon as React.SVGProps<SVGSVGElement>)}
-                  />
+      {quizzes.length > 0 ? (
+        quizzes.map(quiz => {
+          const Icon = quiz.icon;
+          return (
+            <Card key={quiz.id} style={styles.card}>
+              <Card.Content>
+                <View style={styles.headerRow}>
+                  <View style={styles.iconContainer}>
+                    {Icon && (
+                      <Icon
+                        width={34}
+                        height={34}
+                        {...(Icon as React.SVGProps<SVGSVGElement>)}
+                      />
+                    )}
+                  </View>
+                  <Title style={styles.title}>{String(quiz.title)}</Title>
                 </View>
-                <Title style={styles.title}>{quiz.title}</Title>
-              </View>
-              <Paragraph>{quiz.description}</Paragraph> {/* Display description */}
-              <Paragraph style={styles.questionCount}>
-              {`${quiz.questionCount} Questions`} {/* Use template literal */}
-              </Paragraph>
-            </Card.Content>
-            <Card.Actions>
-              <Button
-                mode="contained"
-                onPress={() => handleStartQuiz(quiz.moduleId)} // Corrected line
-              >
-                Start Quiz
-              </Button>
-            </Card.Actions>
-          </Card>
-        );
-      })}
+                <Paragraph>{String(quiz.description)}</Paragraph>
+                <Paragraph style={styles.questionCount}>
+                  {`${quiz.questionCount} ${strings.questionsSuffix || 'Questions'}`}
+                </Paragraph>
+              </Card.Content>
+              <Card.Actions>
+                <Button
+                  mode="contained"
+                  onPress={() => handleStartQuiz(quiz.moduleId)}
+                >
+                  {strings.startQuiz || 'Start Quiz'}
+                </Button>
+              </Card.Actions>
+            </Card>
+          );
+        })
+      ) : (
+        <View style={styles.noQuizzesContainer}>
+          <Text>No quizzes available</Text>
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -203,8 +215,8 @@ const QuizzesScreen = () => {
 const styles = StyleSheet.create({
   iconContainer: {
     marginRight: 12,
-    width: 34, // Set a fixed width
-    height: 34, // Set a fixed height
+    width: 34,
+    height: 34,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -237,10 +249,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
   errorText: {
     color: 'red',
     textAlign: 'center',
+  },
+  noQuizzesContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
 });
 

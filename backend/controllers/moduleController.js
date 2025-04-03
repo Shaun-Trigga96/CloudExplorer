@@ -59,7 +59,7 @@ exports.listModules = async (req, res, next) => {
     const modules = modulesSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
-        id: doc.id,
+        moduleId: doc.moduleId,
         title: data.title,
         description: data.description || null,
         content: data.content, // Google Doc URL or other content identifier
@@ -92,15 +92,15 @@ exports.getModuleById = async (req, res, next) => {
   try {
     const moduleId = req.params;
     console.log('moduleId:', moduleId);
-    // if (!moduleId || typeof moduleId !== 'string') {
-    //   return next(
-    //     new AppError(
-    //       'Invalid module ID parameter',
-    //       400,
-    //       'INVALID_MODULE_ID_PARAM',
-    //     ),
-    //   );
-    // }
+    if (!moduleId || typeof moduleId !== 'string') {
+      return next(
+        new AppError(
+          'Invalid module ID parameter',
+          400,
+          'INVALID_MODULE_ID_PARAM',
+        ),
+      );
+    }
     const moduleDoc = await db.collection('modules').doc(moduleId).get();
 
     if (!moduleDoc.exists) {
@@ -115,7 +115,7 @@ exports.getModuleById = async (req, res, next) => {
 
     const data = moduleDoc.data();
     res.json({
-      id: moduleDoc.id,
+      moduleId: moduleDoc.moduleId,
       title: data.title,
       description: data.description || null,
       content: data.content,
@@ -127,7 +127,7 @@ exports.getModuleById = async (req, res, next) => {
       // Include other fields as needed
     });
   } catch (error) {
-    console.error(`Error getting module by ID ${req.params.id}:`, error);
+    console.error(`Error getting module by ID ${req.params.moduleId}:`, error);
     next(error);
   }
 };
@@ -135,7 +135,7 @@ exports.getModuleById = async (req, res, next) => {
 // GET /module/:id/sections
 exports.getModuleSections = async (req, res, next) => {
   try {
-    const moduleId = req.params.id;
+    const moduleId = req.params.moduleId;
     if (!moduleId || typeof moduleId !== 'string') {
       return next(
         new AppError(
@@ -166,7 +166,7 @@ exports.getModuleSections = async (req, res, next) => {
     const sections = sectionsSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
-        id: doc.id,
+        moduleId: doc.moduleId,
         title: data.title,
         content: data.content, // Could be text, markdown, video URL, quiz ID etc.
         contentType: data.contentType || 'text', // Indicate type of content

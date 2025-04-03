@@ -16,11 +16,12 @@ import auth from '@react-native-firebase/auth';
 import messaging from '@react-native-firebase/messaging';
 import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
-import {RootStackParamList} from '../navigation/RootNavigator'; 
-import {useTheme} from '../context/ThemeContext'; 
+import {RootStackParamList} from '../navigation/RootNavigator';
+import {useTheme} from '../context/ThemeContext';
 import {REACT_APP_BASE_URL} from '@env';
+import Sound from 'react-native-sound'; // Import react-native-sound
 
-const BASE_URL = REACT_APP_BASE_URL; 
+const BASE_URL = REACT_APP_BASE_URL;
 
 interface UserSettings {
   notificationsEnabled: boolean;
@@ -46,6 +47,7 @@ const SettingsScreen: FC = () => {
     soundEffects: false,
   });
   const [loading, setLoading] = useState<boolean>(true);
+  const [sound, setSound] = useState<Sound | null>(null);
 
   // Fetch settings
   const fetchUserSettings = async () => {
@@ -55,7 +57,8 @@ const SettingsScreen: FC = () => {
         auth().currentUser?.uid || (await AsyncStorage.getItem('userId'));
       if (!userId) throw new Error('User ID not found');
 
-      const response = await axios.get(`${BASE_URL}/api/v1/users/{userId}/settings`);
+      const response = await axios.get(`${BASE_URL}/api/v1/users/${userId}/settings`);
+      console.log('User Settings Response:', response)
       const settings = response.data.settings || {};
       setUserSettings({...userSettings, ...settings});
       await AsyncStorage.setItem('userSettings', JSON.stringify(settings));
@@ -80,7 +83,7 @@ const SettingsScreen: FC = () => {
         auth().currentUser?.uid || (await AsyncStorage.getItem('userId'));
       if (!userId) throw new Error('User ID not found');
 
-      await axios.put(`${BASE_URL}/api/v1/users/{userId}/settings`, {
+      await axios.put(`${BASE_URL}/api/v1/users/${userId}/settings`, {
         settings: updatedSettings,
       });
       const newSettings = {...userSettings, ...updatedSettings};
@@ -123,22 +126,66 @@ const SettingsScreen: FC = () => {
     }
   };
 
-  // Handle email updates (placeholder)
+  // Handle email updates
   const handleEmailUpdates = async (enabled: boolean) => {
     console.log(enabled ? 'Email updates enabled' : 'Email updates disabled');
-    // TODO: Integrate with backend email service (e.g., SendGrid)
+    try {
+      const userId = auth().currentUser?.uid || await AsyncStorage.getItem('userId');
+      if (!userId) {
+        console.error('No user ID found for email update.');
+        return;
+      }
+      const response = await axios.post(`${BASE_URL}/api/v1/email/update-subscription`, {
+        enabled,
+      });
+      console.log('Email update response:', response.data);
+    } catch (error) {
+      console.error('Error updating email subscription:', error);
+      handleAxiosError(error);
+    }
   };
 
-  // Handle sync data (placeholder)
+  // Handle sync data
   const handleSyncData = async (enabled: boolean) => {
     console.log(enabled ? 'Sync data enabled' : 'Sync data disabled');
-    // TODO: Enable/disable Firestore real-time listeners
+    // TODO: Implement Firestore real-time listeners logic here
+    // This is a placeholder for future implementation
+    if (enabled) {
+      // Start listening for changes in Firestore
+      console.log('Starting Firestore real-time listeners...');
+    } else {
+      // Stop listening for changes in Firestore
+      console.log('Stopping Firestore real-time listeners...');
+    }
   };
 
-  // Handle sound effects (placeholder)
+  // Handle sound effects
   const handleSoundEffects = async (enabled: boolean) => {
     console.log(enabled ? 'Sound effects enabled' : 'Sound effects disabled');
-    // TODO: Integrate react-native-sound
+    if (enabled) {
+      // Load and play a sound
+      const newSound = new Sound('click.mp3', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+          console.error('Failed to load the sound', error);
+          return;
+        }
+        // Play the sound with an onEnd callback
+        newSound.play((success) => {
+          if (success) {
+            console.log('successfully finished playing');
+          } else {
+            console.log('playback failed due to audio decoding errors');
+          }
+        });
+      });
+      setSound(newSound);
+    } else {
+      // Release the sound
+      if (sound) {
+        sound.release();
+        setSound(null);
+      }
+    }
   };
 
   // Handle logout

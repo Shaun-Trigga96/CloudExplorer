@@ -6,7 +6,7 @@
 /* eslint-disable linebreak-style */
 // functions/auth.js
 const {user} = require("firebase-functions/v1/auth"); // v1 Auth trigger
-const {db, logger, sendgridApiKeyParam} = require("../config/config"); // Get shared db and logger
+const {db, logger, sendgridApiKeyParam} = require("../config/config"); // Import SendGrid API key from config
 const admin = require("firebase-admin"); // Still need admin for FieldValue
 const sgMail = require("@sendgrid/mail"); // *** Add SendGrid require ***
 
@@ -69,7 +69,9 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
   // 3. *** Send Welcome Email via SendGrid ***
   if (userRecord.email) { // Only attempt if email exists
     try {
+      logger.info(`[auth.js] Getting SendGrid API key...`);
       const apiKey = sendgridApiKeyParam.value(); // Get API key from config parameter
+      logger.info(`[auth.js] SendGrid API key retrieved: ${apiKey ? "Yes" : "No"}`);
       if (!apiKey) {
         logger.error("[auth.js] SendGrid API Key is missing or not configured properly. Cannot send welcome email.");
         throw new Error("SendGrid API Key not configured."); // Prevent sending attempt
@@ -80,9 +82,72 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
         to: userRecord.email, // Use email from userRecord
         from: "cloudexplorer1996@gmail.com", // *** Use your verified SendGrid sender email ***
         subject: "Welcome to Cloud Explorer!",
-        // You can use HTML content for richer emails
         text: `Welcome aboard, ${newUserProfile.displayName}!\n\nWe're excited to have you join Cloud Explorer. Start exploring GCP concepts today!\n\nHappy Learning,\nThe Cloud Explorer Team`,
-        // html: "<strong>HTML version of the email</strong>", // Optional HTML content
+        html: `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Welcome to Cloud Explorer!</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    background-color: #f4f4f4;
+                    color: #333;
+                    margin: 0;
+                    padding: 0;
+                }
+                .container {
+                    max-width: 600px;
+                    margin: 20px auto;
+                    background-color: #fff;
+                    padding: 30px;
+                    border-radius: 5px;
+                    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                }
+                h1 {
+                    color: #007bff;
+                }
+                p {
+                    line-height: 1.6;
+                }
+                .button {
+                    display: inline-block;
+                    background-color: #007bff;
+                    color: #fff;
+                    padding: 10px 20px;
+                    text-decoration: none;
+                    border-radius: 5px;
+                }
+                .footer {
+                    margin-top: 20px;
+                    font-size: 0.8em;
+                    color: #777;
+                }
+                .logo {
+                   display: block;
+                   margin: 0 auto 20px;
+                  max-width: 150px;
+                }
+
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                  <img src="https://firebasestorage.googleapis.com/v0/b/cloud-explorer-c3d98.firebasestorage.app/o/cloud_explorer.png?alt=media&token=cb42c19a-5be2-4b3d-a8ec-fef71d02a698" alt="Cloud Explorer Logo" class="logo">
+                <h1>Welcome to Cloud Explorer, ${newUserProfile.displayName}!</h1>
+                <p>We're thrilled to welcome you to the Cloud Explorer community! Your journey into the world of cloud computing starts now.</p>
+                <p>Get ready to explore, learn, and master the concepts of GCP. We've got a ton of resources to help you on your way.</p>
+                <a href="https://your-cloud-explorer-app-url.com" class="button">Start Exploring</a>
+                <div class="footer">
+                    <p>Happy Learning,</p>
+                    <p>The Cloud Explorer Team</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        `,
       };
 
       logger.info(`[auth.js] Attempting to send welcome email to ${userRecord.email}...`);

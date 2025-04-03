@@ -67,7 +67,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
   const handleGoogleSignIn = async () => {
     console.log('Starting Google Sign-In process');
     try {
-      const userCredential = await googleAuthService.signIn(); await googleAuthService.signIn();
+      const userCredential = await googleAuthService.signIn(); 
+      await googleAuthService.signIn();
       // Store the Firebase userId in AsyncStorage
       await AsyncStorage.setItem('userId', userCredential.user.uid);
       console.log('Firebase Auth UID:', userCredential.user.uid);
@@ -98,6 +99,8 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
           email,
           password,
         );
+        // Update the user record with the email
+        await auth().currentUser?.updateEmail(email);
         await firestore()
           .collection('users')
           .doc(userCredential.user.uid)

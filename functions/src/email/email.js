@@ -6,7 +6,7 @@
 // functions/src/email/index.js
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const sgMail = require("@sendgrid/mail");
-const {db, logger} = require("../config/config"); // Get shared resources (NO sendgridApiKeyParam)
+const {db, logger, sendgridApiKeyParam} = require("../config/config"); // Import SendGrid API key from config
 
 // NOTE: The 'canSendEmail' variable and consistent API key handling
 // (using sendgridApiKeyParam.value()) still need to be addressed as discussed before.
@@ -52,6 +52,69 @@ exports.updateEmailSubscription = onCall(async (request) => {
           from: "cloudexplorer1996@gmail.com", // Verified sender
           subject: "Welcome to CloudExplorer Updates",
           text: "You’ve subscribed to receive progress reports and tips!",
+          html: `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Welcome to Cloud Explorer Updates</title>
+              <style>
+                  body {
+                      font-family: Arial, sans-serif;
+                      background-color: #f4f4f4;
+                      color: #333;
+                      margin: 0;
+                      padding: 0;
+                  }
+                  .container {
+                      max-width: 600px;
+                      margin: 20px auto;
+                      background-color: #fff;
+                      padding: 30px;
+                      border-radius: 5px;
+                      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                  }
+                  h1 {
+                      color: #007bff;
+                  }
+                  p {
+                      line-height: 1.6;
+                  }
+                  .button {
+                      display: inline-block;
+                      background-color: #007bff;
+                      color: #fff;
+                      padding: 10px 20px;
+                      text-decoration: none;
+                      border-radius: 5px;
+                  }
+                  .footer {
+                      margin-top: 20px;
+                      font-size: 0.8em;
+                      color: #777;
+                  }
+                  .logo {
+                     display: block;
+                    margin: 0 auto 20px;
+                    max-width: 150px;
+                 }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <img src="https://firebasestorage.googleapis.com/v0/b/cloud-explorer-c3d98.firebasestorage.app/o/cloud_explorer.png?alt=media&token=cb42c19a-5be2-4b3d-a8ec-fef71d02a698" alt="Cloud Explorer Logo" class="logo">
+                  <h1>Welcome to Cloud Explorer Updates!</h1>
+                  <p>You've successfully subscribed to receive progress reports and tips from Cloud Explorer.</p>
+                  <p>Stay tuned for the latest updates and insights to help you on your cloud learning journey.</p>
+                  <div class="footer">
+                      <p>Happy Learning,</p>
+                      <p>The Cloud Explorer Team</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          `,
         };
 
         try {await sgMail.send(msg); logger.info(`[email.js] Welcome email sent to ${emailFromDoc}.`);}
