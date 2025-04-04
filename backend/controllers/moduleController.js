@@ -1,6 +1,5 @@
 const admin = require('firebase-admin');
 const AppError = require('../utils/appError');
-const {serverTimestamp} = require('../utils/firestoreHelpers');
 
 const db = admin.firestore();
 
@@ -59,7 +58,7 @@ exports.listModules = async (req, res, next) => {
     const modules = modulesSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
-        moduleId: doc.moduleId,
+        id: doc.id,
         title: data.title,
         description: data.description || null,
         content: data.content, // Google Doc URL or other content identifier
@@ -90,17 +89,8 @@ exports.listModules = async (req, res, next) => {
 // GET /module/:id
 exports.getModuleById = async (req, res, next) => {
   try {
-    const moduleId = req.params;
+    const moduleId = req.params.moduleId;
     console.log('moduleId:', moduleId);
-    if (!moduleId || typeof moduleId !== 'string') {
-      return next(
-        new AppError(
-          'Invalid module ID parameter',
-          400,
-          'INVALID_MODULE_ID_PARAM',
-        ),
-      );
-    }
     const moduleDoc = await db.collection('modules').doc(moduleId).get();
 
     if (!moduleDoc.exists) {
@@ -115,7 +105,7 @@ exports.getModuleById = async (req, res, next) => {
 
     const data = moduleDoc.data();
     res.json({
-      moduleId: moduleDoc.moduleId,
+      id: moduleDoc.id,
       title: data.title,
       description: data.description || null,
       content: data.content,
@@ -166,10 +156,10 @@ exports.getModuleSections = async (req, res, next) => {
     const sections = sectionsSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
-        moduleId: doc.moduleId,
+        id: doc.id,
+        moduleId: data.moduleId,
         title: data.title,
         content: data.content, // Could be text, markdown, video URL, quiz ID etc.
-        contentType: data.contentType || 'text', // Indicate type of content
         order: data.order,
         // durationEstimate: data.durationEstimate, // Optional time estimate
       };

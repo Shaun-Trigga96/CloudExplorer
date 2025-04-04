@@ -8,6 +8,8 @@ import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
 import strings from '../localization/strings'; // Adjust the path as needed
+import { Question } from '../interface/Question';
+import { Timestamp, FieldValue } from '@react-native-firebase/firestore';
 
 
 const BASE_URL = REACT_APP_BASE_URL;
@@ -15,12 +17,16 @@ const BASE_URL = REACT_APP_BASE_URL;
 type ExamsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ExamDetail'>;
 
 interface Exam {
-  id: string; // Persistent ID
+  examId: string; // Persistent ID
   title: string;
   description: string;
   duration: number | null;
   prerequisites: string[];
   associatedModules?: string[]; // For AI context generation
+  questions?: Question[]; // Store generated questions here
+  questionsGeneratedAt?: Timestamp | FieldValue;
+  createdAt?: Timestamp | FieldValue;
+  updatedAt?: Timestamp | FieldValue;
   passingRate: number;
   icon: any;
 }
@@ -64,14 +70,14 @@ const ExamsScreen = () => {
         console.log("Exams API Response:", response.data); // Log the API response
         const formattedExams: Exam[] = response.data.exams.map((exam: any) => {
           const formattedExam: Exam = {
-            id: exam.id,
+            examId: exam.id,
             title: exam.title,
             description: exam.description,
             duration: exam.duration,
             prerequisites: exam.prerequisites,
             associatedModules: exam.associatedModules,
             passingRate: exam.passingRate,
-            icon: getIconForExam(exam.examId),
+            icon: getIconForExam(exam.id),
           };
           console.log("Formatted Exam:", formattedExam); // Log the formatted exam
           return formattedExam;
@@ -172,11 +178,9 @@ const ExamsScreen = () => {
     }
   };
 
-  const handleStartExam = (exam: Exam) => {
-    navigation.navigate('ExamDetail', {
-      examId: exam.id,
-      title: exam.title,
-    });
+  const handleStartExam = (examId: string) => {
+    console.log('examId:', examId);
+    navigation.navigate('ExamDetail', { examId, title: '' });
   };
 
   const handleRetry = async () => {
@@ -244,7 +248,7 @@ const ExamsScreen = () => {
         <ActivityIndicator style={styles.loader} />
       ) : (
         exams.map((exam) => (
-          <Card key={exam.id} style={styles.card}>
+          <Card key={exam.examId} style={styles.card}>
             <Card.Content>
               <View style={styles.headerRow}>
                 <View style={styles.iconContainer}>
@@ -274,13 +278,13 @@ const ExamsScreen = () => {
                 </View>
               </View>
 
-              {examAttempts[exam.id] > 0 && (
+              {examAttempts[exam.examId] > 0 && (
                 <View style={styles.progressContainer}>
                   {/* Use template literal with string key */}
-                  <Text style={styles.progressText}>{`${strings.previousAttemptsPrefix}${examAttempts[exam.id]}`}</Text>
-                  {examScores[exam.id] !== undefined && ( // Check if score exists
+                  <Text style={styles.progressText}>{`${strings.previousAttemptsPrefix}${examAttempts[exam.examId]}`}</Text>
+                  {examScores[exam.examId] !== undefined && ( // Check if score exists
                      /* Use template literal with string key */
-                    <Text style={styles.progressText}>{`${strings.bestScorePrefix}${examScores[exam.id].toFixed(1)}${strings.percentSuffix}`}</Text>
+                    <Text style={styles.progressText}>{`${strings.bestScorePrefix}${examScores[exam.examId].toFixed(1)}${strings.percentSuffix}`}</Text>
                   )}
                 </View>
               )}
@@ -288,7 +292,7 @@ const ExamsScreen = () => {
             <Card.Actions>
               <Button
                 mode="contained"
-                onPress={() => handleStartExam(exam)}
+                onPress={() => handleStartExam(exam.examId)}
                 style={styles.startButton}
               >
                  {/* Use string key */}

@@ -74,51 +74,44 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
   const [examStartTime, setExamStartTime] = useState<Date | null>(null);
   const [examTiming, setExamTiming] = useState<ExamTimingData | null>(null);
 
-  const fetchExamQuestions = useCallback(async () => {
-  console.log('fetchExamQuestions: Starting to fetch exam questions...');
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch exam questions from your API
-      const response = await axios.post(`${BASE_URL}/api/v1/exams/generate`, {
-        examId,
-        numberOfQuestions: 25, // Typical for certification practice exams
-        questionTypes: ['multiple choice', 'true or false'],
-      }, {
-        timeout: 30000, // 20 seconds timeout for this specific request
-      });
-
-      if (response.data && response.data.questions) {
-        setQuestions(response.data.questions);
-      } else {
-        throw new Error('Invalid response format');
-      }
-    } catch (err: any) {
-      console.error('Error fetching exam questions:', err);
-      let errorMessage = 'Failed to load exam questions. Please try again.';
-
-      if (err.code === 'ECONNABORTED') {
-        errorMessage = 'Request timed out. Please check your connection and try again.';
-      } else if (err.response) {
-        // Server responded with an error status
-        if (err.response.status === 404) {
-          errorMessage = 'Exam not found. Please check the exam ID.';
-        } else {
-          errorMessage = `Server error (${err.response.status}). Please try again later.`;
-        }
-      } else if (err.request) {
-        // Request was made but no response received
-        errorMessage = 'No response from server. Please check your network connection.';
-      }
-
-      setError(errorMessage);
-      setRetryCount(prev => prev + 1);
-    } finally {
-      setLoading(false);
-    }
-  }, [examId]);
-
+ const fetchExamQuestions = useCallback(async () => {
+ console.log('fetchExamQuestions: Starting to fetch exam questions...');
+   try {
+     setLoading(true);
+     setError(null);
+ 
+     // Fetch exam questions from your API
+     const response = await axios.get(`${BASE_URL}/api/v1/exams/${examId}`);
+     if (response.data && response.data.questions) {
+       setQuestions(response.data.questions);
+     } else {
+       throw new Error('Invalid response format');
+     }
+   } catch (err: any) {
+     console.error('Error fetching exam questions:', err);
+     let errorMessage = 'Failed to load exam questions. Please try again.';
+ 
+     if (err.code === 'ECONNABORTED') {
+       errorMessage = 'Request timed out. Please check your connection and try again.';
+     } else if (err.response) {
+       // Server responded with an error status
+       if (err.response.status === 404) {
+         errorMessage = 'Exam not found. Please check the exam ID.';
+       } else {
+         errorMessage = `Server error (${err.response.status}). Please try again later.`;
+       }
+     } else if (err.request) {
+       // Request was made but no response received
+       errorMessage = 'No response from server. Please check your network connection.';
+     }
+ 
+     setError(errorMessage);
+     setRetryCount(prev => prev + 1);
+   } finally {
+     setLoading(false);
+   }
+ }, [examId]);
+ 
   // Load any saved exam state when component mounts
   useEffect( () => {
     console.log('useEffect [examId, fetchExamQuestions]: Component mounted or dependencies changed.');
@@ -727,7 +720,7 @@ const styles = StyleSheet.create({
   navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 6,
   },
   navButton: {
     flex: 1,

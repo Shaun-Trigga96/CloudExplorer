@@ -16,6 +16,7 @@
     "run-schema": "node --no-deprecation dist/scripts/create-schema-content-only.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
     "@huggingface/inference": "^3.5.2",
     "@invertase/react-native-apple-authentication": "^2.4.0",
     "@react-native-async-storage/async-storage": "^1.24.0",
@@ -38,6 +39,7 @@
     "firebase-admin": "^13.1.0",
     "googleapis": "^137.1.0",
     "lru-cache": "^11.0.1",
+    "openai": "^4.91.1",
     "react": "18.3.1",
     "react-native": "0.77.0",
     "react-native-dotenv": "^3.4.11",

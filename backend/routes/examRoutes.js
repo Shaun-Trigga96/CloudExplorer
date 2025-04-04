@@ -37,12 +37,4 @@ router.get('/progress/:userId', /* protect, */ examController.getExamProgress);
 // Get a specific exam definition by ID (protect based on user role/enrollment?)
 router.get('/:examId', /* protect, */ examController.getExamById);
 
-// Route for submitting exam attempts (maybe handled by save-result?)
-// router.post('/:examId/attempt', protect, examController.submitExamAttempt);
-
-// DEPRECATED? Review if this route is needed
-// POST /api/v1/exams/complete/:userId (Old route name was /user/:userId/exam)
-// router.post('/complete/:userId', /* protect, */ examController.completeExam);
-
-
 module.exports = router;

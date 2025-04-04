@@ -5,7 +5,7 @@ const {authenticateGoogleDocs} = require('../utils/googleAuth');
 const {serverTimestamp} = require('../utils/firestoreHelpers');
 const {executeWithRetry} = require('../utils/retryHandler'); // Import retry helper
 const {parseQuizFromAIResponse, getExamContent} = require('../utils/aiHelpers'); // Import AI helpers
-const {hf} = require('../server'); // Import initialized HF instance
+const { googleAiClient } = require('../server'); // Import the Google client
 
 const db = admin.firestore();
 
@@ -83,165 +83,6 @@ exports.createExamDoc = async (req, res, next) => {
   }
 };
 
-// --- NEW: Generate Exam Questions ---
-// POST /generate
-exports.generateExamQuestions = async (req, res, next) => {
-  try {
-    const {
-      examId,
-      numberOfQuestions = 25, // Default number for exams
-      questionTypes = ['multiple choice', 'true or false'], // Default types
-    } = req.body;
-
-    // --- Input Validation ---
-    if (!examId || typeof examId !== 'string') {
-      return next(
-        new AppError('Valid examId is required.', 400, 'INVALID_EXAM_ID'),
-      );
-    }
-    const numQuestions = parseInt(numberOfQuestions, 10);
-    if (isNaN(numQuestions) || numQuestions <= 5 || numQuestions > 100) {
-      // Exam question limits
-      return next(
-        new AppError(
-          'numberOfQuestions must be a number between 6 and 100.',
-          400,
-          'INVALID_QUESTION_COUNT',
-        ),
-      );
-    }
-    if (!Array.isArray(questionTypes) || questionTypes.length === 0) {
-      return next(
-        new AppError(
-          'questionTypes must be a non-empty array.',
-          400,
-          'INVALID_QUESTION_TYPES',
-        ),
-      );
-    }
-
-    // --- Fetch Exam Definition and Content Context ---
-    const examDocRef = db.collection('exams').doc(examId);
-    const examDoc = await examDocRef.get();
-    if (!examDoc.exists) {
-      return next(
-        new AppError(
-          `Exam definition with ID ${examId} not found.`,
-          404,
-          'EXAM_DEF_NOT_FOUND',
-        ),
-      );
-    }
-    const examData = examDoc.data();
-    const examTitle = examData.title || 'Certification Exam'; // Use exam title
-
-    // Get content context using the helper function
-    const examContentContext = await getExamContent(examId); // Handles fetching logic
-
-    if (!examContentContext || examContentContext.length < 50) {
-      // Basic check for minimal content
-      console.warn(
-        `Insufficient content context found for exam ${examId} to generate questions reliably.`,
-      );
-      // Allow generation but maybe with a warning, or return error?
-      // return next(new AppError(`Not enough content context found for exam ${examId} to generate questions.`, 404, 'EXAM_CONTENT_INSUFFICIENT'));
-    }
-
-    console.log(
-      `Generating ${numQuestions} exam questions for exam ${examId} (${examTitle})...`,
-    );
-
-    // --- Prepare AI Prompt ---
-    // Similar prompt structure to quiz generation, adjusted for exams
-    const prompt = `Generate exactly ${numQuestions} challenging certification exam questions for the topic "${examTitle}".
-The questions should be based on the following content context: """${examContentContext}"""
-The questions must strictly be of the following types: ${questionTypes.join(
-      ', ',
-    )}.
-Ensure the questions test application and understanding, not just rote memorization, reflecting typical certification exam difficulty.
-Format the output precisely as follows for each question:
-- For multiple choice questions:
-Question: [The question text]
-a) [Option a text]
-b) [Option b text]
-c) [Option c text]
-d) [Option d text]
-Correct answer: [Correct option letter, e.g., a]
-Explanation: [Brief explanation why the answer is correct, ideally referencing the context]
-
-- For True or False questions:
-Question: [The question text]
-Correct answer: [True or False]
-Explanation: [Brief explanation why the answer is True or False, ideally referencing the context]
-
-Return *only* the formatted questions, answers, and explanations. Do not include any introductory text, summaries, or closing remarks. Ensure all requested questions are generated.`;
-
-    // --- Call Hugging Face API ---
-    let generatedText = '';
-    try {
-      const result = await executeWithRetry(
-        () =>
-          hf.textGeneration({
-            model:
-              process.env.HF_MODEL_EXAM || 'mistralai/Mistral-7B-Instruct-v0.2', // Separate model possible
-            inputs: prompt,
-            parameters: {
-              max_new_tokens: 300 * numQuestions, // Higher token estimate for complex exam Qs
-              temperature: 0.5, // Lower temp for more deterministic/accurate exam Qs
-              repetition_penalty: 1.15,
-              // top_p: 0.85,
-            },
-          }),
-        3, // Retries
-        30000, // Longer timeout for potentially larger context/generation
-      );
-      generatedText = result.generated_text;
-    } catch (apiError) {
-      console.error(
-        `Hugging Face API error generating exam ${examId}:`,
-        apiError,
-      );
-      throw new AppError(
-        `AI model failed to generate exam questions: ${apiError.message}`,
-        503,
-        'AI_SERVICE_ERROR',
-      );
-    }
-
-    // --- Parse AI Response ---
-    const examQuestions = parseQuizFromAIResponse(generatedText); // Reuse the parser
-
-    if (examQuestions.length === 0) {
-      console.warn(
-        `AI model did not return parseable questions for exam ${examId}. Response: ${generatedText.substring(
-          0,
-          200,
-        )}...`,
-      );
-      return next(
-        new AppError(
-          'Failed to parse valid exam questions from the AI response.',
-          500,
-          'AI_RESPONSE_PARSE_FAILED',
-        ),
-      );
-    }
-    // Optional: Could save the generated questions back to the exam document or a subcollection
-    // await examDocRef.collection('generatedQuestions').add({ questions: examQuestions, generatedAt: serverTimestamp() });
-
-    // --- Respond to Client ---
-    // Return the generated questions directly
-    res.json({examId: examId, title: examTitle, questions: examQuestions});
-  } catch (error) {
-    if (!error.isOperational) {
-      console.error(
-        `Unexpected error during exam generation for exam ${req.body.examId}:`,
-        error,
-      );
-    }
-    next(error);
-  }
-};
 
 // --- NEW: Save Exam Result ---
 // POST /save-result
@@ -548,7 +389,7 @@ exports.listExams = async (req, res, next) => {
     const exams = examsSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
-        examId: doc.id,
+        id: doc.id,
         title: data.title,
         description: data.description,
         duration: data.duration,
@@ -581,8 +422,8 @@ exports.listExams = async (req, res, next) => {
 // GET /:examId
 exports.getExamById = async (req, res, next) => {
   try {
-    const { examId } = req.params;
-
+    const examId = req.params.examId;
+    console.log('examId:', examId);
     if (!examId || typeof examId !== 'string') {
       return next(
         new AppError('Invalid exam ID parameter', 400, 'INVALID_EXAM_ID'),
@@ -599,7 +440,7 @@ exports.getExamById = async (req, res, next) => {
 
     const examData = examDoc.data();
     res.json({
-      id: examDoc.id,
+      examId: examDoc.examId,
       ...examData,
       // Include other relevant fields from the exam document
     });

@@ -102,7 +102,10 @@ export interface Quiz {
 }
 
 
-export interface Question {
+interface Question { // Assuming structure from AI parser
+  id: number;
+  explanation: string[];
+  answers: Array<{ letter: string; answer: string; uniqueKey?: string }>;
   question: string;
   options: string[];
   correctAnswer: string;

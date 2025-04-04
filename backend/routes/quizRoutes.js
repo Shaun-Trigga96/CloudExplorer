@@ -1,6 +1,5 @@
 const express = require('express');
 const quizController = require('../controllers/quizController');
-const { hfApiLimiter } = require('../middleware/middleware'); // Import limiter from server
 // const { protect } = require('../middleware/authMiddleware'); // Authentication middleware
 
 const router = express.Router();
@@ -10,7 +9,7 @@ const router = express.Router();
 // Generate quiz questions for a module (apply rate limiting and protection)
 // POST /api/v1/quizzes/generate
 // quizRoutes.js
-router.post('/generate', hfApiLimiter, /* protect, */ quizController.generateQuiz);
+//router.post('/generate', hfApiLimiter, /* protect, */ quizController.generateQuiz);
 
 // Save a user's quiz result (apply protection)
 // POST /api/v1/quizzes/save-result
@@ -27,7 +26,7 @@ router.get('/history/:userId', /* protect, */ quizController.getQuizHistory);
 router.get('/list-quizzes', quizController.getAllQuizzes);
 // --- NEW: Get Quiz by ID ---
 // GET /api/v1/quizzes/:quizId
-router.get('/:quizId', quizController.getQuizById);
+router.get('/:id', quizController.getQuizById);
 
 
 

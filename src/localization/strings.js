@@ -32,6 +32,18 @@ const strings = {
     errorUnexpectedResponse: 'Unexpected response format from server.',
     errorUserIDRequired: 'User ID is required. Please log in.',
     errorExamProgressNotFound: 'Exam progress not found.',
+  
+      // ModuleDetailScreen specific
+    loadingModule: 'Loading...',
+    failedLoadModule: 'Failed to load module details. Please check your connection and try again.',
+    failedLoadSections: 'Failed to load module content. Please check your connection and try again.',
+    failedSaveChanges: 'Failed to save progress. Please try again.',
+    noModuleContent: 'No content available for this section.',
+    markAsRead: 'Mark as read',
+    completeAndContinue: 'Complete & Continue to Quiz',
+    readAllContentPrompt: 'Please read all content',
+    iconNotFound: (iconName) => `[Icon not found: ${iconName}]`, // Example function for dynamic text
+    
     // Add other common strings as needed
   };
   

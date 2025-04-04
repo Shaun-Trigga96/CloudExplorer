@@ -6,8 +6,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from 'react-native-paper';
 import iconMap from '../utils/iconMap';
 import {REACT_APP_BASE_URL} from '@env';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
+import { useNavigation } from '@react-navigation/native';
 
 const BASE_URL = REACT_APP_BASE_URL; 
+
+type QuizzesScreenNavigationProp = StackNavigationProp<RootStackParamList, 'QuizzesDetail'>;
+
 
 interface Answer {
   letter: string;
@@ -90,7 +96,8 @@ const preprocessMarkdownWithIcons = (content: string) => {
   return { modifiedContent, replacements };
 };
 
-const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any }) => {
+const ModuleDetailScreen = ({ route }: { route: any, navigation: any }) => {
+  const navigation = useNavigation<QuizzesScreenNavigationProp>();
   const { moduleId } = route.params;
   const [module, setModule] = useState<any>(null);
   const [sections, setSections] = useState<any[]>([]);
@@ -197,7 +204,7 @@ const ModuleDetailScreen = ({ route, navigation }: { route: any, navigation: any
         timestamp: new Date().toISOString(),
       });
 
-      navigation.navigate('QuizzesScreen', { moduleId });
+      navigation.navigate('QuizzesDetail', { moduleId });
     } catch (error) {
       console.error('Failed to mark module as complete:', error);
       setError('Failed to save progress. Please try again.');

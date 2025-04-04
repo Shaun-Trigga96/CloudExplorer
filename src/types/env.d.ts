@@ -14,7 +14,7 @@ declare module '@env' {
   export const GOOGLE_CLIENT_SECRET: string;
   export const FIREBASE_DATABASE_URL: string;
   export const BASE_URL: string;
-  export const HUGGINGFACE_API_KEY: string;
+  export const GEMINI_API_KEY: string;
   export const NODE_ENV: string;
   export const SENDGRID_API_KEY: string;
 }

@@ -10,10 +10,10 @@ router.get('/list', moduleController.listModules); // Changed from /list-modules
 
 // --- Dynamic routes ---
 // Get a specific module by ID
-router.get('/:id', moduleController.getModuleById);
+router.get('/:moduleId', moduleController.getModuleById);
 
 // Get sections for a specific module
-router.get('/:id/sections', moduleController.getModuleSections);
+router.get('/:moduleId/sections', moduleController.getModuleSections);
 
 // Add routes for creating/updating/deleting modules if needed (likely protected)
 // router.post('/', protect, adminOnly, moduleController.createModule);

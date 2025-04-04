@@ -1,189 +1,9 @@
 const admin = require('firebase-admin');
 const AppError = require('../utils/appError');
 const {serverTimestamp} = require('../utils/firestoreHelpers');
-const {executeWithRetry} = require('../utils/retryHandler');
-const {parseQuizFromAIResponse} = require('../utils/aiHelpers');
-const {hf} = require('../middleware/middleware'); // Import initialized HF instance from server.js
 
 const db = admin.firestore();
 
-// POST /generate-quiz
-exports.generateQuiz = async (req, res, next) => {
-  try {
-    const {
-      moduleId,
-      numberOfQuestions = 5, // Default to 5 questions
-      questionTypes = ['multiple choice', 'true or false'], // Default types
-    } = req.body;
-
-    // --- Input Validation ---
-    if (!moduleId || typeof moduleId !== 'string') {
-      return next(
-        new AppError(
-          'Valid moduleId is required in the request body.',
-          400,
-          'INVALID_MODULE_ID',
-        ),
-      );
-    }
-    const numQuestions = parseInt(numberOfQuestions, 10);
-    if (isNaN(numQuestions) || numQuestions <= 0 || numQuestions > 20) {
-      // Limit max questions
-      return next(
-        new AppError(
-          'numberOfQuestions must be a number between 1 and 20.',
-          400,
-          'INVALID_QUESTION_COUNT',
-        ),
-      );
-    }
-    if (!Array.isArray(questionTypes) || questionTypes.length === 0) {
-      return next(
-        new AppError(
-          'questionTypes must be a non-empty array.',
-          400,
-          'INVALID_QUESTION_TYPES',
-        ),
-      );
-    }
-    // Optional: Validate specific question types if needed
-
-    // --- Fetch Module Content ---
-    const moduleRef = db.collection('modules').doc(moduleId);
-    const moduleDoc = await moduleRef.get();
-
-    if (!moduleDoc.exists) {
-      return next(
-        new AppError(
-          `Module with ID ${moduleId} not found.`,
-          404,
-          'MODULE_NOT_FOUND',
-        ),
-      );
-    }
-
-    const moduleData = moduleDoc.data();
-    const sectionsSnapshot = await moduleRef
-      .collection('sections')
-      .orderBy('order')
-      .get(); // Fetch in order
-
-    let sectionContent = '';
-    sectionsSnapshot.forEach(doc => {
-      sectionContent += ` ${doc.data().content || ''}`; // Handle potentially missing content
-    });
-
-    // Combine description and section content (ensure they exist)
-    const moduleContentContext = `${
-      moduleData.description || ''
-    } ${sectionContent}`.trim();
-
-    if (!moduleContentContext) {
-      return next(
-        new AppError(
-          `No content found for module ${moduleId} to generate quiz from.`,
-          404,
-          'MODULE_CONTENT_NOT_FOUND',
-        ),
-      );
-    }
-
-    console.log(
-      `Generating ${numQuestions} quiz questions for module ${moduleId}...`,
-    );
-
-    // --- Prepare AI Prompt ---
-    const prompt = `Generate exactly ${numQuestions} quiz questions based on the following content: """${moduleContentContext}"""
-The questions should strictly be of the following types: ${questionTypes.join(
-      ', ',
-    )}.
-Format the output precisely as follows for each question:
-- For multiple choice questions:
-Question: [The question text]
-a) [Option a text]
-b) [Option b text]
-c) [Option c text]
-d) [Option d text]
-Correct answer: [Correct option letter, e.g., a]
-Explanation: [Brief explanation why the answer is correct, referencing the content if possible]
-
-- For True or False questions:
-Question: [The question text]
-Correct answer: [True or False]
-Explanation: [Brief explanation why the answer is True or False, referencing the content if possible]
-
-Ensure the explanations are concise and accurate. Return *only* the formatted questions, answers, and explanations. Do not include any introductory text, summaries, or closing remarks.`;
-
-    // --- Call Hugging Face API with Retry ---
-    let generatedText = '';
-    try {
-      const result = await executeWithRetry(
-        () =>
-          hf.textGeneration({
-            // Consider using a model fine-tuned for question generation if available
-            model:
-              process.env.HF_MODEL_QUIZ || 'mistralai/Mistral-7B-Instruct-v0.2', // Use env var
-            inputs: prompt,
-            parameters: {
-              max_new_tokens: 200 * numQuestions, // Estimate tokens needed based on question count
-              temperature: 0.6, // Slightly lower temp for more factual questions
-              repetition_penalty: 1.1, // Discourage repetition
-              // top_p: 0.9, // Optional nucleus sampling
-              // do_sample: true, // Ensure sampling is enabled if using temp/top_p
-            },
-          }),
-        3, // Max retries
-        15000, // Timeout (adjust based on model/load)
-      );
-      generatedText = result.generated_text;
-    } catch (apiError) {
-      console.error(
-        `Hugging Face API error after retries for module ${moduleId}:`,
-        apiError,
-      );
-      // Throw a specific operational error
-      throw new AppError(
-        `Failed to generate quiz questions from AI model: ${apiError.message}`,
-        503,
-        'AI_SERVICE_ERROR',
-      ); // 503 Service Unavailable
-    }
-
-    // --- Parse AI Response ---
-    const quizQuestions = parseQuizFromAIResponse(generatedText);
-
-    if (quizQuestions.length === 0) {
-      console.warn(
-        `AI model did not return parseable questions for module ${moduleId}. Response: ${generatedText.substring(
-          0,
-          200,
-        )}...`,
-      );
-      // Decide whether to return error or empty array
-      return next(
-        new AppError(
-          'Failed to parse valid quiz questions from the AI response.',
-          500,
-          'AI_RESPONSE_PARSE_FAILED',
-        ),
-      );
-      // OR: res.json({ quiz: [] }); // Return empty quiz
-    }
-
-    // --- Respond to Client ---
-    res.json({quiz: quizQuestions});
-  } catch (error) {
-    // Pass error to the global error handler
-    // Ensure AppErrors created above are passed correctly
-    if (!error.isOperational) {
-      console.error(
-        `Unexpected error during quiz generation for module ${req.body.moduleId}:`,
-        error,
-      );
-    }
-    next(error);
-  }
-};
 
 // POST /save-quiz-result
 exports.saveQuizResult = async (req, res, next) => {
@@ -237,6 +57,7 @@ exports.saveQuizResult = async (req, res, next) => {
       );
 
     const userRef = db.collection('users').doc(userId);
+
     const batch = db.batch();
 
     // --- Prepare Quiz Result Data ---
@@ -409,7 +230,7 @@ exports.getQuizHistory = async (req, res, next) => {
   } catch (error) {
     console.error(
       `Error fetching quiz history for user ${req.params.userId}:`,
-      error,
+      error,quizId
     );
     next(
       new AppError('Failed to retrieve quiz history.', 500, 'DB_FETCH_ERROR'),
@@ -418,36 +239,31 @@ exports.getQuizHistory = async (req, res, next) => {
 };
 
 // --- NEW: Get Quiz by ID ---
-// GET /:quizId
+// GET /quiz/:id
 exports.getQuizById = async (req, res, next) => {
   try {
-    const { quizId } = req.params;
-
-    if (!quizId || typeof quizId !== 'string') {
-      return next(
-        new AppError('Invalid quiz ID parameter', 400, 'INVALID_QUIZ_ID'),
-      );
-    }
-
-    const quizDoc = await db.collection('quizzes').doc(quizId).get();
+    const id = req.params.id; // Changed from quizId to id
+    console.log('quizId:', id);
+    const quizDoc = await db.collection('quizzes').doc(id).get(); // Changed from quizId to id
 
     if (!quizDoc.exists) {
       return next(
-        new AppError(`Quiz with ID ${quizId} not found`, 404, 'QUIZ_NOT_FOUND'),
+        new AppError(`Quiz with ID ${id} not found`, 404, 'QUIZ_NOT_FOUND'),
       );
     }
 
     const quizData = quizDoc.data();
     res.json({
-      id: quizDoc.id,
+      id: quizDoc.id, // Changed from quizDoc.quizId to quizDoc.id
       ...quizData,
       // Include other relevant fields from the quiz document
     });
   } catch (error) {
-    console.error(`Error getting quiz by ID ${req.params.quizId}:`, error);
+    console.error(`Error getting quiz by ID ${req.params.id}:`, error);
     next(error);
   }
 };
+
 
 // --- NEW: Get All Quizzes ---
 // GET /

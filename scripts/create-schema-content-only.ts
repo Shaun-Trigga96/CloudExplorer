@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs'; // Using Node's built-in file system module
 import admin from 'firebase-admin'; // Use import syntax if your tsconfig allows esModuleInterop
 import { FieldValue, Timestamp } from 'firebase-admin/firestore'; // Correct import for FieldValue/Timestamp
-import { HfInference } from '@huggingface/inference';
+import { GoogleGenerativeAI, GenerateContentResult } from '@google/generative-ai'; // Import result type if needed
 
 // --- Type Definitions (Simplified or Import from main types) ---
 // Ensure these types match the structure you expect in Firestore
@@ -33,10 +33,11 @@ interface Module {
 
 interface Question { // Assuming structure from AI parser
   id: number;
+  explanation: string[];
+  answers: Array<{ letter: string; answer: string; uniqueKey?: string }>;
   question: string;
-  answers: { letter: string; answer: string; uniqueKey: string }[];
+  options: string[];
   correctAnswer: string;
-  explanation: string;
 }
 
 interface Quiz {
@@ -64,60 +65,266 @@ interface Exam {
   passingRate: number;
 }
 
+interface ScriptSectionDef {
+  title: string;
+  contentPath: string;
+  order: number;
+}
+
+type ScriptModuleDef = Omit<Module, 'sections' | 'createdAt' | 'updatedAt' | 'quizIds' | 'contentType'> & {
+  sections: ScriptSectionDef[];
+};
+
+type ScriptExamDef = Omit<Exam, 'questions' | 'questionsGeneratedAt' | 'createdAt' | 'updatedAt'> & {
+  numberOfQuestions: number;
+};
+
+type ScriptQuizDef = Omit<Quiz, 'questions' | 'createdAt' | 'updatedAt'> & {
+  numberOfQuestions: number;
+};
 // --- Load Environment Variables ---
 dotenv.config({ path: path.resolve(__dirname, '../..', '.env') });
-console.log('ENV loaded:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH ? 'FB Path Found' : 'FB Path Missing!', process.env.HUGGINGFACE_API_KEY ? 'HF Key Found' : 'HF Key Missing!');
+console.log('ENV loaded:', process.env.FIREBASE_SERVICE_ACCOUNT_PATH ? 'FB Path Found' : 'FB Path Missing!',
+  process.env.INFERENCE_API_KEY ? 'HF Key Found' : 'HF Key Missing!');
 
 // --- Utility Functions (Copy/Paste or Require from script utils) ---
-// Ensure these are available in your script's scope
-
-async function executeWithRetry(fn: () => Promise<any>, maxRetries = 3, timeout = 20000, initialDelay = 1000): Promise<any> {
-  console.log(`      >> Calling function with retry (max ${maxRetries}, timeout ${timeout}ms)...`);
+async function executeWithRetry(fn: () => Promise<any>, maxRetries = 3, timeout = 30000, initialDelay = 1000): Promise<any> { // Increased default timeout
+  console.log(`        >> Calling function with retry (max ${maxRetries}, timeout ${timeout}ms)...`);
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const timeoutPromise = new Promise((_, reject) => {
-        const timer = setTimeout(() => reject(new Error(`Operation timed out after ${timeout}ms`)), timeout);
-        timer.unref?.(); // Allow Node.js to exit if this is the only thing running
-      });
-      return await Promise.race([fn(), timeoutPromise]);
-    } catch (error: any) {
-      lastError = error;
-      const isRetryable = error.message?.includes('RESOURCE_EXHAUSTED') || error.status === 429 || error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('Too Many Requests');
-      if (isRetryable && attempt < maxRetries - 1) {
-        const delay = initialDelay * (2 ** attempt);
-        console.warn(`!! Attempt ${attempt + 1} failed: ${error.message}. Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      } else {
-        console.error(`!! Attempt ${attempt + 1} failed permanently: ${error.message}`);
-        throw error;
+      try {
+          const timeoutPromise = new Promise((_, reject) => {
+              const timer = setTimeout(() => reject(new Error(`Operation timed out after ${timeout}ms`)), timeout);
+              timer.unref?.();
+          });
+          // Important: Added await here, executeWithRetry should await the function call
+          return await Promise.race([fn(), timeoutPromise]);
+      } catch (error: any) {
+          lastError = error;
+           // Slightly broader check for retryable conditions from Gemini or network issues
+           const isRetryable = error.message?.includes('RESOURCE_EXHAUSTED') ||
+                               error.status === 429 || // Rate limit
+                               error.status === 500 || // Internal server error
+                               error.status === 503 || // Service unavailable
+                               error.name === 'AbortError' ||
+                               error.message?.includes('timeout') ||
+                               error.message?.includes('Too Many Requests') ||
+                               error.message?.includes('fetch failed'); // Network error
+
+          if (isRetryable && attempt < maxRetries - 1) {
+              const delay = initialDelay * (2 ** attempt);
+              console.warn(`!! Attempt ${attempt + 1} failed: ${error.message}. Retrying in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+              console.error(`!! Attempt ${attempt + 1} failed permanently: ${error.message}`);
+              throw error; // Re-throw the error if not retryable or max retries reached
+          }
       }
-    }
   }
-  throw lastError; // Throw last error if all retries failed
+  console.error("Retry loop finished unexpectedly without success or throwing."); // Should not happen
+  throw lastError ?? new Error("Unknown error after retries."); // Throw last known error or a generic one
 }
 
+
+// --- Corrected Parser Implementation ---
 function parseQuizFromAIResponse(text: string): Question[] {
   console.log(`>> Parsing AI response (${(text || '').length} chars)...`);
-  // *** PASTE your updated parseQuizFromAIResponse code here ***
-  // Ensure it returns an array matching the Question interface
-  if (!text) return [];
-  const parsedQuestions = [{ id: 0, question: "Placeholder Q", answers: [{ letter: 'a', answer: 'Placeholder A', uniqueKey: 'q0-a' }], correctAnswer: 'a', explanation: 'Placeholder Expl.' }]; // Replace with real parser
-  console.log(`      >> Parsed ${parsedQuestions.length} questions.`);
-  return parsedQuestions;
+  if (!text || typeof text !== 'string') {
+      console.warn('AI response text is empty or invalid. Returning empty questions array.');
+      return [];
+  }
+  const questions: Question[] = [];
+  const lines = text.trim().split(/\r?\n/);
+
+  let currentQuestionInternal: Partial<Question> | null = null; // Use Partial for building
+  let processingStage: 'question' | 'options' | 'answer' | 'explanation' = 'question';
+
+  for (const [index, originalLine] of lines.entries()) {
+      let line = originalLine.trim();
+      if (!line) continue;
+
+      try {
+          const newQuestionMatch = line.match(/^(?:question|Q)\s*\d*[:.)]?\s*(.*)/i) || line.match(/^(\d+)[:.)]\s+(.*)/);
+          if (newQuestionMatch) {
+              // Push previous valid question
+              if (currentQuestionInternal && currentQuestionInternal.question && currentQuestionInternal.answers && currentQuestionInternal.answers.length > 0 && currentQuestionInternal.correctAnswer) {
+                  if (!currentQuestionInternal.explanation) {
+                    currentQuestionInternal.explanation = [`The correct answer is ${currentQuestionInternal.correctAnswer.toUpperCase()}.`];
+                  }
+                  // Ensure it matches the Question interface before pushing
+                  questions.push({
+                    id: currentQuestionInternal.id ?? questions.length, // Use parsed ID or fallback
+                    question: currentQuestionInternal.question,
+                    answers: currentQuestionInternal.answers,
+                    correctAnswer: currentQuestionInternal.correctAnswer,
+                    explanation: currentQuestionInternal.explanation,
+                    options: []
+                  });
+              }
+              // Start new question
+              currentQuestionInternal = {
+                  id: questions.length, // Default ID
+                  question: (newQuestionMatch[1] || newQuestionMatch[2]).trim(),
+                  answers: [], // Initialize as empty array
+                  correctAnswer: '',
+                  explanation: [], // Initialize explanation as an empty array
+              };
+              processingStage = 'options';
+              continue;
+          }
+
+          if (!currentQuestionInternal) continue; // Skip if no question context
+
+          const explanationMatch = line.match(/^(?:explanation|rationale|reason)[:\s]*(.*)/i);
+          if (explanationMatch) {
+              currentQuestionInternal.explanation = [(explanationMatch[1] || '').trim()];
+              processingStage = 'explanation';
+              continue;
+          }
+          if (processingStage === 'explanation') {
+              currentQuestionInternal.explanation = currentQuestionInternal.explanation || [];
+              currentQuestionInternal.explanation.push(line); // Safely append
+              continue;
+          }
+
+          const correctMatch = line.match(/^(?:correct\s+answer|answer)[:\s]*(.+)/i);
+          if (correctMatch) {
+              let correctAnswerText = correctMatch[1].trim();
+              let parsedCorrectAnswer = '';
+              // ... (Parsing logic for a, b, c, d, true, false) ...
+               if (correctAnswerText.match(/^[a-d]$/i)) {
+                   parsedCorrectAnswer = correctAnswerText.toLowerCase();
+               } else if (correctAnswerText.match(/^[a-d][)\.]/i)) {
+                   parsedCorrectAnswer = correctAnswerText.charAt(0).toLowerCase();
+               } else if (correctAnswerText.toLowerCase() === 'true' || correctAnswerText.toLowerCase() === 'false') {
+                    parsedCorrectAnswer = correctAnswerText.toLowerCase();
+                    // Ensure answers array exists before checking length
+                    if (currentQuestionInternal.answers?.length === 0) {
+                          // Check if T/F already added
+                         if(!currentQuestionInternal.answers.find(a => a.letter === 'true')){
+                             currentQuestionInternal.answers.push({ letter: 'true', answer: 'True' });
+                         }
+                         if(!currentQuestionInternal.answers.find(a => a.letter === 'false')){
+                              currentQuestionInternal.answers.push({ letter: 'false', answer: 'False'});
+                         }
+                    }
+               } else {
+                    const embeddedLetter = correctAnswerText.match(/(?:option|answer)?\s*['"(]?([a-d])['")\.]?/i);
+                    if (embeddedLetter) {
+                        parsedCorrectAnswer = embeddedLetter[1].toLowerCase();
+                    } else {
+                        console.warn(`Could not parse correct answer format: "${correctAnswerText}" for question ID ${currentQuestionInternal.id}`);
+                    }
+               }
+
+              currentQuestionInternal.correctAnswer = parsedCorrectAnswer;
+              processingStage = 'explanation';
+              continue;
+          }
+
+          const optionMatch = line.match(/^([a-d])[:.)]\s+(.*)/i);
+          if (optionMatch && processingStage === 'options') {
+              const letter = optionMatch[1].toLowerCase();
+              const answerText = optionMatch[2].trim();
+              if (answerText) {
+                  // Ensure answers array is initialized
+                  if (!currentQuestionInternal.answers) {
+                      currentQuestionInternal.answers = [];
+                  }
+                  currentQuestionInternal.answers.push({
+                      letter: letter,
+                      answer: answerText,
+                      uniqueKey: `q${currentQuestionInternal.id}-${letter}` // Add unique key back
+                  });
+              }
+              continue;
+          }
+
+      } catch (parseError: any) {
+          console.error(`Error parsing line ${index + 1}: "${line}"`, parseError);
+          currentQuestionInternal = null;
+          processingStage = 'question'; // Reset stage on error
+          continue; // Skip to next line on error
+      }
+  }
+
+  // Add the last valid question
+  if (currentQuestionInternal && currentQuestionInternal.question && currentQuestionInternal.answers && currentQuestionInternal.answers.length > 0 && currentQuestionInternal.correctAnswer) {
+      if (!currentQuestionInternal.explanation) {
+          currentQuestionInternal.explanation = [`The correct answer is ${currentQuestionInternal.correctAnswer.toUpperCase()}.`];
+      }
+       questions.push({
+         id: currentQuestionInternal.id ?? questions.length,
+         question: currentQuestionInternal.question,
+         answers: currentQuestionInternal.answers,
+         correctAnswer: currentQuestionInternal.correctAnswer,
+         explanation: currentQuestionInternal.explanation,
+         options: []
+       });
+  }
+
+  console.log(`        >> Parsed ${questions.length} questions.`);
+  return questions;
 }
 
+
+// --- Corrected getExamContent (Simplified Context) ---
 async function getExamContent(examId: string, dbInstance: admin.firestore.Firestore): Promise<string> {
   console.log(`>> Fetching content context for examId: ${examId}`);
-  // *** PASTE your updated getExamContent code here (ensure it uses dbInstance) ***
-  // It should query 'exams' and potentially 'modules'/'sections' based on associatedModules
-  const examDoc = await dbInstance.collection('exams').doc(examId).get();
-  if (!examDoc.exists) return "Exam definition not found.";
-  let content = examDoc.data()?.description || "";
-  // Add logic to fetch associated module content if needed...
-  console.log(`>> Context length: ${content.length} chars`);
-  return content.trim() || "Default exam context.";
+  let content: string = '';
+  const associatedModuleSummaries: string[] = [];
+
+  try {
+      const examDocRef = dbInstance.collection('exams').doc(examId);
+      const examDoc = await examDocRef.get();
+      let associatedModuleIds: string[] = [];
+
+      if (examDoc.exists) {
+          const examData = examDoc.data();
+          content += (examData?.title || 'Exam Topic') + '. ' + (examData?.description || '') + ' ';
+          if (examData?.associatedModules && Array.isArray(examData.associatedModules)) {
+              associatedModuleIds = examData.associatedModules;
+          }
+      } else {
+          console.warn(`Exam document ${examId} not found when fetching content.`);
+          content += 'General exam topics. ';
+      }
+
+      if (associatedModuleIds.length > 0) {
+          console.log(`   Fetching summaries from associated modules: ${associatedModuleIds.join(', ')}`);
+          const modulePromises = associatedModuleIds.map(modId => dbInstance.collection('modules').doc(modId).get());
+          const moduleDocs = await Promise.all(modulePromises);
+
+          moduleDocs.forEach(modDoc => {
+              if (modDoc.exists) {
+                  const modData = modDoc.data();
+                  const summary = `Module: ${modData?.title || 'Untitled Module'}. Description: ${modData?.description || 'No description.'}`;
+                  associatedModuleSummaries.push(summary);
+              } else {
+                   console.warn(`Associated module ${modDoc.id} not found.`);
+              }
+          });
+      }
+
+      if (associatedModuleSummaries.length > 0) {
+          content += '\nRelevant Module Summaries:\n' + associatedModuleSummaries.join('\n');
+      }
+
+       if (content.trim() === '' || associatedModuleSummaries.length === 0) {
+          console.warn('No specific content or module summaries found. Using default placeholder.');
+          content = 'General knowledge related to the expected exam topic.';
+       }
+
+       content = content.replace(/\s+/g, ' ').trim();
+       console.log(`>> Reduced context length: ${content.length} chars`);
+
+  } catch(error: any) {
+       console.error(`Error fetching content for exam ${examId}:`, error);
+       content = `Error retrieving exam content context: ${error.message}`;
+  }
+  return content;
 }
+
 
 const serverTimestamp = () => FieldValue.serverTimestamp();
 
@@ -156,31 +363,16 @@ try {
   process.exit(1);
 }
 
-// --- Hugging Face Initialization ---
-let hf: HfInference;
-try {
-  if (!process.env.HUGGINGFACE_API_KEY) throw new Error('HUGGINGFACE_API_KEY is required in .env file for seeding.');
-  hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
-  console.log('Hugging Face client initialized.');
-} catch (error: any) {
-  console.error('CRITICAL: Failed to initialize Hugging Face client:', error.message);
+
+// --- Initialize Google AI Client for Seeding Script ---
+if (!process.env.GEMINI_API_KEY) { // Update check
+  console.error('CRITICAL: GEMINI_API_KEY environment variable is not set. Seeding script AI generation will fail.');
   process.exit(1);
 }
+// Initialize Google client
+const googleAiClientSeeding = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+console.log('Google AI client initialized for seeding.');
 
-// --- Content Definitions ---
-
-// Define the structure for a section definition within the script
-interface ScriptSectionDef {
-  title: string;
-  contentPath: string; // Path to the .md file relative to content directory
-  order: number;
-}
-
-// Define the structure for a module definition within the script
-// Omit 'sections' from the Module type, and add the script-specific sections definition
-type ScriptModuleDef = Omit<Module, 'sections' | 'createdAt' | 'updatedAt' | 'quizIds' | 'contentType'> & {
-  sections: ScriptSectionDef[];
-};
 
 // Updated function to define modules with descriptions and ordered sections
 function defineModules(): ScriptModuleDef[] {
@@ -262,18 +454,6 @@ function defineModules(): ScriptModuleDef[] {
   ];
 }
 
-// Define the structure for an exam definition within the script
-// Exclude fields automatically set or generated later
-type ScriptExamDef = Omit<Exam, 'questions' | 'questionsGeneratedAt' | 'createdAt' | 'updatedAt'> & {
-  numberOfQuestions: number; // Add generation parameter
-};
-
-// Define the structure for a quiz definition within the script
-// Exclude fields automatically set or generated later
-type ScriptQuizDef = Omit<Quiz, 'questions' | 'createdAt' | 'updatedAt'> & {
-  numberOfQuestions: number; // Add generation parameter
-};
-
 
 function defineExams(): ScriptExamDef[] {
   console.log('\n[CONTENT] Defining Exams Metadata & Generation Params...');
@@ -283,9 +463,9 @@ function defineExams(): ScriptExamDef[] {
       title: 'Google Cloud Digital Leader Practice Exam',
       description: 'Assesses foundational knowledge of cloud concepts and Google Cloud products, services, tools, features, benefits, and use cases.', // Updated Description
       duration: 90, // minutes
-      prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions'], // Suggested prerequisite
+      prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'], // Suggested prerequisite
       // Modules relevant for fundamental understanding for AI context
-      associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage'],
+      associatedModules:['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'],
       numberOfQuestions: 30, // Adjusted number of questions for practice CDL
       passingRate: 70 // Adjusted passing rate for CDL
     },
@@ -295,10 +475,10 @@ function defineExams(): ScriptExamDef[] {
       description: 'Assesses ability to design, develop, and manage robust, secure, scalable, highly available, and dynamic solutions on Google Cloud.', // Updated Description
       duration: 120,
       // Suggested prerequisites based on broad scope
-      prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions'], // Add others like networking if available
+      prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'], // Add others like networking if available
       // Include all available core modules for broad architect context
-      associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'cloud-functions', 'kubernetes-engine'],
-      numberOfQuestions: 50,
+      associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'],
+      numberOfQuestions: 30,
       passingRate: 70 // Adjusted passing rate for CDL
     },
     {
@@ -306,10 +486,10 @@ function defineExams(): ScriptExamDef[] {
       title: 'Google Cloud Data Engineer Practice Exam',
       description: 'Assesses ability to design, build, operationalize, secure, and monitor data processing systems, focusing on data pipelines and machine learning models.', // Updated Description
       duration: 120,
-      prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage'], // Core prerequisites
+      prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'], // Core prerequisites
       // Focus context on modules relevant to data storage, processing, serverless triggers
-      associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'cloud-functions'],
-      numberOfQuestions: 50,
+      associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'],
+      numberOfQuestions: 30,
       passingRate: 70 // Adjusted passing rate for CDL
     },
     {
@@ -317,10 +497,10 @@ function defineExams(): ScriptExamDef[] {
       title: 'Google Cloud Security Practice Exam',
       description: 'Assesses ability to design and implement a secure infrastructure on Google Cloud Platform using Google Cloud security technologies.', // Updated Description
       duration: 120,
-      prerequisites: ['cloud-fundamentals', 'compute-engine'], // Add networking, IAM modules if available
+      prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'], // Add networking, IAM modules if available
       // Focus context on infrastructure modules that need securing
-      associatedModules: ['cloud-fundamentals', 'compute-engine', 'kubernetes-engine'],
-      numberOfQuestions: 50,
+      associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'],
+      numberOfQuestions: 30,
       passingRate: 70 // Adjusted passing rate for CDL
     },
     // Add other exam definitions here...
@@ -336,7 +516,7 @@ function defineQuizzes(): ScriptQuizDef[] {
       quizId: 'cloud-fundamentals-quiz-1', // Persistent ID for the quiz
       moduleId: 'cloud-fundamentals', // Link to the module
       title: 'Cloud Fundamentals Quiz', // Title for the quiz
-      numberOfQuestions: 5, // How many questions to generate
+      numberOfQuestions: 10, // How many questions to generate
       passingScore: 60, // Required score percentage to pass,
       description: 'Test your knowledge of core cloud computing concepts and Google Cloud fundamentals.' // Added Description
     },
@@ -344,7 +524,7 @@ function defineQuizzes(): ScriptQuizDef[] {
       quizId: 'compute-engine-quiz-1',
       moduleId: 'compute-engine',
       title: 'Compute Engine Basics Quiz',
-      numberOfQuestions: 5,
+      numberOfQuestions: 10,
       passingScore: 70,
       description: 'Test your understanding of Google Cloud Compute Engine basics.' // Added Description
     },
@@ -352,7 +532,7 @@ function defineQuizzes(): ScriptQuizDef[] {
       quizId: 'cloud-storage-quiz-1',
       moduleId: 'cloud-storage',
       title: 'Cloud Storage Quiz',
-      numberOfQuestions: 5,
+      numberOfQuestions: 10,
       passingScore: 70,
       description: 'Test your knowledge of Google Cloud Storage concepts and use cases.' // Added Description
     },
@@ -360,7 +540,7 @@ function defineQuizzes(): ScriptQuizDef[] {
       quizId: 'cloud-functions-quiz-1',
       moduleId: 'cloud-functions',
       title: 'Cloud Functions Quiz',
-      numberOfQuestions: 5,
+      numberOfQuestions: 10,
       passingScore: 70,
       description: 'Test your understanding of Google Cloud Functions and serverless computing.' // Added Description
     },
@@ -368,7 +548,7 @@ function defineQuizzes(): ScriptQuizDef[] {
       quizId: 'kubernetes-engine-quiz-1',
       moduleId: 'kubernetes-engine',
       title: 'Kubernetes Engine Quiz',
-      numberOfQuestions: 5,
+      numberOfQuestions: 10,
       passingScore: 70,
       description: 'Test your knowledge of Google Kubernetes Engine and container orchestration.' // Added Description
     },
@@ -377,7 +557,7 @@ function defineQuizzes(): ScriptQuizDef[] {
       quizId: 'data-transformation-quiz-1',
       moduleId: 'data-transformation',
       title: 'Data Transformation Quiz',
-      numberOfQuestions: 5,
+      numberOfQuestions: 10,
       passingScore: 70,
       description: 'Test your understanding of data transformation and management concepts.' // Added Description
     }
@@ -465,128 +645,227 @@ async function seedExamMetadata(examDefinitions: ReturnType<typeof defineExams>)
   }
 }
 
+// Updated generateAndSaveQuizQuestions with Gemini API call
 async function generateAndSaveQuizQuestions(quizDefinitions: ReturnType<typeof defineQuizzes>) {
-  console.log('\n[SEEDING] Generating and Saving Quiz Questions...');
-  const quizCollection = db.collection('quizzes');
-  const moduleCollection = db.collection('modules');
+    console.log('\n[SEEDING] Generating and Saving Quiz Questions...');
+    const quizCollection = db.collection('quizzes');
+    const moduleCollection = db.collection('modules');
 
-  for (const quizInfo of quizDefinitions) {
-    const quizId = quizInfo.quizId;
-    const moduleId = quizInfo.moduleId;
-    const quizRef = quizCollection.doc(quizId);
-    console.log(`Processing quiz: ${quizId} for module: ${moduleId}`);
+    for (const quizInfo of quizDefinitions) {
+        const quizId = quizInfo.quizId;
+        const moduleId = quizInfo.moduleId;
+        const quizRef = quizCollection.doc(quizId);
+        console.log(`   Processing quiz: ${quizId} for module: ${moduleId}`);
 
-    // Fetch module content context
-    let moduleContentContext = '';
-    try {
-      const moduleDoc = await moduleCollection.doc(moduleId).get();
-      if (!moduleDoc.exists) throw new Error(`Module ${moduleId} not found.`);
-      const moduleData = moduleDoc.data() as Module;
-      moduleContentContext = moduleData.description || '';
-      const sectionsSnapshot = await moduleCollection.doc(moduleId).collection('sections').orderBy('order').get();
-      sectionsSnapshot.forEach(doc => { moduleContentContext += ` ${doc.data().content || ''}`; });
-      moduleContentContext = moduleContentContext.trim();
-      if (!moduleContentContext) throw new Error(`No content context found for module ${moduleId}.`);
-    } catch (fetchError: any) {
-      console.error(`!! Error fetching context for quiz '${quizId}':`, fetchError.message);
-      continue; // Skip this quiz
+        let moduleContentContext = '';
+        try {
+             const moduleDoc = await moduleCollection.doc(moduleId).get();
+             if (!moduleDoc.exists) throw new Error(`Module ${moduleId} not found.`);
+             const moduleData = moduleDoc.data() as Module;
+             moduleContentContext = moduleData.description || '';
+             const sectionsSnapshot = await moduleCollection.doc(moduleId).collection('sections').orderBy('order').get();
+             sectionsSnapshot.forEach(doc => { moduleContentContext += ` ${doc.data().content || ''}`; });
+             moduleContentContext = moduleContentContext.trim();
+             if (!moduleContentContext) throw new Error(`No content context found for module ${moduleId}.`);
+        } catch (fetchError: any) {
+             console.error(`!! Error fetching context for quiz '${quizId}':`, fetchError.message);
+             continue;
+        }
+
+        const quizTitle = quizInfo.title || `Quiz for ${moduleId}`;
+        const numQuestions = quizInfo.numberOfQuestions || 5; // Use default from definition
+        const prompt = `Generate exactly ${numQuestions} quiz questions (multiple choice or true/false) based strictly on the following content: """${moduleContentContext}"""
+
+        Format the output precisely as follows for each question:
+
+        Question: [The question text]
+        a) [Option a text]
+        b) [Option b text]
+        c) [Option c text]
+        d) [Option d text]
+        Correct answer: [Correct option letter, e.g., a]
+        Explanation: [Brief explanation why the answer is correct, referencing the content if possible]
+
+        OR for True/False:
+
+        Question: [The question text]
+        Correct answer: [True or False]
+        Explanation: [Brief explanation why the answer is True or False, referencing the content if possible]
+
+        RULES:
+        - Return *only* the formatted questions, answers, and explanations.
+        - Do not include introductory text, summaries, numbering beyond the question itself (like "1."), or closing remarks.
+        - Ensure explanations are concise and accurate based *only* on the provided content context.
+        - Ensure all ${numQuestions} questions are generated.
+        - Adhere strictly to the a) b) c) d) format for multiple choice options.
+        - Adhere strictly to the "Correct answer: " prefix for the answer line.
+        - Adhere strictly to the "Explanation: " prefix for the explanation line.`;
+
+
+        try {
+            console.log(`       Generating ${numQuestions} questions for '${quizTitle}' using Google Gemini API...`);
+            const modelName = process.env.QUIZ_MODEL_GEMINI || "gemini-1.5-flash-latest"; // Using Flash for quizzes
+            console.log(`       Using model: ${modelName}`);
+            const model = googleAiClientSeeding.getGenerativeModel({ model: modelName });
+
+            const result: GenerateContentResult = await executeWithRetry(
+              () => model.generateContent(
+                  prompt,
+                  // Optional: Add generationConfig if needed
+                  // { temperature: 0.6 }
+              ),
+              3, 30000 // 30 second timeout
+            );
+
+            console.log(`       >> RAW API Response for Quiz ${quizId}:`, JSON.stringify(result, null, 2)); // Keep logging raw response
+
+            const response = result.response;
+            // Add extra safety check for response existence
+            if (!response) {
+                 throw new Error('Gemini API did not return a response object.');
+            }
+            const generatedText = response.text();
+            if (!generatedText) throw new Error('Gemini API response content is empty.');
+
+            console.log(`       >> Text content received (${generatedText.length} chars). Parsing...`);
+            const questions = parseQuizFromAIResponse(generatedText); // Use corrected parser
+
+            if (questions.length === 0) {
+                console.warn(`Parsing failed for ${quizId}. Text was:\n---\n${generatedText}\n---`);
+                throw new Error('AI response parsing failed or returned no questions.');
+            }
+
+            const quizData: Partial<Quiz> = {
+                quizId: quizId, moduleId: moduleId, title: quizTitle,
+                description: quizInfo.description, passingScore: quizInfo.passingScore || 70,
+                questions: questions, updatedAt: serverTimestamp(),
+            };
+
+            const batch = db.batch();
+            batch.set(quizRef, quizData, { merge: true });
+            batch.set(moduleCollection.doc(moduleId), { quizIds: FieldValue.arrayUnion(quizId) }, { merge: true });
+            await batch.commit();
+
+            console.log(`-> Saved/Updated generated quiz ${quizId} with ${questions.length} questions.`);
+
+        } catch (error: any) {
+            console.error(`!! Error generating/saving quiz '${quizId}':`, error.message);
+             if (error.message.includes('GoogleGenerativeAI Error')) {
+                 console.error(" -> Google API Error Details:", JSON.stringify(error, null, 2)); // Log full error
+             }
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Increased delay slightly
     }
-
-    const quizTitle = quizInfo.title || `Quiz for ${moduleId}`;
-    const numQuestions = quizInfo.numberOfQuestions || 5;
-    const prompt = `Generate exactly ${numQuestions} quiz questions based on: """${moduleContentContext}"""... [rest of your standard quiz prompt]`;
-
-    try {
-      console.log(`    Generating ${numQuestions} questions for '${quizTitle}'...`);
-      const result = await executeWithRetry(() => hf.textGeneration({
-        model: process.env.HF_MODEL_QUIZ || 'mistralai/Mistral-7B-Instruct-v0.2',
-        inputs: prompt, parameters: { max_new_tokens: 250 * numQuestions, temperature: 0.6 }
-      }), 3, 30000); // Adjust timeout
-
-      const questions = parseQuizFromAIResponse(result.generated_text);
-      if (questions.length === 0) throw new Error('AI response parsing failed or returned no questions.');
-
-      // Prepare full quiz data
-      const quizData: Partial<Quiz> = {
-        quizId: quizId, moduleId: moduleId, title: quizTitle,
-        passingScore: quizInfo.passingScore || 70, questions: questions,
-        updatedAt: serverTimestamp(),
-      };
-      // Use set with merge to create or overwrite the quiz with this ID
-      await quizRef.set(quizData, { merge: true });
-      console.log(`-> Saved/Updated generated quiz ${quizId}.`);
-      // Update module with quizId link (idempotent using merge + arrayUnion if FieldValue imported)
-      await moduleCollection.doc(moduleId).set({ quizIds: FieldValue.arrayUnion(quizId) }, { merge: true });
-
-    } catch (error: any) {
-      console.error(`!! Error generating/saving quiz '${quizId}':`, error.message);
-    }
-    // Optional delay
-    await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 sec delay
-  }
 }
 
+
+// Updated generateAndSaveExamQuestions with Gemini API call
 async function generateAndSaveExamQuestions(examDefinitions: ReturnType<typeof defineExams>) {
   console.log('\n[SEEDING] Generating and Saving Exam Questions...');
   const examCollection = db.collection('exams');
 
   for (const examInfo of examDefinitions) {
-    const examId = examInfo.examId;
-    console.log(`  Processing exam: ${examId}`);
-    const examRef = examCollection.doc(examId);
+      const examId = examInfo.examId;
+      console.log(`   Processing exam: ${examId}`);
+      const examRef = examCollection.doc(examId);
 
-    // Get content context using helper
-    let examContentContext = '';
-    try {
-      const examMetaDoc = await examRef.get();
-      if (!examMetaDoc.exists) throw new Error(`Exam metadata for ${examId} not found.`);
-      examContentContext = await getExamContent(examId, db); // Pass db instance
-      if (!examContentContext || examContentContext.length < 50) {
-        console.warn(`  !! Insufficient content context for exam ${examId}. Generation might be less accurate.`);
+      let examContentContext = '';
+      try {
+          const examMetaDoc = await examRef.get();
+          if (!examMetaDoc.exists) throw new Error(`Exam metadata for ${examId} not found.`);
+          // Use the UPDATED getExamContent which uses only titles/descriptions
+          examContentContext = await getExamContent(examId, db);
+          if (!examContentContext || examContentContext.includes('Error retrieving')) {
+               throw new Error(`Failed to get valid content context for exam ${examId}`);
+          }
+           if (examContentContext.length < 50) { // Basic check even on reduced context
+              console.warn(`   !! Potentially insufficient content context for exam ${examId} (${examContentContext.length} chars). Generation might be less accurate.`);
+          }
+      } catch (fetchError: any) {
+          console.error(`!! Error fetching context for exam '${examId}':`, fetchError.message);
+          continue;
       }
-    } catch (fetchError: any) {
-      console.error(`!! Error fetching context for exam '${examId}':`, fetchError.message);
-      continue; // Skip this exam
-    }
+
+      const examTitle = examInfo.title || 'Exam';
+      const numQuestions = examInfo.numberOfQuestions || 25; // Use definition's count
+      const prompt = `Generate exactly ${numQuestions} challenging, scenario-based exam questions suitable for a "${examTitle}" certification practice exam. Base the questions strictly on the following provided context summaries: """${examContentContext}"""
+
+      Format the output precisely as follows for each question:
+
+      Question: [The question text, often presenting a scenario]
+      a) [Option a text]
+      b) [Option b text]
+      c) [Option c text]
+      d) [Option d text]
+      Correct answer: [Correct option letter, e.g., a]
+      Explanation: [Brief but clear explanation why the answer is correct, referencing concepts if possible]
+
+      RULES:
+      - Return *only* the formatted questions, answers, and explanations.
+      - Do not include introductory text, summaries, numbering beyond the question itself, or closing remarks.
+      - Ensure explanations are concise and accurate based *only* on the provided context.
+      - Ensure all ${numQuestions} questions are generated.
+      - Adhere strictly to the a) b) c) d) format for multiple choice options.
+      - Adhere strictly to the "Correct answer: " prefix for the answer line.
+      - Adhere strictly to the "Explanation: " prefix for the explanation line.`;
 
 
-    const examTitle = examInfo.title || 'Exam';
-    const numQuestions = examInfo.numberOfQuestions || 25;
-    const prompt = `Generate exactly ${numQuestions} challenging exam questions for "${examTitle}" based on: """${examContentContext}"""... [rest of your standard exam prompt]`;
+      try {
+          console.log(`       Generating ${numQuestions} questions for '${examTitle}' using Google Gemini API...`);
+           // Using Gemini 1.5 Pro for potentially more complex exam questions
+          const modelName = process.env.EXAM_MODEL_GEMINI || "gemini-1.5-pro-latest";
+          console.log(`       Using model: ${modelName}`);
+          const model = googleAiClientSeeding.getGenerativeModel({ model: modelName });
 
-    try {
-      console.log(`Generating ${numQuestions} questions for '${examTitle}'...`);
-      const result = await executeWithRetry(() => hf.textGeneration({
-        model: process.env.HF_MODEL_EXAM || 'mistralai/Mistral-7B-Instruct-v0.2',
-        inputs: prompt, parameters: { max_new_tokens: 350 * numQuestions, temperature: 0.5 }
-      }), 3, 45000); // Longer timeout
+          // Add generationConfig for exams if needed (e.g., temperature)
+          // const generationConfig = { temperature: 0.5 };
 
-      const questions = parseQuizFromAIResponse(result.generated_text);
-      if (questions.length === 0) throw new Error('AI response parsing failed or returned no questions.');
+          const result: GenerateContentResult = await executeWithRetry(
+            () => model.generateContent(
+                prompt,
+                // generationConfig // Pass config if defined
+            ),
+            3, 60000 // 60 second timeout for exams
+          );
 
-      // Update existing exam document with questions
-      await examRef.update({ // Use update for existing doc
-        questions: questions,
-        questionsGeneratedAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-      console.log(`    -> Saved/Updated generated questions for exam ${examId}.`);
+          console.log(`       >> RAW API Response for Exam ${examId}:`, JSON.stringify(result, null, 2));
 
-    } catch (error: any) {
-      console.error(`  !! Error generating/saving questions for exam '${examId}':`, error.message);
-    }
-    // Optional delay
-    await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 sec delay
+          const response = result.response;
+           if (!response) {
+               throw new Error('Gemini API did not return a response object.');
+          }
+          const generatedText = response.text();
+          if (!generatedText) throw new Error('Gemini API response content is empty.');
+
+          console.log(`       >> Text content received (${generatedText.length} chars). Parsing...`);
+          const questions = parseQuizFromAIResponse(generatedText); // Use corrected parser
+
+          if (questions.length === 0) {
+               console.warn(`Parsing failed for ${examId}. Text was:\n---\n${generatedText}\n---`);
+              throw new Error('AI response parsing failed or returned no questions.');
+          }
+
+          await examRef.update({
+              questions: questions,
+              questionsGeneratedAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+          });
+          console.log(`-> Saved/Updated generated questions for exam ${examId} (${questions.length} questions).`);
+
+      } catch (error: any) {
+          console.error(`!! Error generating/saving questions for exam '${examId}':`, error.message);
+           if (error.message.includes('GoogleGenerativeAI Error')) {
+               console.error(" -> Google API Error Details:", JSON.stringify(error, null, 2));
+           }
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Increased delay slightly
   }
 }
+
 
 // --- Main Execution Function ---
 async function runSeeding() {
   console.log('\n--- Starting Firestore Content Seeding Script ---');
-  // WARNING: Do not uncomment cleanup unless you intend to wipe these collections!
-  // console.warn("!!! WARNING: Firestore cleanup is enabled. This will wipe data. !!!");
-  // await cleanupFirestoreSafe(); // Use a modified, safer cleanup if absolutely needed
-
   try {
     const modules = defineModules();
     const exams = defineExams();
@@ -605,51 +884,6 @@ async function runSeeding() {
     process.exit(1);
   }
 }
-
-// --- (Optional) Cleanup Function - MODIFIED AND COMMENTED OUT ---
-/*
-async function cleanupFirestoreSafe(): Promise<void> {
-    // WARNING: This function deletes data. Use with extreme caution.
-    // Consider adding prompts or command-line flags to prevent accidental runs.
-    const readline = require('readline').createInterface({ input: process.stdin, output: process.stdout });
-    const collectionsToClean = ['modules', 'quizzes', 'exams']; // ONLY content collections
-
-    console.warn(`\n!!! WARNING !!!`);
-    console.warn(`This will DELETE ALL data in the following Firestore collections:`);
-    console.warn(`  ${collectionsToClean.join(', ')}`);
-    console.warn(`For project: ${process.env.GCLOUD_PROJECT || admin.app().options.projectId}`); // Show project ID
-
-    const answer = await new Promise(resolve => readline.question(`Type 'YESDELETE' to confirm: `, resolve));
-    readline.close();
-
-    if (answer !== 'YESDELETE') {
-        console.log('Cleanup aborted.');
-        return;
-    }
-
-    console.log('Starting Firestore content cleanup...');
-    try {
-        for (const collection of collectionsToClean) {
-            console.log(`  Cleaning up ${collection}...`);
-            const snapshot = await db.collection(collection).limit(500).get(); // Limit initial query
-            if (snapshot.empty) {
-                console.log(`  Collection ${collection} is already empty or has few items.`);
-                continue; // Check next collection or implement recursive delete if needed
-            }
-             // Simple batch delete (limited by snapshot size - use recursive delete for >500)
-            const batch = db.batch();
-            snapshot.docs.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-            console.log(`  Deleted ${snapshot.size} documents from ${collection} (more may exist if >500).`);
-            // TODO: Implement proper recursive delete for large collections if needed
-        }
-        console.log('Firestore content cleanup finished (check for remaining docs if large).');
-    } catch (error) {
-        console.error('Error during Firestore content cleanup:', error);
-        throw error;
-    }
-}
-*/
 
 
 // --- Script Execution ---

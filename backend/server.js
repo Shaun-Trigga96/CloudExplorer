@@ -6,8 +6,8 @@ const dotenv = require('dotenv');
 const path = require('path');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const {HfInference} = require('@huggingface/inference'); // Import HF Inference
-const { hfApiLimiter } = require('./middleware/middleware'); // Import limiter from middleware.js
+//const {hfApiLimiter} = require('./middleware/middleware'); // Import limiter from middleware.js
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // --- Load Environment Variables ---
 dotenv.config({path: path.resolve(__dirname, '..', '.env')});
@@ -15,62 +15,72 @@ dotenv.config({path: path.resolve(__dirname, '..', '.env')});
 // --- Firebase Initialization ---
 try {
   if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_PATH environment variable is not set.');
+    throw new Error(
+      'FIREBASE_SERVICE_ACCOUNT_PATH environment variable is not set.',
+    );
   }
   // Get the relative path from the environment variable (e.g., 'backend/src/config/key.json')
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 
   // Resolve the absolute path starting from the project root (one level up from __dirname)
-  const absoluteCredentialsPath = path.resolve(__dirname, '..', serviceAccountPath);
+  const absoluteCredentialsPath = path.resolve(
+    __dirname,
+    '..',
+    serviceAccountPath,
+  );
 
   console.log(`Loading Firebase credentials from: ${absoluteCredentialsPath}`); // Should now be the correct path
   const serviceAccount = require(absoluteCredentialsPath); // This require should now work
 
   if (!process.env.FIREBASE_STORAGE_BUCKET) {
-      console.warn('FIREBASE_STORAGE_BUCKET environment variable is not set. Storage operations might fail.');
+    console.warn(
+      'FIREBASE_STORAGE_BUCKET environment variable is not set. Storage operations might fail.',
+    );
   }
 
   // Check if the default app is already initialized BEFORE initializing
   if (admin.apps.length === 0) {
-      admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-          storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-      });
-      console.log('Firebase Admin SDK Initialized Successfully.');
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    });
+    console.log('Firebase Admin SDK Initialized Successfully.');
   } else {
-      console.log('Firebase Admin SDK already initialized.');
+    console.log('Firebase Admin SDK already initialized.');
   }
-
-  // Make sure authenticateGoogleDocs is imported if you uncomment this
-  // const { authenticateGoogleDocs } = require('./utils/googleAuth');
-  // authenticateGoogleDocs().catch(err => {
-  //     console.error('Initial Google Auth failed:', err.message);
-  // });
-
 } catch (error) {
   console.error(
-      'CRITICAL: Failed to initialize Firebase Admin SDK or load credentials:',
-      error.message,
+    'CRITICAL: Failed to initialize Firebase Admin SDK or load credentials:',
+    error.message,
   );
   if (error.code === 'MODULE_NOT_FOUND') {
-      // This error might still occur if the path in .env is wrong AFTER the fix above
-      console.error(
-          `Ensure the credentials file exists at the resolved path: ${error.path || absoluteCredentialsPath}. Check the FIREBASE_SERVICE_ACCOUNT_PATH in your .env file. It should be relative to the project root (e.g., backend/src/config/your-key.json).`,
-      );
+    // This error might still occur if the path in .env is wrong AFTER the fix above
+    console.error(
+      `Ensure the credentials file exists at the resolved path: ${
+        error.path || absoluteCredentialsPath
+      }. Check the FIREBASE_SERVICE_ACCOUNT_PATH in your .env file. It should be relative to the project root (e.g., backend/src/config/your-key.json).`,
+    );
   }
   process.exit(1); // Exit if Firebase initialization fails
 }
-// --- Initialize Hugging Face Inference API --- (Do this early)
-if (!process.env.HUGGINGFACE_API_KEY) {
-  console.warn(
-    'HUGGINGFACE_API_KEY not found in .env. AI features will likely fail.',
+// Initialize GEMINI_API_KEY  client with custom base URL and API key
+if (!process.env.GEMINI_API_KEY) {
+  console.error(
+    'CRITICAL: GEMINI_API_KEY environment variable is not set. AI features will fail.',
   );
-  // You might choose to throw an error if AI is critical:
-  // throw new Error('HUGGINGFACE_API_KEY is required.');
+} else {
+    console.log("GEMINI_API_KEY found, initializing Google AI client...");
 }
-const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
-// Export hf instance so controllers can import it
-module.exports.hf = hf; // Make hf available for import
+
+// Initialize Google AI client
+const googleAiClient = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+
+if (!googleAiClient) {
+    console.warn("Google AI client not initialized due to missing GEMINI_API_KEY.");
+}
+
+module.exports.googleAiClient = googleAiClient;
+
 
 // --- Utils and Middleware ---
 const AppError = require('./utils/appError');
@@ -98,7 +108,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: 'Too many requests from this IP, please try again after 15 minutes',
 });
-app.use(hfApiLimiter); // Apply to all routes by default
+//app.use(hfApiLimiter); // Apply to all routes by default
 // Body Parsing
 app.use(express.json({limit: '10kb'})); // Limit payload size
 app.use(express.urlencoded({extended: true, limit: '10kb'})); // For form data if needed
@@ -106,13 +116,9 @@ app.use(express.urlencoded({extended: true, limit: '10kb'})); // For form data i
 // Logging (use 'dev' for development, 'combined' for production)
 app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
 
-
-module.exports.hf = hf;
-
 app.use(express.json({limit: '50kb'})); // Increased limit slightly if quiz/exam answers are large
 app.use(express.urlencoded({extended: true, limit: '50kb'}));
-app.use(apiLimiter); // Apply to all routes by default
-
+//app.use(apiLimiter); // Apply to all routes by default
 
 // --- API Routes --- (Add new routers)
 app.use('/api/v1', appRoutes); // General: /api/v1/health
@@ -153,9 +159,12 @@ const globalErrorHandler = (err, req, res, next) => {
   ) {
     err.statusCode = err.statusCode || 503; // Service Unavailable or Internal Server Error
   }
-  if (err.message?.includes('Hugging Face') && err.message?.includes('auth')) {
+  if (
+    err.message?.includes('Inference Face') &&
+    err.message?.includes('auth')
+  ) {
     err.statusCode = 401; // Unauthorized
-    err.message = 'Invalid or missing Hugging Face API credentials.';
+    err.message = 'Invalid or missing Inference Face API credentials.';
     err.code = 'AI_AUTH_ERROR';
   }
   if (

@@ -31,6 +31,13 @@ interface QuestionType {
 interface Quiz extends QuestionType {
   id: number;
 }
+interface ApiQuiz {
+  id: string;
+  title: string;
+  description: string;
+  questionCount: number;
+  moduleId: string;
+}
 
 const QuizzesDetailScreen = ({
   route,
@@ -73,78 +80,61 @@ const QuizzesDetailScreen = ({
 
     getUserId();
 
-    const fetchQuiz = async () => {
-      setLoading(true);
-      try {
-        const moduleResponse = await axios.get(`${BASE_URL}/api/v1/modules/${moduleId}`); // Corrected URL
-        setModuleTitle(moduleResponse.data.title);
-
-        const quizResponse = await axios.post(`${BASE_URL}/api/v1/quizzes/generate`, {
-          moduleId,
-        });
-        const formattedQuiz = quizResponse.data.quiz
-          .filter((q: Quiz) => {
-            const isValidQuestion =
-              q.question &&
-              q.question.trim().length > 0 &&
-              (q.correctAnswer === 'True' ||
-                q.correctAnswer === 'False' ||
-                ['a', 'b', 'c', 'd'].includes(q.correctAnswer));
-            return (
-              isValidQuestion &&
-              (q.answers.length > 0 ||
-                q.correctAnswer === 'True' ||
-                q.correctAnswer === 'False')
-            );
-          })
-          .map((q: Quiz, index: number) => ({
-            ...q,
-            id: index, // Assign a unique ID based on index
-            question: q.question.replace(/\s*\(question\)\s*/g, '').trim(),
-            answers: q.answers.map((a: any, answerIndex: number) => ({
-              letter: a.letter,
-              answer: a.answer.replace(/\s*\(answer\)\s*/g, '').trim(),
-              uniqueKey: `${index}-${a.letter}-${answerIndex}`, // Ensure unique key for answers
-            })),
-          }));
-        setQuiz(formattedQuiz);
-        // eslint-disable-next-line no-catch-shadow, @typescript-eslint/no-shadow
-      } catch (error: any) {
-        console.error('Error fetching quiz:', error); // Log the error
-        if (axios.isAxiosError(error)) {
-          const axiosError = error as AxiosError;
-          if (axiosError.response) {
-            // The request was made and the server responded with a status code
-            // that falls out of the range of 2xx
-            console.error('Server responded with:', axiosError.response.status, axiosError.response.data);
-            setError(
-              `Server Error: ${axiosError.response.status} - ${axiosError.response.data || axiosError.response.statusText}`,
-            );
-          } else if (axiosError.request) {
-            // The request was made but no response was received
-            console.error('No response received:', axiosError.request);
-            setError(
-              'Network error: Unable to connect to server. Please check your connection.',
-            );
-          } else {
-            // Something happened in setting up the request that triggered an Error
-            console.error('Error setting up the request:', axiosError.message);
-            setError(`Error: ${axiosError.message}`);
-          }
-        } else {
-          // Handle non-Axios errors
-          console.error('An unexpected error occurred:', error.message);
-          setError(`An unexpected error occurred: ${error.message}`);
-        }
-      } finally {
-        setLoading(false);
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }).start();
+  const fetchQuiz = async () => {
+  setLoading(true);
+  try {
+    const moduleResponse = await axios.get(`${BASE_URL}/api/v1/modules/${moduleId}`); // Corrected URL
+    setModuleTitle(moduleResponse.data.title);
+    // Fetch the list of quizzes
+    const quizzesResponse = await axios.get(`${BASE_URL}/api/v1/quizzes/list-quizzes`);
+    const quizzes: ApiQuiz[] = quizzesResponse.data.quizzes;
+    // Find the quiz associated with the current module
+    const currentQuiz = quizzes.find(q => q.moduleId === moduleId);
+    if (!currentQuiz) {
+      throw new Error(`No quiz found for module ID: ${moduleId}`);
+    }
+    console.log("Fetching quiz questions for quizId:", currentQuiz.id); // Log 2: quizId before quiz request
+    // Fetch the quiz questions using the correct quiz ID
+    const quizResponse = await axios.get(`${BASE_URL}/api/v1/quizzes/${currentQuiz.id}`); // Corrected URL
+    setQuiz(quizResponse.data.questions);
+    // eslint-disable-next-line no-catch-shadow, @typescript-eslint/no-shadow
+  } catch (error: any) {
+    console.error('Error fetching quiz:', error); // Log the error
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      if (axiosError.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Server responded with:', axiosError.response.status, axiosError.response.data);
+        setError(
+          `Server Error: ${axiosError.response.status} - ${axiosError.response.data || axiosError.response.statusText}`,
+        );
+      } else if (axiosError.request) {
+        // The request was made but no response was received
+        console.error('No response received:', axiosError.request);
+        setError(
+          'Network error: Unable to connect to server. Please check your connection.',
+        );
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error setting up the request:', axiosError.message);
+        setError(`Error: ${axiosError.message}`);
       }
-    };
+    } else {
+      // Handle non-Axios errors
+      console.error('An unexpected error occurred:', error.message);
+      setError(`An unexpected error occurred: ${error.message}`);
+    }
+  } finally {
+    setLoading(false);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }
+};
+
 
     fetchQuiz();
   }, [moduleId, fadeAnim, navigation]);
