@@ -1,15 +1,26 @@
-import admin from 'firebase-admin';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 export interface Exam {
-    examId: string;
-    title: string;
-    description: string;
-    content: string;
-    duration: number;
-    prerequisites?: string[];
-    createdAt: admin.firestore.Timestamp | Date;
-    updatedAt: admin.firestore.Timestamp | Date;
+  examId: string; // Persistent ID
+  title: string;
+  description: string;
+  duration: number | null;
+  prerequisites: string[];
+  associatedModules?: string[]; // For AI context generation
+  questions?: Question[]; // Store generated questions here
+  questionsGeneratedAt?: Timestamp | FieldValue;
+  createdAt?: Timestamp | FieldValue;
+  updatedAt?: Timestamp | FieldValue;
+  passingRate: number;
+}
+
+interface Question { // Assuming structure from AI parser
+  id: number;
+  explanation: string[];
+  answers: Array<{ letter: string; answer: string; uniqueKey?: string }>;
+  question: string;
+  options: string[];
+  correctAnswer: string;
 }
 
   export interface User {
@@ -39,6 +50,8 @@ export interface Exam {
     notificationsEnabled?: boolean;
     darkMode?: boolean;
     emailUpdates?: boolean;
+    syncData: boolean,
+    soundEffects: boolean,
   }
 
   export interface Module {
@@ -58,8 +71,11 @@ export interface ModuleWithContent extends Module {
     rawContent: any; // Raw Google Doc content
   }
 
-  export interface Section {
+  interface Section {
+    id?: string; // ID will be generated or based on order
     title: string;
-    content: string;
+    content: string; // Will hold Markdown content
     order: number;
+    moduleId?: string; // Link back
+    contentPath?: string; // Used temporarily for reading file
   }

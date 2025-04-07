@@ -291,7 +291,7 @@ async function getExamContent(examId: string, dbInstance: admin.firestore.Firest
       }
 
       if (associatedModuleIds.length > 0) {
-          console.log(`   Fetching summaries from associated modules: ${associatedModuleIds.join(', ')}`);
+          console.log(`Fetching summaries from associated modules: ${associatedModuleIds.join(', ')}`);
           const modulePromises = associatedModuleIds.map(modId => dbInstance.collection('modules').doc(modId).get());
           const moduleDocs = await Promise.all(modulePromises);
 
@@ -517,7 +517,7 @@ function defineQuizzes(): ScriptQuizDef[] {
       moduleId: 'cloud-fundamentals', // Link to the module
       title: 'Cloud Fundamentals Quiz', // Title for the quiz
       numberOfQuestions: 10, // How many questions to generate
-      passingScore: 60, // Required score percentage to pass,
+      passingScore: 70, // Required score percentage to pass,
       description: 'Test your knowledge of core cloud computing concepts and Google Cloud fundamentals.' // Added Description
     },
     {
@@ -580,7 +580,7 @@ async function seedModules(moduleDefinitions: ReturnType<typeof defineModules>) 
   for (const modDef of moduleDefinitions) {
     const moduleId = modDef.moduleId;
     const moduleRef = moduleCollection.doc(moduleId);
-    console.log(`  Processing Module: ${moduleId}`);
+    console.log(`Processing Module: ${moduleId}`);
 
     const sectionsToUpload = (modDef.sections || []).map(secDef => {
       try {
@@ -590,7 +590,7 @@ async function seedModules(moduleDefinitions: ReturnType<typeof defineModules>) 
           title: secDef.title, content: mdContent, order: secDef.order, moduleId: moduleId,
         };
       } catch (e: any) {
-        console.error(`    ! Error reading ${secDef.contentPath} for module ${moduleId}:`, e.message); return null;
+        console.error(`! Error reading ${secDef.contentPath} for module ${moduleId}:`, e.message); return null;
       }
     }).filter(s => s !== null); // Just filter out nulls
     const moduleDocData: Partial<Module> = { // Use Partial as some fields are optional or handled by merge
@@ -630,7 +630,7 @@ async function seedExamMetadata(examDefinitions: ReturnType<typeof defineExams>)
   for (const examDef of examDefinitions) {
     const examId = examDef.examId;
     const examRef = examCollection.doc(examId);
-    console.log(`  Processing Exam Metadata: ${examId}`);
+    console.log(`Processing Exam Metadata: ${examId}`);
     const examDocData: Partial<Exam> = {
       examId: examId, title: examDef.title, description: examDef.description,
       duration: examDef.duration || null, prerequisites: examDef.prerequisites || [],
@@ -655,7 +655,7 @@ async function generateAndSaveQuizQuestions(quizDefinitions: ReturnType<typeof d
         const quizId = quizInfo.quizId;
         const moduleId = quizInfo.moduleId;
         const quizRef = quizCollection.doc(quizId);
-        console.log(`   Processing quiz: ${quizId} for module: ${moduleId}`);
+        console.log(`Processing quiz: ${quizId} for module: ${moduleId}`);
 
         let moduleContentContext = '';
         try {
@@ -727,7 +727,7 @@ async function generateAndSaveQuizQuestions(quizDefinitions: ReturnType<typeof d
             const generatedText = response.text();
             if (!generatedText) throw new Error('Gemini API response content is empty.');
 
-            console.log(`       >> Text content received (${generatedText.length} chars). Parsing...`);
+            console.log(`>> Text content received (${generatedText.length} chars). Parsing...`);
             const questions = parseQuizFromAIResponse(generatedText); // Use corrected parser
 
             if (questions.length === 0) {
@@ -811,10 +811,10 @@ async function generateAndSaveExamQuestions(examDefinitions: ReturnType<typeof d
 
 
       try {
-          console.log(`       Generating ${numQuestions} questions for '${examTitle}' using Google Gemini API...`);
+          console.log(`Generating ${numQuestions} questions for '${examTitle}' using Google Gemini API...`);
            // Using Gemini 1.5 Pro for potentially more complex exam questions
           const modelName = process.env.EXAM_MODEL_GEMINI || "gemini-1.5-pro-latest";
-          console.log(`       Using model: ${modelName}`);
+          console.log(`Using model: ${modelName}`);
           const model = googleAiClientSeeding.getGenerativeModel({ model: modelName });
 
           // Add generationConfig for exams if needed (e.g., temperature)
@@ -828,7 +828,7 @@ async function generateAndSaveExamQuestions(examDefinitions: ReturnType<typeof d
             3, 60000 // 60 second timeout for exams
           );
 
-          console.log(`       >> RAW API Response for Exam ${examId}:`, JSON.stringify(result, null, 2));
+          console.log(`>> RAW API Response for Exam ${examId}:`, JSON.stringify(result, null, 2));
 
           const response = result.response;
            if (!response) {
@@ -837,7 +837,7 @@ async function generateAndSaveExamQuestions(examDefinitions: ReturnType<typeof d
           const generatedText = response.text();
           if (!generatedText) throw new Error('Gemini API response content is empty.');
 
-          console.log(`       >> Text content received (${generatedText.length} chars). Parsing...`);
+          console.log(`>> Text content received (${generatedText.length} chars). Parsing...`);
           const questions = parseQuizFromAIResponse(generatedText); // Use corrected parser
 
           if (questions.length === 0) {

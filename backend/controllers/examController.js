@@ -3,9 +3,6 @@ const admin = require('firebase-admin');
 const AppError = require('../utils/appError');
 const {authenticateGoogleDocs} = require('../utils/googleAuth');
 const {serverTimestamp} = require('../utils/firestoreHelpers');
-const {executeWithRetry} = require('../utils/retryHandler'); // Import retry helper
-const {parseQuizFromAIResponse, getExamContent} = require('../utils/aiHelpers'); // Import AI helpers
-const { googleAiClient } = require('../server'); // Import the Google client
 
 const db = admin.firestore();
 
@@ -83,13 +80,12 @@ exports.createExamDoc = async (req, res, next) => {
   }
 };
 
-
 // --- NEW: Save Exam Result ---
 // POST /save-result
 exports.saveExamResult = async (req, res, next) => {
+  console.log('saveExamResult: Received request body:', req.body);
   try {
     const {userId, examId, result} = req.body;
-
     // --- Input Validation ---
     if (!userId || typeof userId !== 'string')
       return next(
@@ -109,8 +105,14 @@ exports.saveExamResult = async (req, res, next) => {
       );
 
     // Validate required fields within the result object
-    const {totalQuestions, correctAnswers, score, isPassed, answeredQuestions} =
-      result;
+    const {
+      totalQuestions,
+      correctAnswers,
+      score,
+      isPassed,
+      answeredQuestions,
+      timestamp,
+    } = result;
     if (
       totalQuestions === undefined ||
       typeof totalQuestions !== 'number' ||
@@ -167,53 +169,95 @@ exports.saveExamResult = async (req, res, next) => {
         ),
       );
 
-    // Recalculate percentage server-side for consistency? Or trust client? Trusting client for now.
-    const percentage = parseFloat(score.toFixed(1));
-
     // --- Prepare Exam Result Data ---
     const examResultRef = db.collection('examResults').doc(); // Auto-generate ID
-    const timestamp = serverTimestamp(); // Use server time for results
+    const resultTimestamp = timestamp
+      ? admin.firestore.Timestamp.fromDate(new Date(timestamp))
+      : admin.firestore.FieldValue.serverTimestamp();
+    const percentage =
+      totalQuestions > 0
+        ? parseFloat(((correctAnswers / totalQuestions) * 100).toFixed(1)) // Use correctAnswers here
+        : 0; // Calculate percentage
+    const passingThreshold = 0.7; // 70%
+    const passed = percentage >= passingThreshold * 100;
     const examResultData = {
       userId,
       examId,
       totalQuestions,
       score: correctAnswers, // Store raw number of correct answers
       percentage, // Store calculated/provided percentage
-      isPassed,
+      passed,
       answeredQuestions: answeredQuestions || {}, // Store details if available
-      timestamp,
+      timestamp: resultTimestamp,
     };
 
     // --- Save Exam Result and Update User Progress (Transaction Recommended) ---
     await db.runTransaction(async transaction => {
+      console.log('saveExamResult: Starting transaction...');
       const userRef = db.collection('users').doc(userId);
+      console.log('saveExamResult: Getting user document:', userId);
       const userDoc = await transaction.get(userRef);
+      console.log('saveExamResult: User document retrieved.');
 
       // 1. Save the detailed exam result
+      console.log('saveExamResult: Saving exam result:', examResultData);
       transaction.set(examResultRef, examResultData);
+      console.log('saveExamResult: Exam result saved.');
 
       // 2. Update user's general progress
-      const userUpdateData = {};
+      // Create a timestamp without serverTimestamp for array elements
+      const completionTimestamp = timestamp
+        ? admin.firestore.Timestamp.fromDate(new Date(timestamp))
+        : new Date(); // Use regular Date when adding to array
+      
       const examCompletionRecord = {
         examId,
         percentage,
-        passed: isPassed, // Use 'passed' consistently
-        completedAt: timestamp, // Use the same server timestamp
+        passed: passed, // Use 'passed' consistently
+        completedAt: completionTimestamp, // Use regular timestamp, NOT serverTimestamp
       };
 
-      userUpdateData['learningProgress.completedExams'] =
-        admin.firestore.FieldValue.arrayUnion(examCompletionRecord);
-      userUpdateData['lastActivity'] = timestamp;
+      // Get existing completed exams or initialize empty array
+      let completedExams = [];
+      if (userDoc.exists && userDoc.data().learningProgress?.completedExams) {
+        completedExams = [...userDoc.data().learningProgress.completedExams];
+      }
 
-      // Potentially update overall score or badges based on exam result here if needed
+      // Check if the user has already completed the exam
+      const existingExamIndex = completedExams.findIndex(
+        (exam) => exam.examId === examId
+      );
+
+      // Update or add the exam record
+      if (existingExamIndex !== -1) {
+        // If the exam exists, replace it with the new record
+        completedExams[existingExamIndex] = examCompletionRecord;
+      } else {
+        // If the exam doesn't exist, push the new record
+        completedExams.push(examCompletionRecord);
+      }
+      
+      // Prepare the update with explicit updates instead of arrayUnion
+      const userUpdateData = {
+        'learningProgress.completedExams': completedExams,
+        'lastActivity': admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      console.log(
+        'saveExamResult: Preparing user update data:',
+        userUpdateData,
+      );
 
       if (userDoc.exists) {
+        console.log('saveExamResult: Updating existing user:', userId);
         transaction.update(userRef, userUpdateData);
+        console.log('saveExamResult: User updated.');
       } else {
         // Create user if they don't exist (edge case?)
         console.warn(
           `User ${userId} not found during exam save. Creating user record.`,
         );
+        console.log('saveExamResult: Creating new user:', userId);
         transaction.set(
           userRef,
           {
@@ -223,14 +267,14 @@ exports.saveExamResult = async (req, res, next) => {
               completedModules: [],
               completedQuizzes: [],
             },
-            lastActivity: timestamp,
-            createdAt: timestamp,
+            lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
           },
           {merge: true},
         );
+        console.log('saveExamResult: New user created.');
       }
-      // Note: We are NOT automatically marking modules/quizzes complete here,
-      // assuming exam completion is tracked separately or triggers other logic.
+      console.log('saveExamResult: Transaction completed.');
     });
 
     console.log(
@@ -241,9 +285,14 @@ exports.saveExamResult = async (req, res, next) => {
     res.status(201).json({
       message: 'Exam result saved successfully.',
       resultId: examResultRef.id,
-      passed: isPassed,
+      passed: passed,
+      timestamp: resultTimestamp, // Include the timestamp in the response
     });
   } catch (error) {
+    console.error(
+      `Error saving exam result for user ${req.body.userId}, exam ${req.body.examId}:`,
+      error, // Log the full error object
+    );
     if (error.code === 'NOT_FOUND' && error.message.includes('User')) {
       // Handle transaction user not found specifically if needed, though covered by AppError below
       next(
@@ -316,7 +365,7 @@ exports.getExamProgress = async (req, res, next) => {
         score: data.score, // Number correct
         totalQuestions: data.totalQuestions,
         percentage: data.percentage,
-        passed: data.isPassed, // Use 'passed' field name
+        passed: data.passed, // Use 'passed' field name
         timestamp: data.timestamp?.toDate()?.toISOString() || null,
       };
     });
@@ -440,7 +489,7 @@ exports.getExamById = async (req, res, next) => {
 
     const examData = examDoc.data();
     res.json({
-      examId: examDoc.examId,
+      examId: examDoc.id,
       ...examData,
       // Include other relevant fields from the exam document
     });
@@ -449,4 +498,3 @@ exports.getExamById = async (req, res, next) => {
     next(error);
   }
 };
-

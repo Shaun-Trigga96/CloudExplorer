@@ -27,6 +27,9 @@ export interface User {
   settings: {
     notificationsEnabled: boolean;
     darkMode: boolean;
+    emailUpdates: boolean;
+    syncData: boolean;
+    soundEffect: boolean;
   };
 }
 
@@ -82,14 +85,6 @@ export interface Notification {
   createdAt: Date;
 }
 
-export interface AIContent {
-  contentId: string;
-  type: string;
-  source: string;
-  content: string;
-  metadata: { moduleId: string; quizId: string };
-  createdAt: Date;
-}
 export interface Quiz {
   quizId: string; // Unique ID for the quiz
   moduleId: string; // ID of the associated learning module

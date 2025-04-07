@@ -42,6 +42,7 @@ interface ExamResult {
   correctAnswers: number;
   score: number;
   isPassed: boolean;
+  timestamp?: any; // Add timestamp to the interface
   answeredQuestions: {
     question: string;
     userAnswer: string;
@@ -59,7 +60,6 @@ interface ExamTimingData {
 const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation }) => {
   const { examId, title } = route.params;
   const theme = useTheme();
-
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,72 +176,102 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
     saveExamState();
   }, [userAnswers, currentQuestionIndex, timeLeft, examId, examStarted, examCompleted, examStartTime]);
 
-  const processExamSubmission = useCallback(async () => {
-    console.log('processExamSubmission: Starting exam submission process...');
-    try {
-      setSubmitting(true);
+ const processExamSubmission = useCallback(async () => {
+   console.log('processExamSubmission: Starting exam submission process...');
+   try {
+     setSubmitting(true);
+     // --- Calculate Results ---
+     let correctAnswers = 0;
+     const answeredQuestions = questions.map(question => {
+       const userAnswer = userAnswers[question.id] || '';
+       const isCorrect = userAnswer.toLowerCase() === question.correctAnswer.toLowerCase();
+ 
+       if (isCorrect) { correctAnswers++; }
+ 
+       return {
+         question: question.question,
+         userAnswer,
+         correctAnswer: question.correctAnswer,
+         isCorrect,
+         explanation: question.explanation,
+       };
+     });
+ 
+     const score = (correctAnswers / questions.length) * 100;
+     const isPassed = score >= 70;
+ 
+     const result: ExamResult = {
+       totalQuestions: questions.length,
+       correctAnswers,
+       score,
+       isPassed,
+       answeredQuestions,
+     };
+     console.log('processExamSubmission: Exam results calculated:', result);
+ 
+     // --- Get User ID ---
+     const userId = await AsyncStorage.getItem('userId');
+     if (!userId) {
+       console.error('processExamSubmission: User ID not found.');
+       Alert.alert('Error', 'User ID not found. Please log in again.');
+       return; // Exit the function if no user ID
+     }
+ 
+     // --- Save Results to Backend (with Retry) ---
+     const saveResultUrl = `${BASE_URL}/api/v1/exams/save-result`;
+     console.log('processExamSubmission: Saving results to backend:', saveResultUrl, { examId, result, userId });
+ 
+     const maxRetries = 3;
+     let retryCount = 0;
+     let success = false;
+     
+     while (retryCount < maxRetries && !success) {
+       try {
+         const response = await axios.post(saveResultUrl, { examId, result, userId });
+         console.log('processExamSubmission: Results saved to backend successfully.', response.data);
+         success = true;
+         result.timestamp = response.data.timestamp;
 
-      // Calculate results
-      let correctAnswers = 0;
-      const answeredQuestions = questions.map(question => {
-        const userAnswer = userAnswers[question.id] || '';
-        const isCorrect = userAnswer.toLowerCase() === question.correctAnswer.toLowerCase();
-
-        if (isCorrect) { correctAnswers++; }
-
-        return {
-          question: question.question,
-          userAnswer,
-          correctAnswer: question.correctAnswer,
-          isCorrect,
-          explanation: question.explanation,
-        };
-      });
-
-      const score = (correctAnswers / questions.length) * 100;
-      const isPassed = score >= 70; // Typically 70% is passing for certification exams
-
-      const result: ExamResult = {
-        totalQuestions: questions.length,
-        correctAnswers,
-        score,
-        isPassed,
-        answeredQuestions,
-      };
-      console.log('processExamSubmission: Exam results calculated:', result);
-
-      try {
-        // Save exam results to your backend
-        const saveResultUrl = `${BASE_URL}/api/v1/exams/save-result`;
-        console.log('processExamSubmission: Saving results to backend:', saveResultUrl, result);
-        await axios.post(saveResultUrl, {
-          examId,
-          result,
-        });
-        console.log('processExamSubmission: Results saved to backend successfully.');
-      } catch (error) {
-        console.error('processExamSubmission: Error saving results to backend:', error);
-        // Continue anyway as we have the results locally
-      }
-
-      setExamResult(result);
-      setExamCompleted(true);
-
-      // Clear saved exam state when exam is completed
-      try {
-        await AsyncStorage.removeItem(`exam_${examId}_state`);
-        console.log('processExamSubmission: Cleared saved exam state.');
-      } catch (error) {
-        console.error('processExamSubmission: Error clearing saved exam state:', error);
-      }
-    } catch (err) {
-      console.error('processExamSubmission: Error submitting exam:', err);
-      Alert.alert('Error', 'Failed to submit exam. Your results have been saved locally.');
-    } finally {
-      setSubmitting(false);
-      console.log('processExamSubmission: Submission process finished.');
-    }
-  }, [examId, questions, userAnswers]);
+       } catch (error: any) {
+         console.error(`processExamSubmission: Attempt ${retryCount + 1} failed:`, error);
+         if (error.response) {
+           console.error('processExamSubmission: Server responded with:', error.response.status, error.response.data);
+           Alert.alert('Error', `Failed to save results. Server responded with ${error.response.status}: ${JSON.stringify(error.response.data)}`);
+          }
+         retryCount++;
+         if (retryCount < maxRetries) {
+           console.log(`processExamSubmission: Retrying in 2 seconds...`);
+           await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds before retrying
+         }
+       }
+     }
+ 
+     if (!success) {
+       console.error('processExamSubmission: Failed to save results after multiple retries.');
+       Alert.alert('Warning', 'Failed to save results to the server after multiple attempts. Your results have been saved locally but may not be reflected in your progress.');
+     } else {
+       Alert.alert('Success', 'Exam submitted successfully.');
+     }
+ 
+     setExamResult(result);
+     setExamCompleted(true);
+ 
+     // Clear saved exam state when exam is completed
+     try {
+       await AsyncStorage.removeItem(`exam_${examId}_state`);
+       console.log('processExamSubmission: Cleared saved exam state.');
+     } catch (error) {
+       console.error('processExamSubmission: Error clearing saved exam state:', error);
+     }
+   } catch (err) {
+     console.error('processExamSubmission: Error submitting exam:', err);
+     Alert.alert('Error', 'Failed to submit exam. An unexpected error occurred.');
+   } finally {
+     setSubmitting(false);
+     console.log('processExamSubmission: Submission process finished.');
+   }
+ }, [examId, questions, userAnswers]);
+ 
 
   const submitExam = useCallback(async () => {
     console.log('submitExam: Attempting to submit the exam.');

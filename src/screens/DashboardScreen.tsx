@@ -630,7 +630,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
 
           <Text style={styles.sectionTitle}>Quizzes</Text>
         {/* Display Available Quizzes */}
-        {quizzes.length > 0 ? (
+        {/* {quizzes.length > 0 ? (
             <View>
               {quizzes.map(quiz => {
                 const IconComponent = iconMap[quiz.moduleId] || CloudGenericIcon;
@@ -650,7 +650,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
             </View>
           ) : (
             <Text style={styles.noDataText}>No quizzes available.</Text>
-          )}
+          )} */}
           {Object.keys(quizzesByModule).length > 0 ? (
             Object.keys(quizzesByModule).map(moduleId => {
               const {title, color, icon} = getModuleDetails(moduleId);
