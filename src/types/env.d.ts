@@ -17,4 +17,8 @@ declare module '@env' {
   export const GEMINI_API_KEY: string;
   export const NODE_ENV: string;
   export const SENDGRID_API_KEY: string;
+  export const CREDLY_API_KEY: string;
+  export const CREDLY_CLIENT_ID: string;
+  export const CREDLY_CLIENT_SECRET: string;
+  export const CREDLY_REDIRECT_URI: string;
 }

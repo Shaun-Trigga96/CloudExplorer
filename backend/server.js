@@ -5,8 +5,6 @@ const admin = require('firebase-admin');
 const dotenv = require('dotenv');
 const path = require('path');
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-//const {hfApiLimiter} = require('./middleware/middleware'); // Import limiter from middleware.js
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // --- Load Environment Variables ---
@@ -78,9 +76,7 @@ const googleAiClient = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(proce
 if (!googleAiClient) {
     console.warn("Google AI client not initialized due to missing GEMINI_API_KEY.");
 }
-
 module.exports.googleAiClient = googleAiClient;
-
 
 // --- Utils and Middleware ---
 const AppError = require('./utils/appError');
@@ -93,6 +89,7 @@ const examRoutes = require('./routes/examRoutes');
 const quizRoutes = require('./routes/quizRoutes'); // Added
 const appRoutes = require('./routes/appRoutes'); // Added
 const emailRoutes = require('./routes/emailRoutes'); // Import email routes
+const credlyRoutes = require('./routes/credlyRoutes');
 
 // --- Express App Setup ---
 const app = express();
@@ -100,15 +97,6 @@ const app = express();
 // --- Global Middleware ---
 app.use(cors({origin: process.env.CORS_ORIGIN || '*'}));
 
-// General API Limiter
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // Higher limit for dev
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many requests from this IP, please try again after 15 minutes',
-});
-//app.use(hfApiLimiter); // Apply to all routes by default
 // Body Parsing
 app.use(express.json({limit: '10kb'})); // Limit payload size
 app.use(express.urlencoded({extended: true, limit: '10kb'})); // For form data if needed
@@ -118,7 +106,6 @@ app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
 
 app.use(express.json({limit: '50kb'})); // Increased limit slightly if quiz/exam answers are large
 app.use(express.urlencoded({extended: true, limit: '50kb'}));
-//app.use(apiLimiter); // Apply to all routes by default
 
 // --- API Routes --- (Add new routers)
 app.use('/api/v1', appRoutes); // General: /api/v1/health
@@ -128,6 +115,7 @@ app.use('/api/v1/docs', docRoutes);
 app.use('/api/v1/quizzes', quizRoutes); // Added: /api/v1/quizzes/...
 app.use('/api/v1/exams', examRoutes); // Added/Updated: /api/v1/exams/...
 app.use('/api/v1/email', emailRoutes); // Mount email routes under /api/v1/email
+app.use('/api/v1/credly', credlyRoutes);
 
 // --- Health Check Route ---
 app.get('/health', (req, res) => {

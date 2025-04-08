@@ -1,73 +1,146 @@
-import React, { FC, useState, useEffect } from 'react';
+import React, { FC, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
   TouchableOpacity,
-  Modal,
-  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
-import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import axios, { AxiosError } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import auth from '@react-native-firebase/auth';
 import { REACT_APP_BASE_URL } from '@env';
-import Icon from 'react-native-vector-icons/Feather';
+import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import CertificationCard   from '../components/CertificationCard';
+import AddCertificationModal from '../components/AddCertificationModal';
+import CredlyImportModal from '../components/CredlyImportModal';
+import Filters from '../components/Filters';
+import { Alert } from 'react-native';
+
 
 const BASE_URL = REACT_APP_BASE_URL;
 
+// --- Interfaces & Types ---
 interface Certification {
   id?: string;
   title: string;
-  dateEarned: string | { _seconds: number; _nanoseconds: number }; // Handle both string and Timestamp
-  issuer?: string;
+  issuedDate: string;
+  expiryDate?: string | null;
+  issuingOrganization: string;
+  url?: string;
+  badgeUrl?: string;
+  credlyId?: string;
+  cloudProvider?: string;
+  credentialId?: string;
   description?: string;
 }
 
-const CertificationsScreen: FC = () => {
+interface CloudProvider {
+  label: string;
+  value: string;
+  icon: string;
+}
+
+// --- Constants ---
+const cloudProviders: CloudProvider[] = [
+  { label: 'Google Cloud', value: 'gcp', icon: 'google-cloud' },
+  { label: 'Microsoft Azure', value: 'azure', icon: 'microsoft-azure' },
+  { label: 'Amazon Web Services', value: 'aws', icon: 'aws' },
+  { label: 'IBM Cloud', value: 'ibm', icon: 'ibm' },
+  { label: 'Oracle Cloud', value: 'oracle', icon: 'database' },
+  { label: 'Alibaba Cloud', value: 'alibaba', icon: 'alpha-a-circle' },
+  { label: 'DigitalOcean', value: 'digitalocean', icon: 'digital-ocean' },
+  { label: 'Salesforce', value: 'salesforce', icon: 'salesforce' },
+  { label: 'Red Hat', value: 'redhat', icon: 'redhat' },
+  { label: 'VMware', value: 'vmware', icon: 'vmware' },
+  { label: 'Other', value: 'other', icon: 'cloud' },
+];
+
+const initialCertification: Certification = {
+  title: '',
+  issuedDate: new Date().toISOString().split('T')[0],
+  expiryDate: null,
+  issuingOrganization: '',
+  cloudProvider: '',
+  url: '',
+  badgeUrl: '',
+  credentialId: '',
+  description: '',
+};
+
+// --- Utility Functions ---
+const formatDate = (date: string | { _seconds: number; _nanoseconds: number }): string => {
+    if (typeof date === 'object' && '_seconds' in date) {
+      return new Date(date._seconds * 1000).toISOString().split('T')[0];
+    }
+    return date;
+  };
+
+const handleAxiosError = (error: unknown) => {
+  if (axios.isAxiosError(error)) {
+    const axiosError = error as AxiosError;
+    if (!axiosError.response) {
+      Alert.alert('Network Error', 'Could not connect to the server.');
+    } else if (axiosError.response.status === 404) {
+      Alert.alert('Not Found', 'The requested resource was not found.');
+    } else {
+      Alert.alert('Server Error', `An error occurred: ${axiosError.response.status}`);
+    }
+  } else {
+    Alert.alert('Unexpected Error', 'An unexpected error occurred.');
+  }
+};
+
+const determineCloudProvider = (title: string, issuer: string): string => {
+  const titleLower = title.toLowerCase();
+  const issuerLower = issuer.toLowerCase();
+
+  if (titleLower.includes('aws') || issuerLower.includes('amazon')) return 'aws';
+  if (titleLower.includes('azure') || issuerLower.includes('microsoft')) return 'azure';
+  if (titleLower.includes('gcp') || titleLower.includes('google cloud') || issuerLower.includes('google')) return 'gcp';
+  if (titleLower.includes('ibm') || issuerLower.includes('ibm')) return 'ibm';
+  if (titleLower.includes('oracle') || issuerLower.includes('oracle')) return 'oracle';
+  if (titleLower.includes('alibaba') || issuerLower.includes('alibaba')) return 'alibaba';
+  if (titleLower.includes('digital ocean') || issuerLower.includes('digitalocean')) return 'digitalocean';
+  if (titleLower.includes('salesforce') || issuerLower.includes('salesforce')) return 'salesforce';
+  if (titleLower.includes('red hat') || issuerLower.includes('redhat')) return 'redhat';
+  if (titleLower.includes('vmware') || issuerLower.includes('vmware')) return 'vmware';
+
+  return 'other';
+};
+
+// --- Main Component ---
+const CertificationsScreen = () => {
   const { isDarkMode } = useTheme();
   const [certifications, setCertifications] = useState<Certification[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isAddModalVisible, setIsAddModalVisible] = useState<boolean>(false);
-  const [newCertification, setNewCertification] = useState<Certification>({
-    title: '',
-    dateEarned: '',
-    issuer: '',
-    description: '',
-  });
+  const [isCredlyModalVisible, setIsCredlyModalVisible] = useState<boolean>(false);
+  const [newCertification, setNewCertification] = useState<Certification>(initialCertification);
+  // Filter states
+  const [filterProvider, setFilterProvider] = useState<string>('');
+  const [searchText, setSearchText] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'date' | 'provider'>('date');
+  const [showFilters, setShowFilters] = useState<boolean>(false);
 
-  useEffect(() => {
-    fetchCertifications();
-  }, []);
-
-  const fetchCertifications = async () => {
+  // --- Data Fetching ---
+  const fetchCertifications = useCallback(async () => {
     setLoading(true);
     try {
-      const storedUserId = await AsyncStorage.getItem('userId');
-      console.log('Stored User ID:', storedUserId);
-      if (!storedUserId) {
-        Alert.alert('Error', 'No user ID found in storage.');
-        return;
-      }
+      const userId = auth().currentUser?.uid;
+      if (!userId) throw new Error('User not authenticated');
 
-      const response = await axios.get(`${BASE_URL}/api/v1/users/${storedUserId}/certifications`);
+      const response = await axios.get(`${BASE_URL}/api/v1/users/${userId}/certifications`);
       const rawCertifications = response.data.certifications || [];
-
-      // Convert Timestamp to string
       const formattedCertifications = rawCertifications.map((cert: Certification) => ({
         ...cert,
-        dateEarned:
-          typeof cert.dateEarned === 'object' && '_seconds' in cert.dateEarned
-            ? new Date(cert.dateEarned._seconds * 1000).toISOString().split('T')[0] // Convert to YYYY-MM-DD
-            : cert.dateEarned || '',
+        issuedDate: formatDate(cert.issuedDate),
+        expiryDate: cert.expiryDate ? formatDate(cert.expiryDate) : null,
       }));
 
-      console.log('Formatted Certifications:', formattedCertifications);
       setCertifications(formattedCertifications);
     } catch (error) {
       console.error('Error fetching certifications:', error);
@@ -75,288 +148,271 @@ const CertificationsScreen: FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleAxiosError = (error: unknown) => {
-    if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError;
-      if (!axiosError.response) {
-        Alert.alert('Network Error', 'Could not connect to the server.');
-      } else if (axiosError.response.status === 404) {
-        Alert.alert('Not Found', 'No certifications found for this user.');
-      } else {
-        Alert.alert('Server Error', `Server error: ${axiosError.response.status}`);
-      }
-    } else {
-      Alert.alert('Unexpected Error', 'An unexpected error occurred.');
+  useEffect(() => {
+    fetchCertifications();
+  }, [fetchCertifications]);
+
+  // --- Data Manipulation ---
+  const addCertification = useCallback(async (certData: Certification) => {
+    try {
+      const userId = auth().currentUser?.uid;
+      if (!userId) throw new Error('User not authenticated');
+
+      const response = await axios.post(`${BASE_URL}/api/v1/users/${userId}/certifications`, certData);
+      return response.data.certification;
+    } catch (error) {
+      console.error('Error adding certification:', error);
+      handleAxiosError(error);
+      throw error; // Re-throw to handle in caller
     }
-  };
+  }, []);
 
   const handleAddCertification = async () => {
     if (!newCertification.title.trim()) {
       Alert.alert('Validation Error', 'Certification title is required.');
       return;
     }
-    if (typeof newCertification.dateEarned === 'string' && !newCertification.dateEarned.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      Alert.alert('Validation Error', 'Date must be in YYYY-MM-DD format.');
+    if (!newCertification.issuingOrganization.trim()) {
+      Alert.alert('Validation Error', 'Issuing organization is required.');
       return;
     }
-
     try {
-      const userId = auth().currentUser?.uid;
-      if (!userId) throw new Error('User not authenticated');
-
-      const response = await axios.post(
-        `${BASE_URL}/user/${userId}/certifications`,
-        newCertification,
-      );
-
-      setCertifications((prev) => [...prev, response.data.certification]);
-      setNewCertification({
-        title: '',
-        dateEarned: '',
-        issuer: '',
-        description: '',
-      });
+      const certToAdd = {
+        ...newCertification,
+        issuedDate: newCertification.issuedDate ? new Date(String(newCertification.issuedDate)): null,
+        expiryDate: newCertification.expiryDate ? new Date(String(newCertification.expiryDate)) : null,
+      };
+      //const addedCert = await addCertification(certToAdd);
+    //  setCertifications((prev) => [...prev, addedCert]);
+      resetNewCertification();
       setIsAddModalVisible(false);
       Alert.alert('Success', 'Certification added successfully.');
     } catch (error) {
-      console.error('Error adding certification:', error);
-      handleAxiosError(error);
+      // Error already handled in addCertification
     }
   };
 
-  const renderAddCertificationModal = () => (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={isAddModalVisible}
-      onRequestClose={() => setIsAddModalVisible(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <Animated.View
-          entering={FadeInDown.duration(300)}
-          style={[
-            styles.modalContainer,
-            { backgroundColor: isDarkMode ? '#2A2A2A' : '#FFFFFF' },
-          ]}
-        >
-          <Text style={[styles.modalTitle, { color: isDarkMode ? '#FFF' : '#1A1A1A' }]}>
-            Add Certification
-          </Text>
+  const handleImportFromCredly = async (badges: any[]) => {
+    try {
+      for (const badge of badges) {
+        const certData = {
+          title: badge.name,
+          issuedDate: new Date(badge.issued_at).toISOString().split('T')[0],
+          expiryDate: badge.expires_at ? new Date(badge.expires_at).toISOString().split('T')[0] : null,
+          issuingOrganization: badge.issuer.name,
+          url: badge.public_url,
+          badgeUrl: badge.image_url,
+          credlyId: badge.id,
+          cloudProvider: determineCloudProvider(badge.name, badge.issuer.name),
+          description: badge.description,
+        };
 
-          <TextInput
-            style={[styles.input, { color: isDarkMode ? '#FFF' : '#1A1A1A' }]}
-            placeholder="Certification Title"
-            placeholderTextColor="#888"
-            value={newCertification.title}
-            onChangeText={(text) =>
-              setNewCertification((prev) => ({ ...prev, title: text }))
-            }
-          />
+        await addCertification(certData);
+      }
 
-          <TextInput
-            style={[styles.input, { color: isDarkMode ? '#FFF' : '#1A1A1A' }]}
-            placeholder="Date Earned (YYYY-MM-DD)"
-            placeholderTextColor="#888"
-            value={newCertification.dateEarned.toString()} // Convert to string
-            onChangeText={(text) =>
-              setNewCertification((prev) => ({ ...prev, dateEarned: text }))
-            }
-          />
+      setIsCredlyModalVisible(false);
+      Alert.alert('Success', 'Badges imported successfully.');
+      fetchCertifications(); // Refresh the list
+    } catch (error) {
+      console.error('Error importing Credly badges:', error);
+    }
+  };
 
-          <TextInput
-            style={[styles.input, { color: isDarkMode ? '#FFF' : '#1A1A1A' }]}
-            placeholder="Issuer (Optional)"
-            placeholderTextColor="#888"
-            value={newCertification.issuer}
-            onChangeText={(text) =>
-              setNewCertification((prev) => ({ ...prev, issuer: text }))
-            }
-          />
+  const resetNewCertification = () => {
+    setNewCertification(initialCertification);
+  };
 
-          <TextInput
-            style={[
-              styles.input,
-              styles.multilineInput,
-              { color: isDarkMode ? '#FFF' : '#1A1A1A' },
-            ]}
-            placeholder="Description (Optional)"
-            placeholderTextColor="#888"
-            multiline
-            numberOfLines={3}
-            value={newCertification.description}
-            onChangeText={(text) =>
-              setNewCertification((prev) => ({ ...prev, description: text }))
-            }
-          />
+  // --- UI Handlers ---
 
-          <View style={styles.modalButtonContainer}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => setIsAddModalVisible(false)}
-            >
-              <Text style={styles.modalButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.saveButton]}
-              onPress={handleAddCertification}
-            >
-              <Text style={styles.modalButtonText}>Save</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </View>
-    </Modal>
-  );
+  const getFilteredCertifications = () => {
+    let filtered = [...certifications];
+    if (filterProvider) {
+      filtered = filtered.filter(cert => cert.cloudProvider === filterProvider);
+    }
+    if (searchText) {
+      const query = searchText.toLowerCase();
+      filtered = filtered.filter(cert =>
+        cert.title.toLowerCase().includes(query) ||
+        cert.issuingOrganization.toLowerCase().includes(query)
+      );
+    }
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-      </View>
-    );
-  }
+    filtered.sort((a, b) => {
+      if (sortBy === 'date') {
+        return new Date(b.issuedDate).getTime() - new Date(a.issuedDate).getTime();
+      } else {
+        return (a.issuingOrganization || '').localeCompare(b.issuingOrganization || '');
+      }
+    });
+
+    return filtered;
+  };
+
+  // --- Rendering ---
+  const renderCertificationCard = (certification: Certification) => {
+    return <CertificationCard certification={certification} />;
+  };
 
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: isDarkMode ? '#1A1A1A' : '#F6F8FF' }]}
     >
-      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <Animated.View entering={FadeInUp.duration(600)} style={styles.header}>
+      <View style={styles.container}>
+        {/* --- Header --- */}
+        <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: isDarkMode ? '#FFF' : '#1A1A1A' }]}>
             Certifications
           </Text>
           <Text style={[styles.headerSubtitle, { color: isDarkMode ? '#A0A0A0' : '#666' }]}>
-            Access your earned certificates
+            Manage your certifications
           </Text>
-        </Animated.View>
+        </View>
 
-        {certifications.length > 0 ? (
-          certifications.map((certification) => (
-            <Animated.View
-              key={certification.id}
-              style={styles.certificationCard}
-              entering={FadeInUp.duration(400)}
-            >
-              <View style={styles.certificationHeader}>
-                <Text
-                  style={[styles.certificationTitle, { color: isDarkMode ? '#FFF' : '#1A1A1A' }]}
-                >
-                  {certification.title}
-                </Text>
-                {certification.issuer && (
-                  <Text
-                    style={[styles.certificationIssuer, { color: isDarkMode ? '#A0A0A0' : '#666' }]}
-                  >
-                    {certification.issuer}
-                  </Text>
-                )}
-              </View>
-              <Text style={[styles.certificationDate, { color: isDarkMode ? '#A0A0A0' : '#666' }]}>
-                Earned on: {String(certification.dateEarned)}
-              </Text>
-              {certification.description && (
-                <Text
-                  style={[
-                    styles.certificationDescription,
-                    { color: isDarkMode ? '#A0A0A0' : '#666' },
-                  ]}
-                >
-                  {certification.description}
-                </Text>
-              )}
-            </Animated.View>
-          ))
-        ) : (
-          <Text style={[styles.noDataText, { color: isDarkMode ? '#FFF' : '#1A1A1A' }]}>
-            No certifications earned yet.
-          </Text>
+        {/* --- Filters --- */}
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setShowFilters(!showFilters)}
+        >
+          <MaterialIcon
+            name={showFilters ? 'filter-remove' : 'filter-variant'}
+            size={24}
+            color={isDarkMode ? '#FFF' : '#1A1A1A'}
+          />
+        </TouchableOpacity>
+        {showFilters && (
+          <Filters
+            searchText={searchText}
+            setSearchText={setSearchText}
+            filterProvider={filterProvider}
+            setFilterProvider={setFilterProvider}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
+            cloudProviders={cloudProviders}
+          />
         )}
-      </ScrollView>
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => setIsAddModalVisible(true)}
-      >
-        <Icon name="plus" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
+        {/* --- Certifications List --- */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={isDarkMode ? '#FFF' : '#1A1A1A'} />
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.scrollViewContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {getFilteredCertifications().map(renderCertificationCard)}
+          </ScrollView>
+        )}
 
-      {renderAddCertificationModal()}
+        {/* --- Add Certification Button --- */}
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setIsAddModalVisible(true)}
+        >
+          <MaterialIcon name="plus" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        {/* --- Import from Credly Button --- */}
+        <TouchableOpacity
+          style={styles.credlyButton}
+          onPress={() => setIsCredlyModalVisible(true)}
+        >
+          <MaterialIcon name="cloud-download" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        {/* --- Modals --- */}
+        <AddCertificationModal
+          isModalVisible={isAddModalVisible}
+          onClose={() => setIsAddModalVisible(false)}
+          onSave={handleAddCertification}
+          newCertification={newCertification}
+          setNewCertification={setNewCertification}
+        />
+
+        <CredlyImportModal
+          isModalVisible={isCredlyModalVisible}
+          onClose={() => setIsCredlyModalVisible(false)}
+          onImport={handleImportFromCredly}
+          baseUrl={BASE_URL}
+        />
+      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  container: { flex: 1 },
-  contentContainer: { padding: 16, paddingBottom: 80 },
-  header: { marginBottom: 24, paddingHorizontal: 4 },
-  headerTitle: { fontSize: 32, fontWeight: 'bold' },
-  headerSubtitle: { fontSize: 16 },
-  certificationCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  // --- Main Screen ---
+  safeArea: {
+    flex: 1,
   },
-  certificationHeader: { marginBottom: 8 },
-  certificationTitle: { fontSize: 18, fontWeight: '600' },
-  certificationIssuer: { fontSize: 14, marginTop: 4 },
-  certificationDate: { fontSize: 14 },
-  certificationDescription: { fontSize: 14, marginTop: 8 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  noDataText: { fontSize: 16, textAlign: 'center', marginTop: 20 },
+  container: {
+    flex: 1,
+    paddingHorizontal: 15,
+  },
+  header: {
+    paddingTop: 20,
+    paddingBottom: 15,
+    marginBottom: 10,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollViewContent: {
+    paddingBottom: 80, // Space for buttons
+  },
+  // --- Buttons ---
   addButton: {
     position: 'absolute',
     bottom: 20,
     right: 20,
     backgroundColor: '#007BFF',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
   },
-  modalOverlay: {
-    flex: 1,
+  credlyButton: {
+    position: 'absolute',
+    bottom: 90,
+    right: 20,
+    backgroundColor: '#ff6b00',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContainer: {
-    width: '90%',
-    padding: 20,
-    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
   },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 16 },
-  input: {
-    width: '100%',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    paddingVertical: 8,
-    marginBottom: 16,
-    fontSize: 16,
+  filterButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    padding: 10,
+    zIndex: 10,
   },
-  multilineInput: { height: 80, textAlignVertical: 'top' },
-  modalButtonContainer: { flexDirection: 'row', justifyContent: 'space-between' },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  cancelButton: { backgroundColor: '#E0E0E0' },
-  saveButton: { backgroundColor: '#007BFF' },
-  modalButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
 });
 
 export default CertificationsScreen;

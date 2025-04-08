@@ -8,7 +8,6 @@ import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
 import strings from '../localization/strings'; // Adjust the path as needed
-import { Question } from '../interface/Question';
 import { Timestamp, FieldValue } from '@react-native-firebase/firestore';
 
 
@@ -29,6 +28,15 @@ interface Exam {
   updatedAt?: Timestamp | FieldValue;
   passingRate: number;
   icon: any;
+}
+
+interface Question { // Assuming structure from AI parser
+  id: number;
+  explanation: string[];
+  answers: Array<{ letter: string; answer: string; uniqueKey?: string }>;
+  question: string;
+  options: string[];
+  correctAnswer: string;
 }
 
 const ExamsScreen = () => {

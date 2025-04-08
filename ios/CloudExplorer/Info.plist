@@ -49,7 +49,7 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 	<key>UIAppFonts</key>
-<array>
+    <array>
     <string>AntDesign.ttf</string>
     <string>Entypo.ttf</string>
     <string>EvilIcons.ttf</string>
@@ -66,6 +66,17 @@
     <string>Octicons.ttf</string>
     <string>Zocial.ttf</string>
 	<string>Feather.ttf</string>
+    </array>
+	<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLName</key>
+    <string>com.cloudexplorer</string>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>cloudexplorer</string>
+    </array>
+  </dict>
 </array>
 </dict>
 </plist>
