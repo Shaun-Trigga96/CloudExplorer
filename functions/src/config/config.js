@@ -1,35 +1,28 @@
 /* eslint-disable linebreak-style */
 // functions/config.js
 const admin = require("firebase-admin");
-const {defineString} = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
+const {defineString} = require("firebase-functions/params");
 
-// --- Firebase Admin SDK Initialization (Initialize ONCE here) ---
+// Initialize Firebase Admin SDK
 try {
-  // Using unconditional initialize from previous debugging steps
   admin.initializeApp();
-  logger.info("Firebase Admin SDK initialized from config.js.");
+  logger.info("Firebase Admin SDK initialized.");
 } catch (e) {
-  // Log error but potentially ignore if it's "already exists"
   if (!e.message.includes("already exists")) {
-    logger.error("Firebase Admin SDK initialization error in config.js", e);
-  } else {
-    logger.info("Firebase Admin SDK likely already initialized (config.js).");
+    logger.error("Firebase Admin SDK initialization error", e);
   }
 }
 
-// --- Define and Export Shared Resources ---
+// Define and export shared resources
 const db = admin.firestore();
 
-// Define SendGrid API key parameter
-const sendgridApiKeyParam = defineString("SENDGRID_KEY");
-// You still need to set this:
-// firebase functions:config:set SENDGRID_KEY="YOUR_KEY"
-// OR define in 'functions/.env.local' for emulation: SENDGRID_KEY=YOUR_KEY
+// Get SendGrid API key from environment
+const SENDGRID_API_KEY = defineString("SENDGRID_API_KEY");
 
 // Export shared resources
 module.exports = {
-  db, // Export Firestore db instance
-  sendgridApiKeyParam, // Export the parameter definition
-  logger, // Export logger for consistent use
+  db,
+  logger,
+  SENDGRID_API_KEY,
 };

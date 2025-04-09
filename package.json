@@ -41,7 +41,6 @@
     "firebase-admin": "^13.1.0",
     "googleapis": "^137.1.0",
     "lru-cache": "^11.0.1",
-    "openai": "^4.91.1",
     "react": "18.3.1",
     "react-native": "0.77.0",
     "react-native-dotenv": "^3.4.11",
