@@ -726,12 +726,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
+  // --- Fix Applied Here ---
   questionContainer: {
-    flex: 1,
-    padding: 16,
+    flex: 1, // Takes up the available space for scrolling
+    paddingHorizontal: 16, // Keep horizontal padding
+    paddingTop: 16, // Keep top padding
+    // Add significant bottom padding to ensure content scrolls above the fixed bottom bars
+    // Adjust this value based on the actual combined height of your bottom bars
+    paddingBottom: 180,
   },
+  // --- End Fix ---
   questionCard: {
-    marginBottom: 16,
+    marginBottom: 16, // Keep margin between cards if multiple are shown (though likely only one)
   },
   questionText: {
     fontSize: 16,
@@ -750,15 +756,24 @@ const styles = StyleSheet.create({
   navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
   navButton: {
     flex: 1,
     marginHorizontal: 8,
   },
   questionNavigator: {
-    padding: 4,
+    // This styles the ScrollView component itself, not its content height directly
+    paddingVertical: 8,
+    paddingHorizontal: 4,
     backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    flexGrow: 0, // Prevent this ScrollView from taking extra vertical space
   },
   questionButton: {
     marginHorizontal: 4,
@@ -771,6 +786,8 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: 'white',
     elevation: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
   submitButton: {
     paddingVertical: 8,

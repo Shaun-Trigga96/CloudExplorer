@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Card, Title, Paragraph, Button, Text } from 'react-native-paper';
 import CloudStorage from '../assets/icons/cloud_storage.svg';
@@ -18,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
-import strings from '../localization/strings'; // Adjust the path as needed
+import strings from '../localization/strings';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -31,13 +32,32 @@ interface Quiz {
   moduleId: string;
 }
 
+interface LearningProgress {
+  modulesInProgress?: string[];
+  completedModules?: string[];
+  completedQuizzes?: { moduleId: string }[];
+}
+
+interface ApiQuiz {
+  id: string;
+  title: string;
+  description: string;
+  moduleId: string;
+  icon?: React.FC;
+}
+
+interface UserProgressResponse {
+  learningProgress: LearningProgress;
+  availableQuizzes: ApiQuiz[];
+}
+
 // Define the icon map for the quizzes
 const iconMap: { [key: string]: React.FC } = {
   'cloud-storage': CloudStorage,
   'compute-engine': ComputeEngine,
   'cloud-functions': CloudFunctions,
   'kubernetes-engine': KubernetesEngine,
-  'cloud-generic': CloudGenericIcon,
+  'cloud-fundamentals': CloudGenericIcon,
   'data-transformation': StreamingAnalyticsIcon,
 };
 
@@ -48,112 +68,155 @@ const QuizzesScreen = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [quizProgress, setQuizProgress] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    const fetchUserId = async () => {
-      try {
-        const storedUserId = await AsyncStorage.getItem('userId');
-        if (storedUserId) {
-          setUserId(storedUserId);
-        } else {
-          console.warn(
-            'No user ID found in AsyncStorage. User might not be logged in.',
-          );
-          navigation.navigate('Auth');
-        }
-      } catch (e) {
-        console.error('Error getting user ID:', e);
-      }
-    };
+  const fetchUserProgress = async () => {
+    setLoading(true);
+    setError(null);
+    
+    const userId = await AsyncStorage.getItem('userId');
+    console.log('fetchUserProgress: User ID:', userId);
+    
+    if (!userId) {
+      Alert.alert('Error', 'User ID not found. Please log in again.');
+      setLoading(false);
+      return;
+    }
 
-    fetchUserId();
-  }, [navigation]);
+    try {
+      // Fetch the list of available quizzes
+      const quizzesResponse = await axios.get<{ quizzes: ApiQuiz[] } | null>(`${BASE_URL}/api/v1/quizzes/list-quizzes`);
+      console.log('fetchUserProgress: Quizzes API Response:', quizzesResponse.data);
 
-  useEffect(() => {
-    const fetchQuizzes = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await axios.get(`${BASE_URL}/api/v1/quizzes/list-quizzes`);
-        console.log('API Response:', response.data);
-
-        if (!response.data || !response.data.quizzes || !Array.isArray(response.data.quizzes)) {
-          setError('Invalid response format from server');
-          return;
-        }
-
-        const formattedQuizzes: Quiz[] = response.data.quizzes.map((quiz: any) => {
-          // Ensure all properties are valid string or number values
-          return {
-            id: String(quiz.id || ''),
-            title: String(quiz.title || ''),
-            description: String(quiz.description || ''),
-            questionCount: quiz.questions && Array.isArray(quiz.questions) ? quiz.questions.length : 0,
-            icon: iconMap[quiz.moduleId] || CloudGenericIcon,
-            moduleId: String(quiz.moduleId || ''),
-          };
-        });
-        
-        setQuizzes(formattedQuizzes);
-      } catch (err) {
-        handleError(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchQuizzes();
-  }, []);
-
-  // Separate function to handle errors
-  const handleError = (err: any) => {
-    if (axios.isAxiosError(err)) {
-      const axiosError = err as AxiosError;
-      if (axiosError.response) {
-        let errorMessage = `Server Error: ${axiosError.response.status}`;
-        
-        // Safely handle response data regardless of type
-        if (axiosError.response.data) {
-          if (typeof axiosError.response.data === 'string') {
-            errorMessage += ` - ${axiosError.response.data}`;
-          } else if (typeof axiosError.response.data === 'object') {
-            try {
-              errorMessage += ` - ${JSON.stringify(axiosError.response.data)}`;
-            } catch (e) {
-              errorMessage += ' - [Complex Error Object]';
-            }
-          }
-        }
-        
-        setError(errorMessage);
-      } else if (axiosError.request) {
-        setError('Network error: Unable to connect to server. Please check your connection.');
+      let fetchedQuizzes: Quiz[] = [];
+      if (quizzesResponse.data && quizzesResponse.data.quizzes && Array.isArray(quizzesResponse.data.quizzes)) {
+        fetchedQuizzes = quizzesResponse.data.quizzes.map((quiz: any) => ({
+          id: String(quiz.id || ''),
+          title: String(quiz.title || ''),
+          description: String(quiz.description || ''),
+          questionCount: quiz.questions && Array.isArray(quiz.questions) ? quiz.questions.length : 0,
+          icon: iconMap[quiz.moduleId] || CloudGenericIcon,
+          moduleId: String(quiz.moduleId || ''),
+        }));
       } else {
-        setError(`Error: ${String(axiosError.message)}`);
+        console.warn('fetchUserProgress: Invalid quizzes response format.');
+        fetchedQuizzes = [];
       }
-    } else {
-      setError(`An unexpected error occurred: ${String(err)}`);
+      
+      setQuizzes(fetchedQuizzes);
+
+      // Fetch user progress
+      const progressResponse = await axios.get<UserProgressResponse>(
+        `${BASE_URL}/api/v1/users/${userId}/progress`,
+      );
+      console.log('fetchUserProgress: User Progress API Response:', progressResponse.data);
+      const { learningProgress } = progressResponse.data;
+
+      const progress: Record<string, boolean> = {};
+
+      if (fetchedQuizzes && fetchedQuizzes.length > 0) {
+        fetchedQuizzes.forEach((quiz) => {
+          const moduleId = quiz.moduleId;
+          const learningData = learningProgress || {};
+          const hasCompletedQuiz = learningData.completedQuizzes?.some(
+            (completedQuiz) => completedQuiz.moduleId === moduleId,
+          );
+          
+          console.log(`fetchUserProgress: Quiz ModuleID: ${moduleId}, hasCompletedQuiz: ${hasCompletedQuiz}`);
+          progress[moduleId] = !!hasCompletedQuiz;
+        });
+      }
+
+      setQuizProgress(progress);
+    } catch (error) {
+      console.error('fetchUserProgress: Error fetching user progress:', error);
+      handleError(error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleStartQuiz = (moduleId: string) => {
-    if (!userId) {
-      // Use react-native's Alert instead of directly rendering strings
-      const { Alert } = require('react-native');
+  useEffect(() => {
+    console.log('useEffect: Component mounted, fetching user progress.');
+    fetchUserProgress();
+  }, []);
+
+  const handleError = (err: any) => {
+    if (axios.isAxiosError(err)) {
+      const axiosError = err as AxiosError;
+      if (!axiosError.response) {
+        Alert.alert(
+          'Network Error',
+          'Could not connect to the server. Please check your internet connection and try again.',
+          [{ text: 'OK' }],
+        );
+      } else {
+        let message = `An error occurred on the server: ${axiosError.response.status}`;
+        if (axiosError.response.status === 404) {
+          message = 'User progress data not found. Please try again later.';
+        } else if (axiosError.response.status === 401) {
+          message = 'Authentication error. Please log in again.';
+        } else if (axiosError.response.data) {
+          message += ` - ${JSON.stringify(axiosError.response.data)}`;
+        }
+        Alert.alert('Server Error', message, [{ text: 'OK' }]);
+      }
+    } else {
       Alert.alert(
-        strings.errorTitle,
-        strings.errorUserIDNotFound
+        'Unexpected Error',
+        'An unexpected error occurred. Please try again later.',
+        [{ text: 'OK' }],
       );
+    }
+    setError(err.message || 'An unexpected error occurred');
+  };
+
+  const handleStartQuiz = async (moduleId: string) => {
+    const userId = await AsyncStorage.getItem('userId');
+    console.log(
+      `handleStartQuiz: Attempting to start quiz for module ${moduleId} for user ${userId}`,
+    );
+    
+    if (!userId) {
+      Alert.alert('Error', 'User ID not found. Cannot start quiz.');
       return;
     }
+
     navigation.navigate('QuizzesDetail', { moduleId: moduleId });
+
+    // If the quiz isn't already completed, mark it as started
+    if (!quizProgress[moduleId]) {
+      try {
+        await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, {
+          resourceType: 'quiz',
+          resourceId: moduleId,
+          action: 'start',
+        });
+        console.log(
+          `handleStartQuiz: Successfully marked quiz for module ${moduleId} as started for user ${userId}`,
+        );
+      } catch (error) {
+        console.error(
+          `handleStartQuiz: Error starting quiz for module ${moduleId} for user ${userId}:`,
+          error,
+        );
+        handleError(error);
+      }
+    }
+  };
+
+  const getButtonLabel = (moduleId: string) => {
+    return quizProgress[moduleId] ? 'Review Quiz' : 'Start Quiz';
+  };
+
+  const getButtonStyle = (moduleId: string) => {
+    return quizProgress[moduleId] ? styles.completedButton : {};
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#6200ee" />
         <Text>{strings.loadingQuizzes || 'Loading...'}</Text>
       </View>
     );
@@ -172,18 +235,15 @@ const QuizzesScreen = () => {
       {quizzes.length > 0 ? (
         quizzes.map(quiz => {
           const Icon = quiz.icon;
+          const buttonLabel = getButtonLabel(quiz.moduleId);
+          const buttonStyle = getButtonStyle(quiz.moduleId);
+          
           return (
             <Card key={quiz.id} style={styles.card}>
               <Card.Content>
                 <View style={styles.headerRow}>
                   <View style={styles.iconContainer}>
-                    {Icon && (
-                      <Icon
-                        width={34}
-                        height={34}
-                        {...(Icon as React.SVGProps<SVGSVGElement>)}
-                      />
-                    )}
+                    {Icon && <Icon />}
                   </View>
                   <Title style={styles.title}>{String(quiz.title)}</Title>
                 </View>
@@ -191,13 +251,19 @@ const QuizzesScreen = () => {
                 <Paragraph style={styles.questionCount}>
                   {`${quiz.questionCount} ${strings.questionsSuffix || 'Questions'}`}
                 </Paragraph>
+                {quizProgress[quiz.moduleId] && (
+                  <Paragraph style={styles.completedText}>
+                    Completed
+                  </Paragraph>
+                )}
               </Card.Content>
               <Card.Actions>
                 <Button
                   mode="contained"
                   onPress={() => handleStartQuiz(quiz.moduleId)}
+                  style={buttonStyle}
                 >
-                  {strings.startQuiz || 'Start Quiz'}
+                  {buttonLabel}
                 </Button>
               </Card.Actions>
             </Card>
@@ -240,6 +306,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: '#666',
   },
+  completedText: {
+    marginTop: 4,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -260,6 +331,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+  },
+  completedButton: {
+    backgroundColor: '#4CAF50',
   },
 });
 
