@@ -18,11 +18,11 @@ try {
 const db = admin.firestore();
 
 // Get SendGrid API key from environment
-const SENDGRID_API_KEY = defineString("SENDGRID_API_KEY");
+const sendgridApiKey = defineString("SENDGRID_API_KEY");
 
 // Export shared resources
 module.exports = {
   db,
   logger,
-  SENDGRID_API_KEY,
+  sendgridApiKey,
 };

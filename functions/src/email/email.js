@@ -5,11 +5,11 @@
 /* eslint-disable max-len */
 // functions/src/email/index.js
 const sgMail = require("@sendgrid/mail");
-const {logger, SENDGRID_API_KEY} = require("../config/config"); // Import logger and SendGrid API key from config
+const {logger, sendgridApiKey} = require("../config/config"); // Import logger and SendGrid API key from config
 
 // Initialize SendGrid
-if (SENDGRID_API_KEY) {
-  sgMail.setApiKey(SENDGRID_API_KEY);
+if (sendgridApiKey) {
+  sgMail.setApiKey(sendgridApiKey);
   logger.info("SendGrid API key configured");
 } else {
   logger.error("SendGrid API key is missing");
@@ -26,9 +26,13 @@ if (SENDGRID_API_KEY) {
  */
 const sendEmail = async (emailData) => {
   try {
-    if (!SENDGRID_API_KEY) {
+    const apiKey = sendgridApiKey.value();
+    if (!apiKey) {
       throw new Error("SendGrid API key not configured");
     }
+
+    // Set the API key for this request
+    sgMail.setApiKey(apiKey);
 
     const msg = {
       to: emailData.to,
