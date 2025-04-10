@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, {FC, useEffect, useState} from 'react';
+import React, { FC, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,10 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import Animated, {FadeIn} from 'react-native-reanimated';
-import {Button, Card, Title} from 'react-native-paper';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { Button } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
@@ -23,9 +23,9 @@ import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
 import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
 import StreamingAnalyticsIcon from '../assets/icons/streaming_analytics.svg';
 import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
-import {REACT_APP_BASE_URL} from '@env';
-import {RootStackParamList} from '../navigation/RootNavigator';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import { REACT_APP_BASE_URL } from '@env';
+import { RootStackParamList } from '../navigation/RootNavigator';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import iconMap from './../utils/iconMap';
 
 const BASE_URL = REACT_APP_BASE_URL;
@@ -104,7 +104,7 @@ interface GridLayoutProps {
 }
 
 // GridLayout component moved to the top
-const GridLayout: FC<GridLayoutProps> = ({navigation}) => {
+const GridLayout: FC<GridLayoutProps> = ({ navigation }) => {
   const gridItems = [
     {
       icon: 'book-open',
@@ -167,11 +167,11 @@ const GridLayout: FC<GridLayoutProps> = ({navigation}) => {
           <Animated.View
             key={item.title}
             entering={FadeIn.duration(800).delay(gridItems.indexOf(item) * 100)}
-            style={[styles.gridItem, {width: itemWidth}]}>
+            style={[styles.gridItem, { width: itemWidth }]}>
             <TouchableOpacity
               onPress={() => handleGridItemPress(item.screen)}
-              style={{width: '100%', alignItems: 'center'}}>
-              <View style={[styles.iconCircle, {backgroundColor: item.color}]}>
+              style={{ width: '100%', alignItems: 'center' }}>
+              <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
                 <Icon name={item.icon} size={24} color="#ffffff" />
               </View>
               <Text style={styles.itemTitle}>{item.title}</Text>
@@ -199,7 +199,7 @@ const ProgressItem: FC<ProgressItemProps> = ({
       <View
         style={[
           styles.progressIconCircle,
-          {backgroundColor: isImage ? 'transparent' : color},
+          { backgroundColor: isImage ? 'transparent' : color },
         ]}>
         {isImage ? (
           <Image
@@ -224,7 +224,7 @@ const ProgressItem: FC<ProgressItemProps> = ({
         <View
           style={[
             styles.progressBar,
-            {width: `${percentage}%`, backgroundColor: color},
+            { width: `${percentage}%`, backgroundColor: color },
           ]}
         />
       </View>
@@ -232,7 +232,7 @@ const ProgressItem: FC<ProgressItemProps> = ({
   </View>
 );
 
-const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
+const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [learningProgress, setLearningProgress] =
     useState<LearningProgress | null>(null);
@@ -263,8 +263,8 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
     'cloud-security-engineer-exam': '#F4B400', // Google Yellow
   };
 
-   // Define the icon map for the quizzes
-   const iconMap: { [key: string]: React.FC } = {
+  // Define the icon map for the quizzes
+  const iconMap: { [key: string]: React.FC } = {
     'cloud-storage': CloudStorageIcon,
     'compute-engine': ComputeEngineIcon,
     'cloud-functions': CloudFunctionsIcon,
@@ -352,7 +352,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
         setProgress(response.data.detailedProgress || []);
         setModules(response.data.availableModules || []);
         setExams(response.data.exams || []);
-        setQuizzes(response.data.availableQuizzes);
+        setQuizzes(response.data.availableQuizzes || []);
         setQuizResults(response.data.quizResults || []);
         setExamResults(response.data.examResults || []);
         setErrorInfo(null);
@@ -482,7 +482,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
       color: '#3b82f6',
       title: module?.title || moduleId,
     };
-    return {...mapped, title: module?.title || mapped.title};
+    return { ...mapped, title: module?.title || mapped.title };
   };
 
 
@@ -509,7 +509,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
   // Render error state for non-index errors or critical errors
   if (
     errorInfo &&
-    (!errorInfo.isIndexError || (modules.length === 0 && exams.length === 0))
+    (!errorInfo.isIndexError || (modules.length === 0 && exams.length === 0 && quizzes.length === 0))
   ) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -565,7 +565,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
               name="alert-triangle"
               size={18}
               color="#fff"
-              style={{marginRight: 8}}
+              style={{ marginRight: 8 }}
             />
             <Text style={styles.warningText}>
               Some data couldn't be loaded.
@@ -594,7 +594,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
               <View
                 style={[
                   styles.progressBar,
-                  {width: `${progressPercentage}%`, backgroundColor: '#3b82f6'},
+                  { width: `${progressPercentage}%`, backgroundColor: '#3b82f6' },
                 ]}
               />
             </View>
@@ -604,7 +604,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
           <Text style={styles.sectionTitle}>Modules</Text>
           {modules.length > 0 ? (
             modules.map(module => {
-              const {icon, color, title} = getModuleDetails(module.id);
+              const { icon, color, title } = getModuleDetails(module.id);
               const isCompleted = completedModuleIds.includes(module.id);
               const isInProgress = progress.some(
                 p => p.moduleId === module.id && p.status === 'in_progress',
@@ -612,8 +612,8 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
               const status = isCompleted
                 ? 'Completed'
                 : isInProgress
-                ? 'In Progress'
-                : 'Not Started';
+                  ? 'In Progress'
+                  : 'Not Started';
               return (
                 <ProgressItem
                   key={module.id}
@@ -629,47 +629,25 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
           )}
 
           <Text style={styles.sectionTitle}>Quizzes</Text>
-        {/* Display Available Quizzes */}
-        {/* {quizzes.length > 0 ? (
-            <View>
-              {quizzes.map(quiz => {
-                const IconComponent = iconMap[quiz.moduleId] || CloudGenericIcon;
-                const status = learningProgress?.completedQuizzes?.includes(quiz.id)
-                ? 'Completed'
-                : 'Not Started';
-                  return (
-                    <ProgressItem
-                    key={quiz.id}
-                    title={quiz.title}
-                    status={status}
-                    color={''}
-                    icon={IconComponent}
-                  />
-                );
-              })}
-            </View>
-          ) : (
-            <Text style={styles.noDataText}>No quizzes available.</Text>
-          )} */}
           {Object.keys(quizzesByModule).length > 0 ? (
             Object.keys(quizzesByModule).map(moduleId => {
-              const {title, color, icon} = getModuleDetails(moduleId);
-              const moduleQuizzes = quizzesByModule[moduleId];
-              const isExpanded = expandedModules[moduleId] || false; // Removed completedQuizzes filter
+              const { title, color, icon } = getModuleDetails(moduleId);
+              const moduleQuizzes = quizzesByModule[moduleId] || []; // Add fallback empty array
+              const isExpanded = expandedModules[moduleId] || false;
               return (
                 <View key={moduleId} style={styles.quizModuleContainer}>
                   {/* Module Header */}
                   <TouchableOpacity
-                    style={[styles.quizModuleHeader, {borderColor: color}]}
+                    style={[styles.quizModuleHeader, { borderColor: color }]}
                     onPress={() => toggleModuleExpanded(moduleId)}>
                     <View style={styles.quizModuleTitleContainer}>
                       <View
                         style={[
                           styles.progressIconCircle,
-                          {backgroundColor: color},
+                          { backgroundColor: color },
                         ]}>
                         {icon &&
-                          React.createElement(icon, {width: 20, height: 20})}
+                          React.createElement(icon, { width: 20, height: 20 })}
                       </View>
                       <Text style={styles.quizModuleTitle}>{title}</Text>
                     </View>
@@ -680,7 +658,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
                       <Icon
                         name={isExpanded ? 'chevron-up' : 'chevron-down'}
                         size={20}
-                        color="#5f6368"
+                        color="#0000"
                       />
                     </View>
                   </TouchableOpacity>
@@ -699,13 +677,13 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
                               style={[
                                 styles.quizItem,
                                 index < moduleQuizzes.length - 1 &&
-                                  styles.quizItemBorder,
+                                styles.quizItemBorder,
                               ]}>
                               <View style={styles.quizItemDetails}>
                                 <Text
                                   style={[
                                     styles.quizItemTitle,
-                                    {color: isCompleted ? '#202124' : '#666'},
+                                    { color: isCompleted ? '#202124' : '#666' },
                                   ]}>
                                   Quiz {index + 1}
                                   {quiz.timestamp &&
@@ -751,9 +729,29 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
               );
             })
           ) : (
-            <Text style={styles.noDataText}>No quizzes available.</Text>
+            quizzes && quizzes.length > 0 ? (
+              // If we have quizzes but they're not properly grouped, show them as a flat list
+              <View>
+                {quizzes.map(quiz => {
+                  const IconComponent = iconMap[quiz.moduleId] || CloudGenericIcon;
+                  const status = learningProgress?.completedQuizzes?.includes(quiz.id)
+                    ? 'Completed'
+                    : 'Not Started';
+                  return (
+                    <ProgressItem
+                      key={quiz.id}
+                      title={quiz.title}
+                      status={status}
+                      color="#0000"
+                      icon={IconComponent}
+                    />
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={styles.noDataText}>No quizzes available.</Text>
+            )
           )}
-
           {/* Exams Section - Using image icons correctly */}
           <Text style={styles.sectionTitle}>Exams</Text>
           {exams.length > 0 ? (
@@ -796,16 +794,16 @@ const styles = StyleSheet.create({
   quizTitle: {
     flex: 1,
   },
-  safeArea: {flex: 1, backgroundColor: '#f8f9fa'},
-  container: {flex: 1, padding: 16},
-  title: {fontSize: 24, fontWeight: '700', marginBottom: 16, color: '#202124'},
+  safeArea: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, padding: 16 },
+  title: { fontSize: 24, fontWeight: '700', marginBottom: 16, color: '#202124' },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 15,
     padding: 20,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
@@ -816,7 +814,7 @@ const styles = StyleSheet.create({
     padding: 24,
     marginVertical: 16,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
@@ -833,7 +831,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
@@ -854,7 +852,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  loadingContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   error: {
     fontSize: 16,
     color: '#333',
@@ -907,7 +905,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
@@ -922,7 +920,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
@@ -947,23 +945,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#202124',
   },
-  progressSection: {marginBottom: 20},
+  progressSection: { marginBottom: 20 },
   progressLabelContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  progressLabel: {fontSize: 16, fontWeight: '600', color: '#202124'},
-  progressPercentage: {fontSize: 16, fontWeight: '700', color: '#3b82f6'},
+  progressLabel: { fontSize: 16, fontWeight: '600', color: '#202124' },
+  progressPercentage: { fontSize: 16, fontWeight: '700', color: '#3b82f6' },
   progressBarContainer: {
     height: 10,
     backgroundColor: '#e0e0e0',
     borderRadius: 5,
     overflow: 'hidden',
   },
-  progressBar: {height: '100%', borderRadius: 5},
-  moduleProgressContainer: {marginTop: 10},
-  moduleItem: {marginBottom: 14},
+  progressBar: { height: '100%', borderRadius: 5 },
+  moduleProgressContainer: { marginTop: 10 },
+  moduleItem: { marginBottom: 14 },
   moduleItemHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -977,15 +975,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 8,
   },
-  moduleTitle: {fontSize: 14, fontWeight: '500', color: '#202124', flex: 1},
-  modulePercentage: {fontSize: 14, fontWeight: '600', color: '#5f6368'},
+  moduleTitle: { fontSize: 14, fontWeight: '500', color: '#202124', flex: 1 },
+  modulePercentage: { fontSize: 14, fontWeight: '600', color: '#5f6368' },
   moduleProgressBarContainer: {
     height: 6,
     backgroundColor: '#e0e0e0',
     borderRadius: 3,
     overflow: 'hidden',
   },
-  moduleProgressBar: {height: '100%', borderRadius: 3},
+  moduleProgressBar: { height: '100%', borderRadius: 3 },
   progressItem: {
     marginBottom: 14,
     borderRadius: 8,

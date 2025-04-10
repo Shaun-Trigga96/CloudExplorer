@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
-    "@huggingface/inference": "^3.5.2",
     "@invertase/react-native-apple-authentication": "^2.4.0",
     "@react-native-async-storage/async-storage": "^1.24.0",
     "@react-native-clipboard/clipboard": "^1.16.2",
@@ -49,7 +48,7 @@
     "react-native-image-picker": "^8.2.0",
     "react-native-markdown-display": "^7.0.2",
     "react-native-paper": "^5.13.1",
-    "react-native-reanimated": "^3.16.7",
+    "react-native-reanimated": "3.17.1",
     "react-native-safe-area-context": "^5.1.0",
     "react-native-screens": "^4.5.0",
     "react-native-sound": "^0.11.2",
