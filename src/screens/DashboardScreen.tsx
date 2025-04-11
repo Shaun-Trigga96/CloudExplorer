@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { FC, useEffect, useState } from 'react';
+import React, {FC, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,10 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { Button } from 'react-native-paper';
+import Animated, {FadeIn} from 'react-native-reanimated';
+import {Button} from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
@@ -23,10 +23,51 @@ import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
 import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
 import StreamingAnalyticsIcon from '../assets/icons/streaming_analytics.svg';
 import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
-import { REACT_APP_BASE_URL } from '@env';
-import { RootStackParamList } from '../navigation/RootNavigator';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import {REACT_APP_BASE_URL} from '@env';
+import {RootStackParamList} from '../navigation/RootNavigator';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import iconMap from './../utils/iconMap';
+import {useTheme as useCustomTheme} from '../context/ThemeContext'; // Import your custom hook
+import {useTheme as usePaperTheme} from 'react-native-paper'; // Import Paper theme hook
+
+// --- Define Theme Colors (or import from App.tsx/central file) ---
+// Add these color definitions near the top, before the component definition
+const lightColors = {
+  background: '#F0F2F5',
+  surface: '#FFFFFF',
+  primary: '#007AFF',
+  text: '#1C1C1E',
+  textSecondary: '#6E6E73',
+  border: '#D1D1D6',
+  error: '#FF3B30',
+  success: '#34C759',
+  warning: '#FFC107',
+  progressBarBackground: '#e0e0e0',
+  gridItemBackground: '#FFFFFF',
+  progressItemBackground: '#f8f9fa', // Light grey for progress items
+  quizModuleBackground: '#f8f9fa',
+  quizItemBackground: '#FFFFFF',
+  // ... other specific colors if needed
+};
+
+const darkColors = {
+  background: '#000000',
+  surface: '#1C1C1E', // Main card background
+  primary: '#0A84FF',
+  text: '#FFFFFF',
+  textSecondary: '#8E8E93',
+  border: '#3A3A3C',
+  error: '#FF453A',
+  success: '#32D74B',
+  warning: '#FFD60A',
+  progressBarBackground: '#3A3A3C',
+  gridItemBackground: '#1C1C1E', // Match surface
+  progressItemBackground: '#2C2C2E', // Slightly lighter dark grey
+  quizModuleBackground: '#1C1C1E', // Match surface
+  quizItemBackground: '#2C2C2E', // Slightly lighter dark grey
+  // ... other specific colors if needed
+};
+// --- End Theme Colors ---
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -90,6 +131,7 @@ interface ProgressItemProps {
   icon?: React.FC<React.SVGProps<SVGSVGElement>>;
   imageIcon?: any; // For Image source
   isImage?: boolean;
+  colors: any;
 }
 
 interface ErrorInfo {
@@ -101,10 +143,12 @@ interface ErrorInfo {
 // Update the GridLayout component to accept navigation prop
 interface GridLayoutProps {
   navigation: NativeStackNavigationProp<RootStackParamList, 'DashboardScreen'>;
+  colors: typeof lightColors | typeof darkColors; // Add colors prop
+  isDarkMode: boolean; // Add isDarkMode prop
 }
 
 // GridLayout component moved to the top
-const GridLayout: FC<GridLayoutProps> = ({ navigation }) => {
+const GridLayout: FC<GridLayoutProps> = ({navigation, colors, isDarkMode}) => {
   const gridItems = [
     {
       icon: 'book-open',
@@ -161,21 +205,34 @@ const GridLayout: FC<GridLayoutProps> = ({ navigation }) => {
 
   return (
     <View style={styles.gridWrapper}>
-      <Text style={styles.gridTitle}>Features</Text>
+      <Text style={[styles.gridTitle, {color: colors.text}]}>Features</Text>
       <View style={styles.gridContainer}>
         {gridItems.map(item => (
           <Animated.View
             key={item.title}
             entering={FadeIn.duration(800).delay(gridItems.indexOf(item) * 100)}
-            style={[styles.gridItem, { width: itemWidth }]}>
+            style={[
+              styles.gridItem,
+              {
+                width: itemWidth,
+                backgroundColor: colors.gridItemBackground, // Use specific grid item background
+                borderColor: colors.border, // Add border color
+                borderWidth: isDarkMode ? 1 : 0, // Add border in dark mode
+              },
+            ]}>
             <TouchableOpacity
               onPress={() => handleGridItemPress(item.screen)}
-              style={{ width: '100%', alignItems: 'center' }}>
-              <View style={[styles.iconCircle, { backgroundColor: item.color }]}>
+              style={{width: '100%', alignItems: 'center'}}>
+              <View style={[styles.iconCircle, {backgroundColor: item.color}]}>
                 <Icon name={item.icon} size={24} color="#ffffff" />
               </View>
-              <Text style={styles.itemTitle}>{item.title}</Text>
-              <Text style={styles.itemDescription}>{item.description}</Text>
+              <Text style={[styles.itemTitle, {color: colors.text}]}>
+                {item.title}
+              </Text>
+              <Text
+                style={[styles.itemDescription, {color: colors.textSecondary}]}>
+                {item.description}
+              </Text>
             </TouchableOpacity>
           </Animated.View>
         ))}
@@ -193,13 +250,18 @@ const ProgressItem: FC<ProgressItemProps> = ({
   icon: IconComponent,
   imageIcon,
   isImage = false,
+  colors,
 }) => (
-  <View style={styles.progressItem}>
+  <View
+    style={[
+      styles.progressItem,
+      {backgroundColor: colors.progressItemBackground},
+    ]}>
     <View style={styles.progressItemHeader}>
       <View
         style={[
           styles.progressIconCircle,
-          { backgroundColor: isImage ? 'transparent' : color },
+          {backgroundColor: isImage ? 'transparent' : color},
         ]}>
         {isImage ? (
           <Image
@@ -212,19 +274,29 @@ const ProgressItem: FC<ProgressItemProps> = ({
         )}
       </View>
       <View style={styles.progressTextContainer}>
-        <Text style={styles.progressTitle}>{title}</Text>
-        <Text style={styles.progressStatus}>{status}</Text>
+        <Text style={[styles.progressTitle, {color: colors.text}]}>
+          {title}
+        </Text>
+        <Text style={[styles.progressStatus, {color: colors.textSecondary}]}>
+          {status}
+        </Text>
       </View>
       {percentage !== undefined && (
-        <Text style={styles.progressPercentage}>{percentage}%</Text>
+        <Text style={[styles.progressPercentage, {color: colors.primary}]}>
+          {percentage}%
+        </Text>
       )}
     </View>
     {percentage !== undefined && (
-      <View style={styles.progressBarContainer}>
+      <View
+        style={[
+          styles.progressBarContainer,
+          {backgroundColor: colors.progressBarBackground},
+        ]}>
         <View
           style={[
             styles.progressBar,
-            { width: `${percentage}%`, backgroundColor: color },
+            {width: `${percentage}%`, backgroundColor: color},
           ]}
         />
       </View>
@@ -232,7 +304,10 @@ const ProgressItem: FC<ProgressItemProps> = ({
   </View>
 );
 
-const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
+const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
+  const {isDarkMode} = useCustomTheme();
+  const colors = isDarkMode ? darkColors : lightColors;
+  const paperTheme = usePaperTheme(); // Get Paper theme if needed for Paper components
   const [loading, setLoading] = useState<boolean>(true);
   const [learningProgress, setLearningProgress] =
     useState<LearningProgress | null>(null);
@@ -264,7 +339,7 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   // Define the icon map for the quizzes
-  const iconMap: { [key: string]: React.FC } = {
+  const iconMap: {[key: string]: React.FC} = {
     'cloud-storage': CloudStorageIcon,
     'compute-engine': ComputeEngineIcon,
     'cloud-functions': CloudFunctionsIcon,
@@ -482,9 +557,8 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
       color: '#3b82f6',
       title: module?.title || moduleId,
     };
-    return { ...mapped, title: module?.title || mapped.title };
+    return {...mapped, title: module?.title || mapped.title};
   };
-
 
   // Helper function to format date
   const formatDate = (dateString: string | number | Date) => {
@@ -500,8 +574,9 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
+      <View
+        style={[styles.loadingContainer, {backgroundColor: colors.background}]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -509,39 +584,49 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
   // Render error state for non-index errors or critical errors
   if (
     errorInfo &&
-    (!errorInfo.isIndexError || (modules.length === 0 && exams.length === 0 && quizzes.length === 0))
+    (!errorInfo.isIndexError ||
+      (modules.length === 0 && exams.length === 0 && quizzes.length === 0))
   ) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView
+        style={[styles.safeArea, {backgroundColor: colors.background}]}>
         <ScrollView style={styles.container}>
           <Animated.View
             entering={FadeIn.duration(800)}
-            style={styles.errorCard}>
+            style={[styles.errorCard, {backgroundColor: colors.surface}]}>
             <Icon
               name="alert-circle"
               size={40}
-              color="#ef4444"
+              color={colors.error}
               style={styles.errorIcon}
             />
-            <Text style={styles.error}>{errorInfo.message}</Text>
-
+            <Text style={[styles.error, {color: colors.text}]}>
+              {errorInfo.message}
+            </Text>
             {errorInfo.isIndexError && errorInfo.indexUrl && (
               <>
-                <Text style={styles.errorHelp}>
+                <Text style={[styles.errorHelp, {color: colors.textSecondary}]}>
                   This is a database configuration issue. An administrator needs
                   to create an index.
                 </Text>
                 <TouchableOpacity
-                  style={styles.indexButton}
+                  style={[
+                    styles.indexButton,
+                    {backgroundColor: colors.primary},
+                  ]}
                   onPress={handleOpenIndexUrl}>
-                  <Text style={styles.indexButtonText}>
+                  <Text style={[styles.indexButtonText, {color: '#FFFFFF'}]}>
                     Open Firebase Console
                   </Text>
                 </TouchableOpacity>
               </>
             )}
 
-            <Button mode="contained" style={styles.retryButton} icon="refresh">
+            <Button
+              mode="contained"
+              style={[styles.retryButton, {backgroundColor: colors.primary}]}
+              labelStyle={{color: '#FFFFFF'}}
+              icon="refresh">
               Retry
             </Button>
           </Animated.View>
@@ -554,57 +639,80 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
   const quizzesByModule = groupQuizzesByModule();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={[styles.safeArea, {backgroundColor: colors.background}]}>
       <ScrollView style={styles.container}>
         {/* Show warning banner for index errors when we have partial data */}
         {errorInfo?.isIndexError && (
           <Animated.View
             entering={FadeIn.duration(800)}
-            style={styles.warningBanner}>
+            style={[styles.warningBanner, {backgroundColor: colors.warning}]}>
             <Icon
               name="alert-triangle"
               size={18}
               color="#fff"
-              style={{ marginRight: 8 }}
+              style={{marginRight: 8}}
             />
             <Text style={styles.warningText}>
               Some data couldn't be loaded.
             </Text>
             <TouchableOpacity style={styles.refreshButton}>
-              <Text style={styles.refreshButtonText}>Retry</Text>
+              <Text style={[styles.refreshButtonText, {color: '#fff'}]}>
+                Retry
+              </Text>
             </TouchableOpacity>
           </Animated.View>
         )}
 
         {/* GridLayout placed at the top */}
-        <GridLayout navigation={navigation} />
+        <GridLayout
+          navigation={navigation}
+          colors={colors}
+          isDarkMode={isDarkMode}
+        />
 
-        <Animated.View entering={FadeIn.duration(1200)} style={styles.card}>
-          <Text style={styles.cardTitle}>Learning Progress</Text>
+        <Animated.View
+          entering={FadeIn.duration(1200)}
+          style={[styles.card, {backgroundColor: colors.surface}]}>
+          <Text style={[styles.cardTitle, {color: colors.text}]}>
+            Learning Progress
+          </Text>
 
           {/* Overall Progress Section */}
           <View style={styles.progressSection}>
             <View style={styles.progressLabelContainer}>
-              <Text style={styles.progressLabel}>Overall Progress</Text>
-              <Text style={styles.progressPercentage}>
+              <Text style={[styles.progressLabel, {color: colors.text}]}>
+                Overall Progress
+              </Text>
+              <Text
+                style={[styles.progressPercentage, {color: colors.primary}]}>
                 {progressPercentage}%
               </Text>
             </View>
-            <View style={styles.progressBarContainer}>
+            <View
+              style={[
+                styles.progressBarContainer,
+                {backgroundColor: colors.progressBarBackground},
+              ]}>
               <View
                 style={[
                   styles.progressBar,
-                  { width: `${progressPercentage}%`, backgroundColor: '#3b82f6' },
+                  {
+                    width: `${progressPercentage}%`,
+                    backgroundColor: colors.primary,
+                  },
                 ]}
               />
             </View>
           </View>
 
           {/* Modules Section */}
-          <Text style={styles.sectionTitle}>Modules</Text>
+          <Text style={[styles.sectionTitle, {color: colors.text}]}>
+            Modules
+          </Text>
           {modules.length > 0 ? (
             modules.map(module => {
-              const { icon, color, title } = getModuleDetails(module.id);
+              const {icon, color, title} = getModuleDetails(module.id);
               const isCompleted = completedModuleIds.includes(module.id);
               const isInProgress = progress.some(
                 p => p.moduleId === module.id && p.status === 'in_progress',
@@ -612,8 +720,8 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
               const status = isCompleted
                 ? 'Completed'
                 : isInProgress
-                  ? 'In Progress'
-                  : 'Not Started';
+                ? 'In Progress'
+                : 'Not Started';
               return (
                 <ProgressItem
                   key={module.id}
@@ -621,51 +729,78 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                   status={status}
                   color={color}
                   icon={icon}
+                  colors={colors}
                 />
               );
             })
           ) : (
-            <Text style={styles.noDataText}>No modules available.</Text>
+            <Text style={[styles.noDataText, {color: colors.textSecondary}]}>
+              No modules available.
+            </Text>
           )}
 
-          <Text style={styles.sectionTitle}>Quizzes</Text>
+          <Text style={[styles.sectionTitle, {color: colors.text}]}>
+            Quizzes
+          </Text>
           {Object.keys(quizzesByModule).length > 0 ? (
             Object.keys(quizzesByModule).map(moduleId => {
-              const { title, color, icon } = getModuleDetails(moduleId);
+              const {title, color, icon} = getModuleDetails(moduleId);
               const moduleQuizzes = quizzesByModule[moduleId] || []; // Add fallback empty array
               const isExpanded = expandedModules[moduleId] || false;
               return (
-                <View key={moduleId} style={styles.quizModuleContainer}>
+                <View
+                  key={moduleId}
+                  style={[
+                    styles.quizModuleContainer,
+                    {backgroundColor: colors.quizModuleBackground},
+                  ]}>
                   {/* Module Header */}
                   <TouchableOpacity
-                    style={[styles.quizModuleHeader, { borderColor: color }]}
+                    style={[
+                      styles.quizModuleHeader,
+                      {
+                        borderColor: color, // Keep brand border color
+                        backgroundColor: colors.surface, // Use surface for header background
+                      },
+                    ]}
                     onPress={() => toggleModuleExpanded(moduleId)}>
                     <View style={styles.quizModuleTitleContainer}>
                       <View
                         style={[
                           styles.progressIconCircle,
-                          { backgroundColor: color },
+                          {backgroundColor: color},
                         ]}>
                         {icon &&
-                          React.createElement(icon, { width: 20, height: 20 })}
+                          React.createElement(icon, {width: 20, height: 20})}
                       </View>
-                      <Text style={styles.quizModuleTitle}>{title}</Text>
+                      <Text
+                        style={[styles.quizModuleTitle, {color: colors.text}]}>
+                        {title}
+                      </Text>
                     </View>
                     <View style={styles.quizModuleRightSection}>
-                      <Text style={styles.quizCountText}>
+                      <Text
+                        style={[
+                          styles.quizCountText,
+                          {color: colors.textSecondary},
+                        ]}>
                         {moduleQuizzes.length} Quizzes
                       </Text>
                       <Icon
                         name={isExpanded ? 'chevron-up' : 'chevron-down'}
                         size={20}
-                        color="#0000"
+                        color={colors.textSecondary}
                       />
                     </View>
                   </TouchableOpacity>
 
                   {/* Dropdown Content */}
                   {isExpanded && (
-                    <View style={styles.quizListContainer}>
+                    <View
+                      style={[
+                        styles.quizListContainer,
+                        {backgroundColor: colors.quizModuleBackground},
+                      ]}>
                       {moduleQuizzes.length > 0 ? (
                         moduleQuizzes.map((quiz, index) => {
                           const isCompleted =
@@ -676,14 +811,21 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                               key={quiz.id}
                               style={[
                                 styles.quizItem,
-                                index < moduleQuizzes.length - 1 &&
-                                styles.quizItemBorder,
+                                {backgroundColor: colors.quizItemBackground}, // Use specific quiz item background
+                                index < moduleQuizzes.length - 1 && [
+                                  styles.quizItemBorder,
+                                  {borderBottomColor: colors.border},
+                                ], // Apply border color
                               ]}>
                               <View style={styles.quizItemDetails}>
                                 <Text
                                   style={[
                                     styles.quizItemTitle,
-                                    { color: isCompleted ? '#202124' : '#666' },
+                                    {
+                                      color: isCompleted
+                                        ? colors.text
+                                        : colors.textSecondary,
+                                    }, // Adjust color based on completion
                                   ]}>
                                   Quiz {index + 1}
                                   {quiz.timestamp &&
@@ -691,7 +833,11 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                                   {!isCompleted && ' (Not Started)'}
                                 </Text>
                                 {isCompleted ? (
-                                  <Text style={styles.quizItemScore}>
+                                  <Text
+                                    style={[
+                                      styles.quizItemScore,
+                                      {color: colors.textSecondary},
+                                    ]}>
                                     Score: {quiz.score}/{quiz.totalQuestions}{' '}
                                     {quiz.percentage !== undefined &&
                                       `(${quiz.percentage}%)`}
@@ -703,7 +849,14 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                                 )}
                               </View>
                               {isCompleted && quiz.percentage !== undefined && (
-                                <View style={styles.quizItemProgressContainer}>
+                                <View
+                                  style={[
+                                    styles.quizItemProgressContainer,
+                                    {
+                                      backgroundColor:
+                                        colors.progressBarBackground,
+                                    },
+                                  ]}>
                                   <View
                                     style={[
                                       styles.quizItemProgress,
@@ -719,7 +872,11 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                           );
                         })
                       ) : (
-                        <Text style={styles.noDataText}>
+                        <Text
+                          style={[
+                            styles.noDataText,
+                            {color: colors.textSecondary},
+                          ]}>
                           No quizzes available for this module.
                         </Text>
                       )}
@@ -728,32 +885,36 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                 </View>
               );
             })
+          ) : quizzes && quizzes.length > 0 ? (
+            // If we have quizzes but they're not properly grouped, show them as a flat list
+            <View>
+              {quizzes.map(quiz => {
+                const IconComponent =
+                  iconMap[quiz.moduleId] || CloudGenericIcon;
+                const status = learningProgress?.completedQuizzes?.includes(
+                  quiz.id,
+                )
+                  ? 'Completed'
+                  : 'Not Started';
+                return (
+                  <ProgressItem
+                    key={quiz.id}
+                    title={quiz.title}
+                    status={status}
+                    color="#0000"
+                    icon={IconComponent}
+                    colors={colors}
+                  />
+                );
+              })}
+            </View>
           ) : (
-            quizzes && quizzes.length > 0 ? (
-              // If we have quizzes but they're not properly grouped, show them as a flat list
-              <View>
-                {quizzes.map(quiz => {
-                  const IconComponent = iconMap[quiz.moduleId] || CloudGenericIcon;
-                  const status = learningProgress?.completedQuizzes?.includes(quiz.id)
-                    ? 'Completed'
-                    : 'Not Started';
-                  return (
-                    <ProgressItem
-                      key={quiz.id}
-                      title={quiz.title}
-                      status={status}
-                      color="#0000"
-                      icon={IconComponent}
-                    />
-                  );
-                })}
-              </View>
-            ) : (
-              <Text style={styles.noDataText}>No quizzes available.</Text>
-            )
+            <Text style={[styles.noDataText, {color: colors.textSecondary}]}>
+              No quizzes available.
+            </Text>
           )}
           {/* Exams Section - Using image icons correctly */}
-          <Text style={styles.sectionTitle}>Exams</Text>
+          <Text style={[styles.sectionTitle, {color: colors.text}]}>Exams</Text>
           {exams.length > 0 ? (
             exams.map(exam => {
               const examImage = examIcons[exam.id];
@@ -771,11 +932,14 @@ const DashboardScreen: FC<{ navigation: any }> = ({ navigation }) => {
                   color={examColor}
                   imageIcon={examImage}
                   isImage={true}
+                  colors={colors}
                 />
               );
             })
           ) : (
-            <Text style={styles.noDataText}>No exams available.</Text>
+            <Text style={[styles.noDataText, {color: colors.textSecondary}]}>
+              No exams available.
+            </Text>
           )}
         </Animated.View>
       </ScrollView>
@@ -794,28 +958,28 @@ const styles = StyleSheet.create({
   quizTitle: {
     flex: 1,
   },
-  safeArea: { flex: 1, backgroundColor: '#f8f9fa' },
-  container: { flex: 1, padding: 16 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 16, color: '#202124' },
+  safeArea: {flex: 1 /* backgroundColor applied dynamically */},
+  container: {flex: 1, padding: 16 /* backgroundColor applied dynamically */},
+  // title: { fontSize: 24, fontWeight: '700', marginBottom: 16 /* color applied dynamically */ }, // Removed if not used directly
   card: {
-    backgroundColor: '#ffffff',
+    // Apply background in JSX
     borderRadius: 15,
     padding: 20,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: {width: 0, height: 2},
+    // shadowOpacity: isDarkMode ? 0.3 : 0.1, // Apply conditional shadow in JSX if needed
     shadowRadius: 4,
     elevation: 5,
   },
   errorCard: {
-    backgroundColor: '#ffffff',
+    // Apply background in JSX
     borderRadius: 15,
     padding: 24,
     marginVertical: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: {width: 0, height: 2},
+    // shadowOpacity: isDarkMode ? 0.3 : 0.1, // Apply conditional shadow in JSX if needed
     shadowRadius: 4,
     elevation: 5,
     alignItems: 'center',
@@ -824,20 +988,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   warningBanner: {
-    backgroundColor: '#f97316',
+    // Apply background in JSX
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
   warningText: {
-    color: '#ffffff',
+    // Apply color in JSX
     flex: 1,
     fontSize: 14,
   },
@@ -848,38 +1012,43 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   refreshButtonText: {
-    color: '#ffffff',
+    // Apply color in JSX
     fontSize: 12,
     fontWeight: '600',
   },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center' /* backgroundColor applied dynamically */,
+  },
   error: {
+    // Apply color in JSX
     fontSize: 16,
-    color: '#333',
     textAlign: 'center',
     marginBottom: 16,
     fontWeight: '500',
   },
   errorHelp: {
+    // Apply color in JSX
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 20,
     paddingHorizontal: 20,
   },
   indexButton: {
-    backgroundColor: '#4f46e5',
+    // Apply background in JSX
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   indexButtonText: {
-    color: '#ffffff',
+    // Apply color in JSX
     fontWeight: '600',
     fontSize: 14,
   },
   retryButton: {
+    // Apply background in JSX
     marginTop: 10,
     paddingHorizontal: 16,
   },
@@ -888,10 +1057,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   gridTitle: {
+    // Apply color in JSX
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 16,
-    color: '#202124',
   },
   gridContainer: {
     flexDirection: 'row',
@@ -899,18 +1068,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   gridItem: {
-    backgroundColor: '#ffffff',
+    // Apply background, border in JSX
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: {width: 0, height: 2},
+    // shadowOpacity: isDarkMode ? 0.2 : 0.1, // Apply conditional shadow in JSX if needed
     shadowRadius: 3,
     elevation: 3,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
   },
   iconCircle: {
     width: 52,
@@ -920,48 +1087,54 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
   itemTitle: {
+    // Apply color in JSX
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
-    color: '#202124',
     marginBottom: 4,
   },
   itemDescription: {
+    // Apply color in JSX
     fontSize: 12,
-    color: '#5f6368',
     textAlign: 'center',
     marginTop: 4,
     lineHeight: 16,
   },
   cardTitle: {
+    // Apply color in JSX
     fontSize: 22,
     fontWeight: '700',
     marginBottom: 20,
-    color: '#202124',
   },
-  progressSection: { marginBottom: 20 },
+  progressSection: {marginBottom: 20},
   progressLabelContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  progressLabel: { fontSize: 16, fontWeight: '600', color: '#202124' },
-  progressPercentage: { fontSize: 16, fontWeight: '700', color: '#3b82f6' },
+  progressLabel: {
+    fontSize: 16,
+    fontWeight: '600' /* color applied dynamically */,
+  },
+  progressPercentage: {
+    fontSize: 16,
+    fontWeight: '700' /* color applied dynamically */,
+  },
   progressBarContainer: {
+    // Apply background in JSX
     height: 10,
-    backgroundColor: '#e0e0e0',
     borderRadius: 5,
     overflow: 'hidden',
   },
-  progressBar: { height: '100%', borderRadius: 5 },
-  moduleProgressContainer: { marginTop: 10 },
-  moduleItem: { marginBottom: 14 },
+  progressBar: {height: '100%', borderRadius: 5},
+  moduleProgressContainer: {marginTop: 10},
+  moduleItem: {marginBottom: 14},
   moduleItemHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -975,19 +1148,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 8,
   },
-  moduleTitle: { fontSize: 14, fontWeight: '500', color: '#202124', flex: 1 },
-  modulePercentage: { fontSize: 14, fontWeight: '600', color: '#5f6368' },
+  moduleTitle: {fontSize: 14, fontWeight: '500', color: '#202124', flex: 1}, // Note: Color might need dynamic application if module title color changes
+  modulePercentage: {fontSize: 14, fontWeight: '600', color: '#5f6368'}, // Note: Color might need dynamic application
   moduleProgressBarContainer: {
     height: 6,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#e0e0e0', // Note: Color might need dynamic application
     borderRadius: 3,
     overflow: 'hidden',
   },
-  moduleProgressBar: { height: '100%', borderRadius: 3 },
+  moduleProgressBar: {height: '100%', borderRadius: 3},
   progressItem: {
+    // Apply background in JSX
     marginBottom: 14,
     borderRadius: 8,
-    backgroundColor: '#f8f9fa',
     padding: 12,
   },
   progressItemHeader: {
@@ -1011,42 +1184,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   progressTitle: {
+    // Apply color in JSX
     fontSize: 15,
     fontWeight: '600',
-    color: '#202124',
   },
   progressStatus: {
+    // Apply color in JSX
     fontSize: 13,
-    color: '#5f6368',
     marginTop: 2,
   },
   noDataText: {
+    // Apply color in JSX
     fontSize: 14,
-    color: '#5f6368',
     textAlign: 'center',
     marginVertical: 10,
   },
   sectionTitle: {
+    // Apply color in JSX
     fontSize: 18,
     fontWeight: '600',
-    color: '#202124',
     marginTop: 20,
     marginBottom: 12,
   },
   // Quiz module styles
   quizModuleContainer: {
+    // Apply background in JSX
     marginBottom: 16,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#f8f9fa',
   },
   quizModuleHeader: {
+    // Apply background, border in JSX
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 12,
     borderLeftWidth: 4,
-    backgroundColor: 'white',
     borderRadius: 8,
   },
   quizModuleTitleContainer: {
@@ -1054,49 +1227,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   quizModuleTitle: {
+    // Apply color in JSX
     fontSize: 15,
     fontWeight: '600',
-    color: '#202124',
   },
   quizModuleRightSection: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   quizCountText: {
+    // Apply color in JSX
     fontSize: 13,
-    color: '#5f6368',
     marginRight: 8,
   },
   quizListContainer: {
+    // Apply background in JSX
     padding: 8,
-    backgroundColor: '#f8f9fa',
   },
   quizItem: {
+    // Apply background in JSX
     padding: 12,
-    backgroundColor: 'white',
     borderRadius: 6,
     marginVertical: 4,
   },
   quizItemBorder: {
+    // Apply border color in JSX
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   quizItemDetails: {
     marginBottom: 8,
   },
   quizItemTitle: {
+    // Apply color in JSX
     fontSize: 14,
     fontWeight: '500',
-    color: '#202124',
     marginBottom: 2,
   },
   quizItemScore: {
+    // Apply color in JSX
     fontSize: 13,
-    color: '#5f6368',
   },
   quizItemProgressContainer: {
+    // Apply background in JSX
     height: 6,
-    backgroundColor: '#e0e0e0',
     borderRadius: 3,
     overflow: 'hidden',
   },

@@ -1,3 +1,4 @@
+// c:\Users\thabi\Desktop\CloudExplorer\src\screens\QuizzesDetailScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,13 +8,56 @@ import {
   TouchableOpacity,
   Animated,
   Alert,
+  ActivityIndicator, // Import ActivityIndicator
 } from 'react-native';
 import axios, { AxiosError } from 'axios';
 import { Button, Card, Paragraph, Title, IconButton } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 import {REACT_APP_BASE_URL} from '@env';
+import { useTheme as useCustomTheme } from '../context/ThemeContext'; // Import your custom theme hook
 
-const BASE_URL = REACT_APP_BASE_URL; 
+const BASE_URL = REACT_APP_BASE_URL;
+
+// --- Define Theme Colors (Matching other screens) ---
+const lightColors = {
+  background: '#F0F2F5',
+  surface: '#FFFFFF',
+  primary: '#007AFF',
+  text: '#1C1C1E',
+  textSecondary: '#6E6E73',
+  border: '#D1D1D6',
+  error: '#FF3B30',
+  success: '#34C759',
+  warning: '#FFC107',
+  buttonText: '#FFFFFF',
+  selectedAnswerBackground: '#007AFF',
+  selectedAnswerText: '#FFFFFF',
+  correctBackground: '#e8f5e9', // Light green
+  wrongBackground: '#ffebee', // Light red
+  neutralBackground: '#f0f2f5', // Light gray
+  explanationBackground: '#f0f2f5',
+};
+
+const darkColors = {
+  background: '#000000',
+  surface: '#1C1C1E',
+  primary: '#0A84FF',
+  text: '#FFFFFF',
+  textSecondary: '#8E8E93',
+  border: '#3A3A3C',
+  error: '#FF453A',
+  success: '#32D74B',
+  warning: '#FFD60A',
+  buttonText: '#FFFFFF',
+  selectedAnswerBackground: '#0A84FF',
+  selectedAnswerText: '#FFFFFF',
+  correctBackground: 'rgba(50, 215, 75, 0.2)', // Darker green with opacity
+  wrongBackground: 'rgba(255, 69, 58, 0.2)', // Darker red with opacity
+  neutralBackground: '#2C2C2E', // Dark gray
+  explanationBackground: '#2C2C2E',
+};
+// --- End Theme Colors ---
+
 
 interface Answer {
   letter: string;
@@ -47,9 +91,12 @@ const QuizzesDetailScreen = ({
   navigation: any;
 }) => {
   const { moduleId } = route.params;
+  const { isDarkMode } = useCustomTheme(); // Use your custom theme hook
+  const colors = isDarkMode ? darkColors : lightColors; // Select color palette
+
   console.log('moduleId:', moduleId);
   const [quiz, setQuiz] = useState<Quiz[] | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true); // Start loading true
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
   const [showResults, setShowResults] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +128,8 @@ const QuizzesDetailScreen = ({
     getUserId();
 
   const fetchQuiz = async () => {
-  setLoading(true);
+  setLoading(true); // Ensure loading is true at the start
+  setError(null); // Reset error
   try {
     const moduleResponse = await axios.get(`${BASE_URL}/api/v1/modules/${moduleId}`); // Corrected URL
     setModuleTitle(moduleResponse.data.title);
@@ -231,32 +279,51 @@ const QuizzesDetailScreen = ({
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Quiz...</Text>
       </View>
     );
   }
 
   if (error) {
-    return <Text style={styles.error}>{error}</Text>;
+    return (
+        <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={[styles.error, { color: colors.error }]}>{error}</Text>
+            {/* Optional: Add a retry button */}
+            <Button
+                mode="contained"
+                onPress={() => { /* Implement retry logic if needed, e.g., call fetchQuiz() */ }}
+                style={{ backgroundColor: colors.primary, marginTop: 15 }}
+                labelStyle={{ color: colors.buttonText }}
+            >
+                Retry
+            </Button>
+        </View>
+    );
   }
 
   if (!quiz || !moduleTitle) {
-    return null;
+    // This case might happen briefly or if there's an issue not caught by error state
+    return (
+        <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Preparing quiz...</Text>
+        </View>
+    );
   }
 
   if (showResults) {
     const score = calculateScore();
     return (
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.contentContainer}>
-        <Animated.View style={[styles.resultCard, { opacity: fadeAnim }]}>
-          <Title style={styles.resultTitle}>Quiz Results</Title>
-          <Text style={styles.resultScore}>
+        <Animated.View style={[styles.resultCard, { opacity: fadeAnim, backgroundColor: colors.surface }]}>
+          <Title style={[styles.resultTitle, { color: colors.text }]}>Quiz Results</Title>
+          <Text style={[styles.resultScore, { color: colors.primary }]}>
             {score} / {quiz.length}
           </Text>
-          <Text style={styles.scorePercentage}>
+          <Text style={[styles.scorePercentage, { color: colors.textSecondary }]}>
             {Math.round((score / quiz.length) * 100)}%
           </Text>
 
@@ -264,44 +331,44 @@ const QuizzesDetailScreen = ({
             <Button
               mode="contained"
               onPress={() => handleRetry()}
-              style={styles.retryButton}
-              labelStyle={styles.buttonText}>
+              style={[styles.retryButton, { backgroundColor: colors.success }]} // Use success color for retry
+              labelStyle={[styles.buttonText, { color: colors.buttonText }]}>
               Try Again
             </Button>
 
             <Button
               mode="contained"
               onPress={() => navigation.goBack()}
-              // eslint-disable-next-line react-native/no-inline-styles
-              style={[styles.retryButton, { backgroundColor: '#4285F4' }]}
-              labelStyle={styles.buttonText}>
+              style={[styles.retryButton, { backgroundColor: colors.primary }]} // Use primary for back
+              labelStyle={[styles.buttonText, { color: colors.buttonText }]}>
               Back to Module
             </Button>
           </View>
         </Animated.View>
 
-        <Title style={styles.reviewTitle}>Review Answers</Title>
+        <Title style={[styles.reviewTitle, { color: colors.text }]}>Review Answers</Title>
 
         {quiz.map(question => {
           const userAnswer = userAnswers[question.id];
           const isCorrect = isAnswerCorrect(question.id);
-
 
           return (
             <Card
               key={question.id}
               style={[
                 styles.reviewCard,
-                isCorrect ? styles.correctCard : styles.incorrectCard,
+                { backgroundColor: colors.surface }, // Use surface for card background
+                isCorrect ? [styles.correctCard, { borderLeftColor: colors.success }] : [styles.incorrectCard, { borderLeftColor: colors.error }],
               ]}>
               <Card.Content>
                 <View style={styles.questionHeader}>
                   <IconButton
                     icon={isCorrect ? 'check-circle' : 'close-circle'}
+                    iconColor={isCorrect ? colors.success : colors.error} // Use theme colors for icon
                     size={24}
                     style={styles.statusIcon}
                   />
-                  <Paragraph style={styles.reviewQuestion}>
+                  <Paragraph style={[styles.reviewQuestion, { color: colors.text }]}>
                     {question.question}
                   </Paragraph>
                 </View>
@@ -316,15 +383,15 @@ const QuizzesDetailScreen = ({
                           styles.reviewAnswer,
                           answer.letter.toLowerCase() ===
                             question.correctAnswer.toLowerCase()
-                            ? styles.correctAnswer
+                            ? { backgroundColor: colors.correctBackground } // Use theme correct background
                             : userAnswer === answer.letter && !isCorrect
-                              ? styles.wrongAnswer
-                              : styles.neutralAnswer,
+                              ? { backgroundColor: colors.wrongBackground } // Use theme wrong background
+                              : { backgroundColor: colors.neutralBackground }, // Use theme neutral background
                         ]}>
-                        <Text style={styles.answerLetter}>
+                        <Text style={[styles.answerLetter, { color: colors.textSecondary }]}>
                           {answer.letter.toUpperCase()}
                         </Text>
-                        <Text style={styles.reviewAnswerText}>
+                        <Text style={[styles.reviewAnswerText, { color: colors.text }]}>
                           {answer.answer}
                         </Text>
                       </View>
@@ -339,21 +406,21 @@ const QuizzesDetailScreen = ({
                         style={[
                           styles.reviewAnswer,
                           question.correctAnswer === option
-                            ? styles.correctAnswer
+                            ? { backgroundColor: colors.correctBackground }
                             : userAnswer === option && !isCorrect
-                              ? styles.wrongAnswer
-                              : styles.neutralAnswer,
+                              ? { backgroundColor: colors.wrongBackground }
+                              : { backgroundColor: colors.neutralBackground },
                         ]}>
-                        <Text style={styles.reviewAnswerText}>{option}</Text>
+                        <Text style={[styles.reviewAnswerText, { color: colors.text }]}>{option}</Text>
                       </View>
                     ))}
                   </View>
                 )}
 
                 {!isCorrect && (
-                  <View style={styles.explanationContainer}>
-                    <Text style={styles.explanationTitle}>Explanation:</Text>
-                    <Text style={styles.explanationText}>
+                  <View style={[styles.explanationContainer, { backgroundColor: colors.explanationBackground }]}>
+                    <Text style={[styles.explanationTitle, { color: colors.text }]}>Explanation:</Text>
+                    <Text style={[styles.explanationText, { color: colors.textSecondary }]}>
                       {question.explanation}
                     </Text>
                   </View>
@@ -368,20 +435,20 @@ const QuizzesDetailScreen = ({
 
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.contentContainer}>
-      <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-        <Title style={styles.moduleTitle}>{moduleTitle} Quiz</Title>
-        <Text style={styles.progress}>
+      <Animated.View style={[styles.header, { opacity: fadeAnim, backgroundColor: colors.surface }]}>
+        <Title style={[styles.moduleTitle, { color: colors.primary }]}>{moduleTitle} Quiz</Title>
+        <Text style={[styles.progress, { color: colors.textSecondary }]}>
           Progress: {Object.keys(userAnswers).length} / {quiz.length}
         </Text>
       </Animated.View>
       {quiz.map(question => (
         <Animated.View
           key={question.id}
-          style={[styles.card, { opacity: fadeAnim }]}>
+          style={[styles.card, { opacity: fadeAnim, backgroundColor: colors.surface }]}>
           <Card.Content>
-            <Paragraph style={styles.question}>{question.question}</Paragraph>
+            <Paragraph style={[styles.question, { color: colors.text }]}>{question.question}</Paragraph>
             {question.answers.length > 0 ? (
               <View style={styles.answerContainer}>
                 {question.answers.map(answer => (
@@ -390,24 +457,27 @@ const QuizzesDetailScreen = ({
                     onPress={() => handleAnswer(question.id, answer.letter)}
                     style={[
                       styles.answerButton,
+                      { backgroundColor: colors.surface, borderColor: colors.border }, // Use theme colors
                       userAnswers[question.id] === answer.letter &&
-                      styles.selectedAnswer,
+                      [styles.selectedAnswer, { backgroundColor: colors.selectedAnswerBackground, borderColor: colors.selectedAnswerBackground }], // Use theme selected colors
                     ]}
                     activeOpacity={0.7}>
                     <View style={styles.answerInner}>
                       <Text
                         style={[
                           styles.answerLetter,
+                          { color: colors.textSecondary }, // Use theme secondary text
                           userAnswers[question.id] === answer.letter &&
-                          styles.selectedAnswerLetter,
+                          [styles.selectedAnswerLetter, { color: colors.selectedAnswerText }], // Use theme selected text
                         ]}>
                         {answer.letter.toUpperCase()}
                       </Text>
                       <Text
                         style={[
                           styles.answerText,
+                          { color: colors.text }, // Use theme text
                           userAnswers[question.id] === answer.letter &&
-                          styles.selectedAnswerText,
+                          [styles.selectedAnswerText, { color: colors.selectedAnswerText }], // Use theme selected text
                         ]}>
                         {answer.answer}
                       </Text>
@@ -422,15 +492,17 @@ const QuizzesDetailScreen = ({
                   onPress={() => handleAnswer(question.id, 'True')}
                   style={[
                     styles.answerButton,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
                     userAnswers[question.id] === 'True' &&
-                    styles.selectedAnswer,
+                    [styles.selectedAnswer, { backgroundColor: colors.selectedAnswerBackground, borderColor: colors.selectedAnswerBackground }],
                   ]}
                   activeOpacity={0.7}>
                   <Text
                     style={[
                       styles.answerText,
+                      { color: colors.text },
                       userAnswers[question.id] === 'True' &&
-                      styles.selectedAnswerText,
+                      [styles.selectedAnswerText, { color: colors.selectedAnswerText }],
                     ]}>
                     True
                   </Text>
@@ -441,15 +513,17 @@ const QuizzesDetailScreen = ({
                   onPress={() => handleAnswer(question.id, 'False')}
                   style={[
                     styles.answerButton,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
                     userAnswers[question.id] === 'False' &&
-                    styles.selectedAnswer,
+                    [styles.selectedAnswer, { backgroundColor: colors.selectedAnswerBackground, borderColor: colors.selectedAnswerBackground }],
                   ]}
                   activeOpacity={0.7}>
                   <Text
                     style={[
                       styles.answerText,
+                      { color: colors.text },
                       userAnswers[question.id] === 'False' &&
-                      styles.selectedAnswerText,
+                      [styles.selectedAnswerText, { color: colors.selectedAnswerText }],
                     ]}>
                     False
                   </Text>
@@ -462,8 +536,8 @@ const QuizzesDetailScreen = ({
       <Button
         mode="contained"
         onPress={() => handleSubmit()}
-        style={styles.submitButton}
-        labelStyle={styles.buttonText}
+        style={[styles.submitButton, { backgroundColor: colors.primary }]} // Use theme primary
+        labelStyle={[styles.buttonText, { color: colors.buttonText }]} // Use theme button text
         loading={submittingResults}
         disabled={submittingResults}>
         Submit Quiz
@@ -476,7 +550,7 @@ const styles = StyleSheet.create({
   // --- General Layout & Containers ---
   container: {
     flex: 1,
-    backgroundColor: '#f0f2f5', // Light gray background
+    // backgroundColor applied dynamically
   },
   contentContainer: {
     padding: 20,
@@ -486,12 +560,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f2f5',
+    // backgroundColor applied dynamically
   },
   error: {
     padding: 20,
     fontSize: 16,
-    color: '#d93025', // Red error color
+    // color applied dynamically
     textAlign: 'center',
     fontFamily: 'System',
   },
@@ -500,7 +574,7 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 20,
     padding: 15,
-    backgroundColor: '#fff',
+    // backgroundColor applied dynamically
     borderRadius: 15,
     // Shadow for depth
     shadowColor: '#000',
@@ -512,26 +586,26 @@ const styles = StyleSheet.create({
   moduleTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1a73e8', // Primary blue color
+    // color applied dynamically
     textAlign: 'center',
     marginBottom: 5,
     fontFamily: 'System',
   },
   progress: {
     fontSize: 14,
-    color: '#5f6368', // Gray text color
+    // color applied dynamically
     textAlign: 'center',
     fontFamily: 'System',
   },
   loadingText: {
     fontSize: 18,
-    color: '#5f6368',
+    // color applied dynamically
     fontFamily: 'System',
   },
 
   // --- Quiz Card ---
   card: {
-    backgroundColor: '#ffffff',
+    // backgroundColor applied dynamically
     borderRadius: 15,
     marginBottom: 15,
     padding: 15,
@@ -545,7 +619,7 @@ const styles = StyleSheet.create({
   question: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#202124', // Dark text color
+    // color applied dynamically
     marginBottom: 15,
     lineHeight: 24,
     fontFamily: 'System',
@@ -556,12 +630,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   answerButton: {
-    backgroundColor: '#fff',
+    // backgroundColor applied dynamically
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 15,
     borderWidth: 1,
-    borderColor: '#e0e0e0', // Light gray border
+    // borderColor applied dynamically
     // Shadow for depth
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -576,40 +650,40 @@ const styles = StyleSheet.create({
   answerLetter: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#5f6368', // Gray text color
+    // color applied dynamically
     marginRight: 12,
     width: 24,
     textAlign: 'center',
   },
   answerText: {
     fontSize: 16,
-    color: '#202124', // Dark text color
+    // color applied dynamically
     fontFamily: 'System',
   },
   selectedAnswer: {
-    backgroundColor: '#1a73e8', // Primary blue color
-    borderColor: '#1a73e8',
+    // backgroundColor applied dynamically
+    // borderColor applied dynamically
     shadowOpacity: 0.2,
   },
   selectedAnswerText: {
-    color: '#ffffff', // White text color
+    // color applied dynamically
   },
   selectedAnswerLetter: {
-    color: '#ffffff', // White text color
+    // color applied dynamically
   },
 
   // --- Submit Button ---
   submitButton: {
     marginTop: 20,
     paddingVertical: 12,
-    backgroundColor: '#1a73e8', // Primary blue color
+    // backgroundColor applied dynamically
     borderRadius: 10,
     elevation: 3,
   },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff', // White text color
+    // color applied dynamically
     fontFamily: 'System',
   },
 
@@ -619,7 +693,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
+    // backgroundColor applied dynamically
     borderRadius: 15,
     // Shadow for depth
     shadowColor: '#000',
@@ -631,20 +705,20 @@ const styles = StyleSheet.create({
   resultTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#202124', // Dark text color
+    // color applied dynamically
     marginBottom: 10,
     fontFamily: 'System',
   },
   resultScore: {
     fontSize: 36,
     fontWeight: '800',
-    color: '#1a73e8', // Primary blue color
+    // color applied dynamically
     marginBottom: 20,
     fontFamily: 'System',
   },
   scorePercentage: {
     fontSize: 24,
-    color: '#5f6368', // Gray text color
+    // color applied dynamically
     marginBottom: 20,
     fontFamily: 'System',
   },
@@ -656,7 +730,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     paddingVertical: 10,
-    backgroundColor: '#34a853', // Green color
+    // backgroundColor applied dynamically
     borderRadius: 10,
     elevation: 3,
   },
@@ -667,7 +741,7 @@ reviewTitle: {
   fontWeight: 'bold',
   marginTop: 20,
   marginBottom: 10,
-  color: '#202124', // Dark text color
+  // color applied dynamically
   textAlign: 'center', // Center the title
 },
 reviewCard: {
@@ -679,14 +753,15 @@ reviewCard: {
   shadowOffset: { width: 0, height: 2 }, // Added shadow offset
   shadowOpacity: 0.1, // Added shadow opacity
   shadowRadius: 4, // Added shadow radius
+  // backgroundColor applied dynamically
 },
 correctCard: {
   borderLeftWidth: 8, // Increased border width
-  borderLeftColor: '#34a853', // Green color
+  // borderLeftColor applied dynamically
 },
 incorrectCard: {
   borderLeftWidth: 8, // Increased border width
-  borderLeftColor: '#ea4335', // Red color
+  // borderLeftColor applied dynamically
 },
 questionHeader: {
   flexDirection: 'row',
@@ -696,15 +771,15 @@ questionHeader: {
 },
 statusIcon: {
   marginRight: 10,
-  color: '#fff', // White icon color
-  backgroundColor: '#1a73e8', // Blue background for the icon
+  // iconColor applied dynamically
+  // backgroundColor: '#1a73e8', // Consider removing or making dynamic
   borderRadius: 100, // Make it circular
   padding: 5, // Add some padding around the icon
 },
 reviewQuestion: {
   fontSize: 18,
   fontWeight: '600',
-  color: '#202124', // Dark text color
+  // color applied dynamically
   flex: 1, // Allow the question to take up available space
   lineHeight: 24, // Added line height for better readability
 },
@@ -720,37 +795,38 @@ reviewAnswer: {
   flexDirection: 'row', // Align letter and text horizontally
   alignItems: 'center', // Center items vertically
   gap: 10, // Added gap between letter and text
+  // backgroundColor applied dynamically
 },
 reviewAnswerText: {
   fontSize: 16,
-  color: '#202124', // Dark text color
+  // color applied dynamically
   flex: 1, // Allow the text to take up available space
   lineHeight: 22, // Added line height for better readability
 },
 neutralAnswer: {
-  backgroundColor: '#f0f2f5', // Light gray
+  // backgroundColor applied dynamically
 },
 correctAnswer: {
-  backgroundColor: '#e8f5e9', // Light green
+  // backgroundColor applied dynamically
 },
 wrongAnswer: {
-  backgroundColor: '#ffebee', // Light red
+  // backgroundColor applied dynamically
 },
 explanationContainer: {
   marginTop: 15, // Increased margin top
   padding: 15, // Increased padding
-  backgroundColor: '#f0f2f5', // Light gray
+  // backgroundColor applied dynamically
   borderRadius: 12, // Increased border radius
 },
 explanationTitle: {
   fontSize: 16,
   fontWeight: 'bold',
-  color: '#202124', // Dark text color
+  // color applied dynamically
   marginBottom: 8, // Increased margin bottom
 },
 explanationText: {
   fontSize: 15, // Slightly reduced font size
-  color: '#5f6368', // Gray text color
+  // color applied dynamically
   lineHeight: 22, // Added line height for better readability
 },
 });

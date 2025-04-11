@@ -1,8 +1,13 @@
+// c:\Users\thabi\Desktop\CloudExplorer\src\navigation\TabNavigator.tsx
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack'; // Import createStackNavigator
-import { useTheme } from 'react-native-paper';
+import { createStackNavigator } from '@react-navigation/stack';
+// Import useTheme from react-native-paper AND your custom context
+import { useTheme as usePaperTheme } from 'react-native-paper';
+import { useTheme as useCustomTheme } from '../context/ThemeContext'; // Import your custom hook
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { StyleSheet } from 'react-native'; // Import StyleSheet
+
 // Import screens directly
 import DashboardScreen from '../screens/DashboardScreen';
 import ModulesScreen from '../screens/ModulesScreen';
@@ -16,122 +21,119 @@ import ProfileScreen from '../screens/ProfileScreen';
 import CertificationsScreen from '../screens/CertificationsScreen';
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator<RootStackParamList>(); // Create a StackNavigator
+const Stack = createStackNavigator<RootStackParamList>();
 
-// Create a Stack Navigator for Modules
+// --- Stack Navigators (No changes needed here) ---
 function ModulesStackNavigator() {
   return (
-    <Stack.Navigator
-        screenOptions={{
-        headerShown: false,
-        }}
-    >
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ModulesScreen" component={ModulesScreen} />
       <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen} />
     </Stack.Navigator>
   );
 }
 
-// Create a Stack Navigator for Quizzes
 function QuizzesStackNavigator() {
   return (
-    <Stack.Navigator
-        screenOptions={{
-        headerShown: false,
-        }}
-    >
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="QuizzesScreen" component={QuizzesScreen} />
       <Stack.Screen name="QuizzesDetail" component={QuizzesDetailScreen} />
     </Stack.Navigator>
   );
 }
 
-// Create a Stack Navigator for Dashboard
 function DashboardStackNavigator() {
   return (
-    <Stack.Navigator
-        screenOptions={{
-        headerShown: false,
-        }}
-    >
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="DashboardScreen" component={DashboardScreen} />
     </Stack.Navigator>
   );
 }
-// Create a Stack Navigator for Exams
+
 function ExamsStackNavigator() {
   return (
-    <Stack.Navigator
-        screenOptions={{
-        headerShown: false,
-        }}
-    >
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ExamsScreen" component={ExamsScreen} />
+      {/* Add ExamDetailScreen if needed within this stack */}
     </Stack.Navigator>
   );
 }
 
-// Create a Stack Navigator for Settings
 function SettingsStackNavigator() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
       <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
       <Stack.Screen name="CertificationsScreen" component={CertificationsScreen} />
+      {/* Add other settings-related screens here */}
     </Stack.Navigator>
   );
 }
-const TabNavigator = () => {
-  const theme = useTheme();
+// --- End Stack Navigators ---
 
+
+const TabNavigator = () => {
+  const theme = usePaperTheme(); // Use Paper's theme (now correctly provided by App.tsx)
+  const { isDarkMode } = useCustomTheme(); // Use your custom hook to get the mode status
+  
+  type MD3Colors = {
+    primary: string;
+    onSurfaceDisabled: string;
+    border: string; // Add 'border' property to the type definition
+  };
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         // eslint-disable-next-line react/no-unstable-nested-components
         tabBarIcon: ({ color, size }) => {
-          let iconName = 'alert';
-
+          let iconName = 'alert'; // Default icon
+  
+          // Using outline icons for potential consistency
           switch (route.name) {
             case 'Dashboard':
-              iconName = 'view-dashboard';
+              iconName = 'view-dashboard-outline';
               break;
             case 'Modules':
-              iconName = 'book-open-variant';
+              iconName = 'book-open-variant'; // Keep filled if preferred
               break;
             case 'Quizzes':
-              iconName = 'help-circle';
+              iconName = 'help-circle-outline';
               break;
             case 'Exams':
-              iconName = 'certificate';
+              iconName = 'certificate-outline';
               break;
             case 'Settings':
-              iconName = 'cog';
+              iconName = 'cog-outline';
               break;
           }
-
+  
           return <Icon name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.onSurfaceDisabled,
+        tabBarActiveTintColor: theme.colors.primary, // Uses Paper theme primary
+        tabBarInactiveTintColor: theme.colors.onSurfaceDisabled, // Uses Paper theme disabled color (ensure this key exists in your merged themes)
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '500',
           marginBottom: 2,
         },
         tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 0,
-          elevation: 8,
-          height: 60,
-          paddingTop: 8,
+          backgroundColor: theme.colors.surface, // Uses Paper theme surface (adapts to dark/light)
+          borderTopWidth: isDarkMode ? StyleSheet.hairlineWidth : 0, // Add subtle border ONLY in dark mode
+          borderTopColor: (theme.colors as unknown as MD3Colors).border, // Use theme border color (ensure 'border' key exists)
+          elevation: 8, // Keep elevation for Android shadow
+          height: 60, // Adjust as needed
+          paddingTop: 8, // Adjust as needed
+          // Add shadow for iOS if needed (often handled by elevation on Android)
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -1 }, // Shadow upwards
+          shadowOpacity: isDarkMode ? 0.3 : 0.1, // Adjust opacity for dark/light
+          shadowRadius: 3,
         },
-        headerShown: false,
+        headerShown: false, // Keep headers hidden as stacks manage them
       })}
     >
+      {/* --- Tab Screens --- */}
       <Tab.Screen
         name="Dashboard"
         component={DashboardStackNavigator}
@@ -155,8 +157,10 @@ const TabNavigator = () => {
       <Tab.Screen
         name="Settings"
         component={SettingsStackNavigator}
-        options={{ title: 'Profile' }}
+        // Changed title to 'Profile' as it includes ProfileScreen & Certs
+        options={{ title: 'Settings' }}
       />
+      {/* --- End Tab Screens --- */}
     </Tab.Navigator>
   );
 };

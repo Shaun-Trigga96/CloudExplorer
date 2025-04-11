@@ -72,7 +72,6 @@ const ProfileScreen: FC = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const { isDarkMode } = useTheme();
   const colors = isDarkMode ? darkColors : lightColors; // Use theme colors
-
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [uploading, setUploading] = useState<boolean>(false);
@@ -443,7 +442,7 @@ const ProfileScreen: FC = () => {
           </Animated.View>
 
            {/* --- Optional: Add other sections like Settings, Logout etc. --- */}
-           {/*
+           
            <Animated.View entering={FadeInUp.duration(600).delay(200)}>
              <TouchableOpacity style={[styles.listItem, { backgroundColor: colors.surface }]}>
                <Icon name="settings" size={20} color={colors.textSecondary} />
@@ -455,7 +454,7 @@ const ProfileScreen: FC = () => {
                <Text style={[styles.listItemText, { color: colors.error }]}>Logout</Text>
              </TouchableOpacity>
            </Animated.View>
-           */}
+          
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -619,7 +618,7 @@ const styles = StyleSheet.create({
       textAlign: 'center',
   },
   // --- Optional List Item Styles ---
-  /*
+  
   listItem: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -634,7 +633,6 @@ const styles = StyleSheet.create({
       marginLeft: 16,
       fontSize: 17,
   },
-  */
 });
 
 export default ProfileScreen;

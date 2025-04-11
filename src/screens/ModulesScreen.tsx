@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { SVGProps, useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Card, Title, Paragraph, Button, ProgressBar, Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
@@ -13,8 +13,44 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError } from 'axios';
 import { REACT_APP_BASE_URL } from '@env';
+import { useTheme } from '../context/ThemeContext'; // Import useTheme
 
 const BASE_URL = REACT_APP_BASE_URL;
+
+// --- Define Theme Colors (Matching other screens) ---
+const lightColors = {
+  background: '#F0F2F5', // Lighter grey background
+  surface: '#FFFFFF', // Card background
+  primary: '#007AFF', // Example primary blue
+  text: '#1C1C1E', // Dark text
+  textSecondary: '#6E6E73', // Grey text
+  border: '#D1D1D6',
+  error: '#FF3B30',
+  success: '#34C759', // Green for completed
+  warning: '#FFC107', // Yellow/Orange for in-progress
+  progressBarBackground: '#e0e0e0', // Light grey for progress bar base
+  buttonPrimaryBackground: '#007AFF',
+  buttonCompletedBackground: '#34C759', // Green button for completed
+  buttonText: '#FFFFFF',
+};
+
+const darkColors = {
+  background: '#000000', // Black background
+  surface: '#1C1C1E', // Dark grey card background
+  primary: '#0A84FF', // Brighter blue for dark mode
+  text: '#FFFFFF', // White text
+  textSecondary: '#8E8E93', // Lighter grey text
+  border: '#3A3A3C',
+  error: '#FF453A',
+  success: '#32D74B', // Brighter green for dark mode
+  warning: '#FFD60A', // Brighter yellow/orange for dark mode
+  progressBarBackground: '#3A3A3C', // Darker grey for progress bar base
+  buttonPrimaryBackground: '#0A84FF',
+  buttonCompletedBackground: '#32D74B', // Brighter green button
+  buttonText: '#FFFFFF',
+};
+// --- End Theme Colors ---
+
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'ModuleDetail'>;
 
@@ -28,7 +64,7 @@ interface ApiModule {
   id: string;
   title: string;
   description: string;
-  icon: React.FC;
+  icon: React.FC; // Keep this, we'll handle fill later
 }
 
 interface UserProgressResponse {
@@ -37,7 +73,7 @@ interface UserProgressResponse {
 }
 
 // Define the icon map for the modules
-const iconMap: { [key: string]: React.FC } = {
+const iconMap: { [key: string]: React.FC } = { // Added SVGProps type
   'cloud-storage': CloudStorageIcon,
   'compute-engine': ComputeEngineIcon,
   'cloud-functions': CloudFunctionsIcon,
@@ -48,6 +84,9 @@ const iconMap: { [key: string]: React.FC } = {
 
 const ModulesScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { isDarkMode } = useTheme(); // Get theme state
+  const colors = isDarkMode ? darkColors : lightColors; // Select color palette
+
   const [moduleProgress, setModuleProgress] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [availableModules, setAvailableModules] = useState<ApiModule[]>([]);
@@ -73,8 +112,8 @@ const ModulesScreen = () => {
       if (modulesResponse.data) {
         if (Array.isArray(modulesResponse.data)) {
           fetchedModules = modulesResponse.data;
-        } else if (modulesResponse.data.modules && Array.isArray(modulesResponse.data.modules)) {
-          fetchedModules = modulesResponse.data.modules;
+        } else if ((modulesResponse.data as any).modules && Array.isArray((modulesResponse.data as any).modules)) {
+          fetchedModules = (modulesResponse.data as any).modules;
         } else {
           console.warn('fetchUserProgress: Invalid modules response format.');
           fetchedModules = [];
@@ -152,32 +191,39 @@ const ModulesScreen = () => {
 
     navigation.navigate('ModuleDetail', { moduleId });
 
-    try {
-      await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, {
-        resourceType: 'module',
-        resourceId: moduleId,
-        action: 'start',
-      });
-      console.log(
-        `handleStartLearning: Successfully marked module ${moduleId} as started for user ${userId}`,
-      );
-      fetchUserProgress(); // Refresh progress after starting the module
-    } catch (error) {
-      console.error(
-        `handleStartLearning: Error starting module ${moduleId} for user ${userId}:`,
-        error,
-      );
-      handleError(error);
+    // Mark as started only if progress is 0
+    if ((moduleProgress[moduleId] ?? 0) === 0) {
+        try {
+          await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, {
+            resourceType: 'module',
+            resourceId: moduleId,
+            action: 'start',
+          });
+          console.log(
+            `handleStartLearning: Successfully marked module ${moduleId} as started for user ${userId}`,
+          );
+          // Optimistically update local progress state for immediate feedback
+          setModuleProgress(prev => ({ ...prev, [moduleId]: 0.25 }));
+          // Optionally refetch, but optimistic update is faster UX
+          // fetchUserProgress();
+        } catch (error) {
+          console.error(
+            `handleStartLearning: Error starting module ${moduleId} for user ${userId}:`,
+            error,
+          );
+          handleError(error);
+        }
     }
   };
 
+  // Use theme colors for progress
   const getProgressColor = (progress: number) => {
     if (progress === 1) {
-      return '#4CAF50';
+      return colors.success; // Use theme success color
     } else if (progress > 0) {
-      return '#FFC107';
+      return colors.warning; // Use theme warning color
     } else {
-      return '#e0e0e0';
+      return colors.progressBarBackground; // Use theme progress bar background
     }
   };
 
@@ -221,46 +267,73 @@ const ModulesScreen = () => {
     setError(err.message || 'An unexpected error occurred');
   };
 
+  // --- Loading State ---
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6200ee" />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
+  // --- Error State ---
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
+      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+        {/* Optional: Add a retry button */}
+        <Button
+          mode="contained"
+          onPress={fetchUserProgress}
+          style={{ backgroundColor: colors.primary }}
+          labelStyle={{ color: colors.buttonText }}
+        >
+          Retry
+        </Button>
       </View>
     );
   }
 
+  // --- Main Content ---
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {availableModules.map((apiModule) => {
         const IconComponent = iconMap[apiModule.id] || CloudGenericIcon;
         const progress = moduleProgress[apiModule.id] ?? 0;
         const progressColor = getProgressColor(progress);
         const buttonLabel = getButtonLabel(progress);
+        const isCompleted = progress === 1;
+        const buttonBackgroundColor = isCompleted
+            ? colors.buttonCompletedBackground
+            : colors.buttonPrimaryBackground;
 
         return (
-          <Card key={apiModule.id} style={styles.card}>
+          <Card
+            key={apiModule.id}
+            style={[
+                styles.card,
+                {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    borderWidth: isDarkMode ? 1 : 0, // Add border in dark mode
+                }
+            ]}
+          >
             <Card.Content>
               <View style={styles.headerRow}>
                 <View style={styles.icon}>
-                  <IconComponent />
+                  {/* Pass fill color to SVG */}
+                  <IconComponent fill={colors.primary} width={30} height={30} {...(IconComponent as React.ComponentProps<typeof IconComponent>) as SVGProps<SVGSVGElement>} />
                 </View>
-                <Title style={styles.title}>{apiModule.title}</Title>
+                <Title style={[styles.title, { color: colors.text }]}>{apiModule.title}</Title>
               </View>
-              <Paragraph>{apiModule.description}</Paragraph>
+              <Paragraph style={{ color: colors.textSecondary }}>{apiModule.description}</Paragraph>
               <ProgressBar
                 progress={progress}
                 color={progressColor}
-                style={styles.progressBar}
+                style={[styles.progressBar, { backgroundColor: colors.progressBarBackground }]} // Apply background color
               />
-              <Paragraph style={styles.percentageText}>
+              <Paragraph style={[styles.percentageText, { color: colors.textSecondary }]}>
                 {`${(progress * 100).toFixed(0)}%`}
               </Paragraph>
             </Card.Content>
@@ -268,9 +341,8 @@ const ModulesScreen = () => {
               <Button
                 mode="contained"
                 onPress={() => handleStartLearning(apiModule.id)}
-                style={
-                  buttonLabel === 'Review Module' ? styles.completedButton : {}
-                }
+                style={{ backgroundColor: buttonBackgroundColor }} // Use dynamic background
+                labelStyle={{ color: colors.buttonText }} // Use theme button text color
               >
                 {buttonLabel}
               </Button>
@@ -282,14 +354,24 @@ const ModulesScreen = () => {
   );
 };
 
+// --- Updated Styles ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    // backgroundColor applied dynamically
   },
   card: {
     marginBottom: 16,
+    borderRadius: 18, // Match other screens
+    overflow: 'hidden',
+    // backgroundColor, borderColor, borderWidth applied dynamically
+    // Shadows for light mode (subtle)
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 8, // Keep elevation for Android
   },
   headerRow: {
     flexDirection: 'row',
@@ -297,39 +379,50 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   icon: {
-    marginRight: 8,
+    marginRight: 12, // Increased margin
+    width: 30, // Match icon size
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     marginLeft: 8,
+    flex: 1, // Allow title to take remaining space
+    // color applied dynamically
   },
   progressBar: {
-    height: 6,
-    marginTop: 8,
-    backgroundColor: '#e0e0e0',
+    height: 8, // Slightly thicker progress bar
+    marginTop: 12, // Increased margin
+    borderRadius: 4,
+    // backgroundColor applied dynamically
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    // backgroundColor applied dynamically
   },
   percentageText: {
-    marginTop: 4,
+    marginTop: 6, // Adjusted margin
     fontSize: 12,
-    color: '#666',
+    // color applied dynamically
+    alignSelf: 'flex-end', // Align percentage to the right
   },
-  completedButton: {
-    backgroundColor: '#4CAF50',
-  },
+  // completedButton style removed, handled inline now
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    // backgroundColor applied dynamically
   },
   errorText: {
-    color: 'red',
     textAlign: 'center',
+    marginBottom: 16,
+    fontSize: 16,
+    // color applied dynamically
   },
+  // Button styles are handled inline using theme colors
 });
 
 export default ModulesScreen;

@@ -1,19 +1,56 @@
+// c:\Users\thabi\Desktop\CloudExplorer\src\screens\ModuleDetailScreen.tsx
 import React, { useEffect, useState, useRef } from 'react';
 import { View, ScrollView, StyleSheet, Text, Animated, TouchableOpacity } from 'react-native';
 import axios from 'axios';
 import Markdown from 'react-native-markdown-display';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Button } from 'react-native-paper';
+import { Button, ActivityIndicator } from 'react-native-paper'; // Added ActivityIndicator
 import iconMap from '../utils/iconMap';
 import {REACT_APP_BASE_URL} from '@env';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme as useCustomTheme } from '../context/ThemeContext'; // Import your custom theme hook
 
-const BASE_URL = REACT_APP_BASE_URL; 
+const BASE_URL = REACT_APP_BASE_URL;
 
 type QuizzesScreenNavigationProp = StackNavigationProp<RootStackParamList, 'QuizzesDetail'>;
 
+// --- Define Theme Colors (Matching other screens) ---
+const lightColors = {
+  background: '#F0F2F5',
+  surface: '#FFFFFF',
+  primary: '#007AFF',
+  text: '#1C1C1E',
+  textSecondary: '#6E6E73',
+  border: '#D1D1D6',
+  error: '#FF3B30',
+  success: '#34C759', // Green for read section border
+  disabledButtonBackground: '#A0A0A0', // Grey for disabled button
+  buttonText: '#FFFFFF',
+  markdownCodeBackground: '#f5f5f5',
+  markAsReadBackground: '#e8f0fe',
+  markAsReadText: '#1a73e8',
+  bottomBarBackground: 'rgba(255, 255, 255, 0.9)',
+};
+
+const darkColors = {
+  background: '#000000',
+  surface: '#1C1C1E',
+  primary: '#0A84FF',
+  text: '#FFFFFF',
+  textSecondary: '#8E8E93',
+  border: '#3A3A3C',
+  error: '#FF453A',
+  success: '#32D74B', // Brighter green
+  disabledButtonBackground: '#555555', // Darker grey for disabled button
+  buttonText: '#FFFFFF',
+  markdownCodeBackground: '#2C2C2E',
+  markAsReadBackground: '#2C2C2E', // Use a dark background
+  markAsReadText: '#0A84FF', // Use primary blue text
+  bottomBarBackground: 'rgba(26, 26, 26, 0.9)', // Dark translucent
+};
+// --- End Theme Colors ---
 
 interface Answer {
   letter: string;
@@ -59,10 +96,89 @@ const useIsContentRead = (sectionRefs: React.RefObject<View>[]) => {
   return { sectionsRead, markSectionAsRead, allContentRead };
 };
 
-const preprocessMarkdownWithIcons = (content: string) => {
+// Function to create dynamic markdown styles
+const createMarkdownStyles = (colors: typeof lightColors | typeof darkColors) => StyleSheet.create({
+  body: {
+    fontSize: 16,
+    color: colors.text,
+    lineHeight: 24,
+    fontFamily: 'System',
+  },
+  heading1: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.primary,
+    marginTop: 20,
+    marginBottom: 10,
+    fontFamily: 'System',
+  },
+  heading2: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.text,
+    marginTop: 15,
+    marginBottom: 8,
+    fontFamily: 'System',
+  },
+  heading3: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginTop: 12,
+    marginBottom: 6,
+    fontFamily: 'System',
+  },
+  paragraph: {
+    marginBottom: 16,
+    lineHeight: 24, // Keep line height consistent
+    color: colors.text, // Ensure paragraph text uses theme color
+  },
+  list_item: {
+    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    color: colors.text, // Ensure list item text uses theme color
+  },
+  bullet_list: {
+    marginBottom: 16,
+    paddingLeft: 10,
+  },
+  code_block: {
+    backgroundColor: colors.markdownCodeBackground,
+    padding: 12,
+    borderRadius: 8,
+    fontFamily: 'monospace',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1, // Shadow might need adjustment for dark mode
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  iconContainer: {
+    marginRight: 12,
+    marginVertical: 8,
+    alignItems: 'center',
+  },
+  iconFallback: {
+    fontSize: 14,
+    color: colors.error,
+    marginVertical: 8,
+    fontFamily: 'System',
+  },
+  text: {
+    fontSize: 16,
+    color: colors.text,
+    lineHeight: 24,
+    fontFamily: 'System',
+  },
+});
+
+const preprocessMarkdownWithIcons = (content: string, colors: typeof lightColors | typeof darkColors) => {
   const iconRegex = /!\[icon:([a-zA-Z0-9-_]+)\]/g;
   let modifiedContent = content;
   const replacements: { placeholder: string; component: JSX.Element }[] = [];
+  const themedMarkdownStyles = createMarkdownStyles(colors); // Use themed styles
 
   let match;
   let index = 0;
@@ -74,8 +190,8 @@ const preprocessMarkdownWithIcons = (content: string) => {
       replacements.push({
         placeholder,
         component: (
-          <View key={placeholder} style={markdownStyles.iconContainer}>
-            <IconComponent width={80} height={80} fill="#1a73e8" />
+          <View key={placeholder} style={themedMarkdownStyles.iconContainer}>
+            <IconComponent width={80} height={80} fill={colors.primary} /> {/* Use theme primary color */}
           </View>
         ),
       });
@@ -83,7 +199,7 @@ const preprocessMarkdownWithIcons = (content: string) => {
       replacements.push({
         placeholder,
         component: (
-          <Text key={placeholder} style={markdownStyles.iconFallback}>
+          <Text key={placeholder} style={themedMarkdownStyles.iconFallback}>
             [Icon not found: {iconName}]
           </Text>
         ),
@@ -98,6 +214,9 @@ const preprocessMarkdownWithIcons = (content: string) => {
 
 const ModuleDetailScreen = ({ route }: { route: any, navigation: any }) => {
   const navigation = useNavigation<QuizzesScreenNavigationProp>();
+  const { isDarkMode } = useCustomTheme(); // Use your custom theme hook
+  const colors = isDarkMode ? darkColors : lightColors; // Select color palette
+
   const { moduleId } = route.params;
   const [module, setModule] = useState<any>(null);
   const [sections, setSections] = useState<any[]>([]);
@@ -105,6 +224,7 @@ const ModuleDetailScreen = ({ route }: { route: any, navigation: any }) => {
   const fadeAnim = useState(new Animated.Value(0))[0];
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true); // Added state for initial fetch loading
 
   const sectionRefs = useRef<React.RefObject<View>[]>([]);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -124,6 +244,7 @@ const ModuleDetailScreen = ({ route }: { route: any, navigation: any }) => {
 
   useEffect(() => {
     const fetchModuleData = async () => {
+      setIsFetching(true); // Start fetching
       try {
         const moduleUrl = `${BASE_URL}/api/v1/modules/${moduleId}`; // Corrected URL
         console.log(`Attempting to fetch module from: ${moduleUrl}`);
@@ -155,7 +276,9 @@ const ModuleDetailScreen = ({ route }: { route: any, navigation: any }) => {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
-    }).start();
+    }).start(() => {
+      setIsFetching(false); // Stop fetching animation after fade-in
+    });
   }, [moduleId, fadeAnim]);
 
   const handleScroll = ({ nativeEvent }: { nativeEvent: any }) => {
@@ -213,24 +336,31 @@ const ModuleDetailScreen = ({ route }: { route: any, navigation: any }) => {
     }
   };
 
+  // --- Loading and Error States ---
+  if (isFetching) { // Show loading indicator during initial fetch
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Module...</Text>
+      </View>
+    );
+  }
+
   if (error) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>{error}</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+        {/* Optional: Add a retry button */}
       </View>
     );
   }
 
-  if (!module) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
-  }
+  // --- Main Content ---
+  // Create dynamic markdown styles based on theme
+  const themedMarkdownStyles = createMarkdownStyles(colors);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
@@ -238,15 +368,16 @@ const ModuleDetailScreen = ({ route }: { route: any, navigation: any }) => {
         onScroll={handleScroll}
         scrollEventThrottle={400}
       >
-        <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-          <Text style={styles.title}>{module.title || 'No title'}</Text>
-          <Text style={styles.description}>{module.description || 'No description'}</Text>
+        <Animated.View style={[styles.header, { opacity: fadeAnim, backgroundColor: colors.surface }]}>
+          <Text style={[styles.title, { color: colors.text }]}>{module?.title || 'No title'}</Text>
+          <Text style={[styles.description, { color: colors.textSecondary }]}>{module?.description || 'No description'}</Text>
         </Animated.View>
 
         {sections && sections.length > 0 ? (
           sections.map((section, sectionIndex) => {
             const { modifiedContent, replacements } = preprocessMarkdownWithIcons(
-              section.content || 'No content available'
+              section.content || 'No content available',
+              colors // Pass colors to the preprocessor
             );
 
             const segments = modifiedContent.split(/(?:__ICON_\d+__)/g);
@@ -256,60 +387,66 @@ const ModuleDetailScreen = ({ route }: { route: any, navigation: any }) => {
             segments.forEach((segment, i) => {
               if (segment) {
                 renderedContent.push(
-                  <Markdown key={`text-${i}`} style={markdownStyles}>
+                  <Markdown key={`text-${i}`} style={themedMarkdownStyles}>
                     {segment}
                   </Markdown>
                 );
               }
               if (replacementIndex < replacements.length) {
                 const replacement = replacements[replacementIndex];
+                // Check if the placeholder exists in the original modified content before adding
                 if (modifiedContent.includes(replacement.placeholder)) {
-                  renderedContent.push(replacement.component);
-                  replacementIndex++;
+                    renderedContent.push(replacement.component);
+                    replacementIndex++;
                 }
               }
             });
 
             const sectionStyle = [
               styles.sectionCard,
-              { opacity: fadeAnim },
-              sectionsRead[sectionIndex] ? styles.readSection : {},
+              {
+                opacity: fadeAnim,
+                backgroundColor: colors.surface,
+                borderColor: colors.border, // Add border color
+                borderWidth: isDarkMode ? 1 : 0, // Add border in dark mode
+              },
+              sectionsRead[sectionIndex] ? [styles.readSection, { borderLeftColor: colors.success }] : {},
             ];
 
             return (
               <Animated.View
                 key={section.id}
                 style={sectionStyle}
-                ref={sectionRefs.current[sectionIndex]}
-              >
+                ref={sectionRefs.current[sectionIndex]}>
                 {renderedContent}
-                {!sectionsRead[sectionIndex] && (
-                  <TouchableOpacity
-                    style={styles.markAsReadButton}
-                    onPress={() => markSectionAsRead(sectionIndex)}
-                  >
-                    <Text style={styles.markAsReadText}>Mark as read</Text>
-                  </TouchableOpacity>
-                )}
               </Animated.View>
             );
           })
         ) : (
-          <Animated.View style={[styles.sectionCard, { opacity: fadeAnim }]}>
-            <Text style={styles.noContent}>No content available</Text>
+          <Animated.View style={[styles.sectionCard, { opacity: fadeAnim, backgroundColor: colors.surface }]}>
+            <Text style={[styles.noContent, { color: colors.textSecondary }]}>No content available</Text>
           </Animated.View>
         )}
       </ScrollView>
 
-      <View style={styles.completeButtonContainer}>
+      <View style={[
+          styles.completeButtonContainer,
+          { backgroundColor: colors.bottomBarBackground, borderTopColor: colors.border }
+      ]}>
         <Button
+          textColor={colors.buttonText} // Ensure text color contrasts with button background
           mode="contained"
           onPress={handleModuleCompletion}
           loading={isLoading}
           disabled={!allContentRead || isLoading}
           style={allContentRead ? styles.completeButton : styles.disabledButton}
+          buttonColor={allContentRead ? colors.primary : colors.disabledButtonBackground} // Use theme colors for button background
         >
-          {allContentRead ? 'Complete & Continue to Quiz' : 'Please read all content'}
+          {isLoading
+            ? 'Saving...'
+            : allContentRead
+            ? 'Complete & Continue to Quiz'
+            : 'Please read all content'}
         </Button>
       </View>
     </View>
@@ -319,17 +456,17 @@ const ModuleDetailScreen = ({ route }: { route: any, navigation: any }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f2f5',
+    // backgroundColor applied dynamically
   },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
     padding: 20,
-    paddingBottom: 80,
+    paddingBottom: 80, // Space for the bottom button
   },
   header: {
-    backgroundColor: '#ffffff',
+    // backgroundColor applied dynamically
     borderRadius: 15,
     padding: 20,
     marginBottom: 20,
@@ -342,18 +479,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#202124',
+    // color applied dynamically
     marginBottom: 10,
     fontFamily: 'System',
   },
   description: {
     fontSize: 16,
-    color: '#5f6368',
+    // color applied dynamically
     lineHeight: 22,
     fontFamily: 'System',
   },
   sectionCard: {
-    backgroundColor: '#ffffff',
+    // backgroundColor applied dynamically
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
@@ -362,28 +499,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 3,
+    // borderColor and borderWidth applied dynamically
   },
   readSection: {
     borderLeftWidth: 4,
-    borderLeftColor: '#34a853',
+    // borderLeftColor applied dynamically
   },
   noContent: {
     fontSize: 16,
-    color: '#5f6368',
+    // color applied dynamically
     textAlign: 'center',
     padding: 20,
     fontFamily: 'System',
   },
   loadingText: {
     fontSize: 18,
-    color: '#5f6368',
+    // color applied dynamically
     textAlign: 'center',
     padding: 20,
     fontFamily: 'System',
   },
   errorText: {
     fontSize: 16,
-    color: '#d93025',
+    // color applied dynamically
     textAlign: 'center',
     padding: 20,
     fontFamily: 'System',
@@ -392,13 +530,13 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#e8f0fe',
+    // backgroundColor applied dynamically
     borderRadius: 20,
     marginTop: 10,
   },
   markAsReadText: {
-    color: '#1a73e8',
     fontSize: 14,
+    // color applied dynamically
     fontWeight: '500',
   },
   completeButtonContainer: {
@@ -406,92 +544,25 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    // backgroundColor applied dynamically
     padding: 15,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    // borderTopColor applied dynamically
   },
   completeButton: {
-    backgroundColor: '#1a73e8',
+    // backgroundColor applied dynamically via buttonColor prop
   },
   disabledButton: {
-    backgroundColor: '#9aa0a6',
+    // backgroundColor applied dynamically via buttonColor prop
+  },
+  loadingContainer: { // Added for initial fetch loading
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // backgroundColor applied dynamically
   },
 });
 
-const markdownStyles = StyleSheet.create({
-  body: {
-    fontSize: 16,
-    color: '#202124',
-    lineHeight: 24,
-    fontFamily: 'System',
-  },
-  heading1: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1a73e8',
-    marginTop: 20,
-    marginBottom: 10,
-    fontFamily: 'System',
-  },
-  heading2: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#202124',
-    marginTop: 15,
-    marginBottom: 8,
-    fontFamily: 'System',
-  },
-  heading3: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#5f6368',
-    marginTop: 12,
-    marginBottom: 6,
-    fontFamily: 'System',
-  },
-  paragraph: {
-    marginBottom: 16,
-    lineHeight: 24,
-  },
-  list_item: {
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  bullet_list: {
-    marginBottom: 16,
-    paddingLeft: 10,
-  },
-  code_block: {
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 8,
-    fontFamily: 'monospace',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  iconContainer: {
-    marginRight: 12,
-    marginVertical: 8,
-    alignItems: 'center',
-  },
-  iconFallback: {
-    fontSize: 14,
-    color: '#d93025',
-    marginVertical: 8,
-    fontFamily: 'System',
-  },
-  text: {
-    fontSize: 16,
-    color: '#202124',
-    lineHeight: 24,
-    fontFamily: 'System',
-  },
-});
+// Markdown styles are now created dynamically by createMarkdownStyles function
 
 export default ModuleDetailScreen;

@@ -20,8 +20,39 @@ import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
 import strings from '../localization/strings';
+import { useTheme } from '../context/ThemeContext'; // Import useTheme
 
 const BASE_URL = REACT_APP_BASE_URL;
+
+// --- Define Theme Colors (Matching other screens) ---
+const lightColors = {
+  background: '#F0F2F5', // Lighter grey background
+  surface: '#FFFFFF', // Card background
+  primary: '#007AFF', // Example primary blue
+  text: '#1C1C1E', // Dark text
+  textSecondary: '#6E6E73', // Grey text
+  border: '#D1D1D6',
+  error: '#FF3B30',
+  success: '#34C759', // Green for completed
+  buttonPrimaryBackground: '#007AFF',
+  buttonCompletedBackground: '#34C759', // Green button for completed
+  buttonText: '#FFFFFF',
+};
+
+const darkColors = {
+  background: '#000000', // Black background
+  surface: '#1C1C1E', // Dark grey card background
+  primary: '#0A84FF', // Brighter blue for dark mode
+  text: '#FFFFFF', // White text
+  textSecondary: '#8E8E93', // Lighter grey text
+  border: '#3A3A3C',
+  error: '#FF453A',
+  success: '#32D74B', // Brighter green for dark mode
+  buttonPrimaryBackground: '#0A84FF',
+  buttonCompletedBackground: '#32D74B', // Brighter green button
+  buttonText: '#FFFFFF',
+};
+// --- End Theme Colors ---
 
 interface Quiz {
   id: string;
@@ -65,6 +96,9 @@ type NavigationProp = StackNavigationProp<RootStackParamList, 'QuizzesDetail'>;
 
 const QuizzesScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { isDarkMode } = useTheme(); // Get theme state
+  const colors = isDarkMode ? darkColors : lightColors; // Select color palette
+
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,10 +107,10 @@ const QuizzesScreen = () => {
   const fetchUserProgress = async () => {
     setLoading(true);
     setError(null);
-    
+
     const userId = await AsyncStorage.getItem('userId');
     console.log('fetchUserProgress: User ID:', userId);
-    
+
     if (!userId) {
       Alert.alert('Error', 'User ID not found. Please log in again.');
       setLoading(false);
@@ -102,7 +136,7 @@ const QuizzesScreen = () => {
         console.warn('fetchUserProgress: Invalid quizzes response format.');
         fetchedQuizzes = [];
       }
-      
+
       setQuizzes(fetchedQuizzes);
 
       // Fetch user progress
@@ -121,7 +155,7 @@ const QuizzesScreen = () => {
           const hasCompletedQuiz = learningData.completedQuizzes?.some(
             (completedQuiz) => completedQuiz.moduleId === moduleId,
           );
-          
+
           console.log(`fetchUserProgress: Quiz ModuleID: ${moduleId}, hasCompletedQuiz: ${hasCompletedQuiz}`);
           progress[moduleId] = !!hasCompletedQuiz;
         });
@@ -176,7 +210,7 @@ const QuizzesScreen = () => {
     console.log(
       `handleStartQuiz: Attempting to start quiz for module ${moduleId} for user ${userId}`,
     );
-    
+
     if (!userId) {
       Alert.alert('Error', 'User ID not found. Cannot start quiz.');
       return;
@@ -209,50 +243,74 @@ const QuizzesScreen = () => {
     return quizProgress[moduleId] ? 'Review Quiz' : 'Start Quiz';
   };
 
-  const getButtonStyle = (moduleId: string) => {
-    return quizProgress[moduleId] ? styles.completedButton : {};
-  };
-
+  // --- Loading State ---
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6200ee" />
-        <Text>{strings.loadingQuizzes || 'Loading...'}</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          {strings.loadingQuizzes || 'Loading...'}
+        </Text>
       </View>
     );
   }
 
+  // --- Error State ---
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{String(error)}</Text>
+      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.error }]}>{String(error)}</Text>
+        {/* Optional: Add a retry button */}
+        <Button
+          mode="contained"
+          onPress={fetchUserProgress}
+          style={{ backgroundColor: colors.primary }}
+          labelStyle={{ color: colors.buttonText }}
+        >
+          Retry
+        </Button>
       </View>
     );
   }
 
+  // --- Main Content ---
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {quizzes.length > 0 ? (
         quizzes.map(quiz => {
           const Icon = quiz.icon;
+          const isCompleted = quizProgress[quiz.moduleId];
           const buttonLabel = getButtonLabel(quiz.moduleId);
-          const buttonStyle = getButtonStyle(quiz.moduleId);
-          
+          const buttonBackgroundColor = isCompleted
+            ? colors.buttonCompletedBackground
+            : colors.buttonPrimaryBackground;
+
           return (
-            <Card key={quiz.id} style={styles.card}>
+            <Card
+              key={quiz.id}
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  borderWidth: isDarkMode ? 1 : 0, // Add border in dark mode
+                }
+              ]}
+            >
               <Card.Content>
                 <View style={styles.headerRow}>
                   <View style={styles.iconContainer}>
-                    {Icon && <Icon />}
+                    {/* Apply theme color to SVG icon if possible, or ensure SVG itself adapts */}
+                    {Icon && <Icon width={34} height={34} {...(Icon as React.SVGProps<SVGSVGElement>)} />}
                   </View>
-                  <Title style={styles.title}>{String(quiz.title)}</Title>
+                  <Title style={[styles.title, { color: colors.text }]}>{String(quiz.title)}</Title>
                 </View>
-                <Paragraph>{String(quiz.description)}</Paragraph>
-                <Paragraph style={styles.questionCount}>
+                <Paragraph style={{ color: colors.textSecondary }}>{String(quiz.description)}</Paragraph>
+                <Paragraph style={[styles.questionCount, { color: colors.textSecondary }]}>
                   {`${quiz.questionCount} ${strings.questionsSuffix || 'Questions'}`}
                 </Paragraph>
-                {quizProgress[quiz.moduleId] && (
-                  <Paragraph style={styles.completedText}>
+                {isCompleted && (
+                  <Paragraph style={[styles.completedText, { color: colors.success }]}>
                     Completed
                   </Paragraph>
                 )}
@@ -261,7 +319,8 @@ const QuizzesScreen = () => {
                 <Button
                   mode="contained"
                   onPress={() => handleStartQuiz(quiz.moduleId)}
-                  style={buttonStyle}
+                  style={{ backgroundColor: buttonBackgroundColor }}
+                  labelStyle={{ color: colors.buttonText }}
                 >
                   {buttonLabel}
                 </Button>
@@ -271,70 +330,90 @@ const QuizzesScreen = () => {
         })
       ) : (
         <View style={styles.noQuizzesContainer}>
-          <Text>No quizzes available</Text>
+          <Text style={{ color: colors.textSecondary }}>No quizzes available</Text>
         </View>
       )}
     </ScrollView>
   );
 };
 
+// --- Updated Styles ---
 const styles = StyleSheet.create({
-  iconContainer: {
-    marginRight: 12,
-    width: 34,
-    height: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    marginLeft: 8,
-  },
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    // backgroundColor applied dynamically
   },
   card: {
     marginBottom: 16,
+    borderRadius: 18, // Match other screens
+    overflow: 'hidden',
+    // backgroundColor, borderColor, borderWidth applied dynamically
+    // Shadows for light mode (subtle)
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
+    elevation: 8, // Keep elevation for Android
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
   },
+  iconContainer: {
+    marginRight: 12,
+    width: 34, // Keep size consistent
+    height: 34,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    marginLeft: 8,
+    flex: 1, // Allow title to take remaining space
+    // color applied dynamically
+  },
   questionCount: {
     marginTop: 8,
-    color: '#666',
+    // color applied dynamically
   },
   completedText: {
     marginTop: 4,
-    color: '#4CAF50',
     fontWeight: 'bold',
+    // color applied dynamically (using success color)
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    // backgroundColor applied dynamically
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    // color applied dynamically
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    // backgroundColor applied dynamically
   },
   errorText: {
-    color: 'red',
     textAlign: 'center',
+    marginBottom: 16,
+    fontSize: 16,
+    // color applied dynamically
   },
   noQuizzesContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    marginTop: 50, // Add some margin to center it better visually
   },
-  completedButton: {
-    backgroundColor: '#4CAF50',
-  },
+  // Button styles are handled inline using theme colors
 });
 
 export default QuizzesScreen;
