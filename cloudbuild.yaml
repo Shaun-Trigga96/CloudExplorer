@@ -27,23 +27,24 @@ steps:
     args: ['run', 'lint'] # Assumes 'lint' script passes
     dir: 'functions' # Run in functions directory
 
-  # Fixed Firebase deployment step with proper authentication
+  # Deploy Firebase Functions with Service Account Key
   - name: 'node:20'
     id: 'deploy-firebase-functions'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Install Firebase CLI
+        # Install Firebase CLI globally
         npm install -g firebase-tools
-        
-        # Use the provided token for authentication (explicitly pass project)
+
+        # Deploy Firebase functions using the service account key
         firebase deploy --only functions \
-          --project $PROJECT_ID \
-          --token "$_FIREBASE_TOKEN" \
+          --project "$PROJECT_ID" \
           --non-interactive
     env:
-      - 'CLOUDSDK_CORE_PROJECT=$PROJECT_ID'
+      - 'GOOGLE_APPLICATION_CREDENTIALS=/workspace/firebase-admin-key.json'
+    secretEnv:
+      - '_FIREBASE_TOKEN'
 
   # 3. Build and push backend container (Corrected Paths)
   - name: 'gcr.io/cloud-builders/docker'
