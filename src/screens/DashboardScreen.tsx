@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
+  ImageSourcePropType,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
@@ -17,16 +18,9 @@ import Animated, {FadeIn} from 'react-native-reanimated';
 import {Button} from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
-import CloudStorageIcon from '../assets/icons/cloud_storage.svg';
-import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
-import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
-import StreamingAnalyticsIcon from '../assets/icons/streaming_analytics.svg';
-import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
 import {REACT_APP_BASE_URL} from '@env';
 import {RootStackParamList} from '../navigation/RootNavigator';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import iconMap from './../utils/iconMap';
 import {useTheme as useCustomTheme} from '../context/ThemeContext'; // Import your custom hook
 import {useTheme as usePaperTheme} from 'react-native-paper'; // Import Paper theme hook
 
@@ -128,8 +122,7 @@ interface ProgressItemProps {
   status: string;
   percentage?: number;
   color: string;
-  icon?: React.FC<React.SVGProps<SVGSVGElement>>;
-  imageIcon?: any; // For Image source
+  imageIcon: ImageSourcePropType;
   isImage?: boolean;
   colors: any;
 }
@@ -247,7 +240,6 @@ const ProgressItem: FC<ProgressItemProps> = ({
   status,
   percentage,
   color,
-  icon: IconComponent,
   imageIcon,
   isImage = false,
   colors,
@@ -263,15 +255,11 @@ const ProgressItem: FC<ProgressItemProps> = ({
           styles.progressIconCircle,
           {backgroundColor: isImage ? 'transparent' : color},
         ]}>
-        {isImage ? (
           <Image
             source={imageIcon}
             style={styles.progressImageIcon}
             resizeMode="contain"
           />
-        ) : (
-          IconComponent && <IconComponent width={20} height={20} />
-        )}
       </View>
       <View style={styles.progressTextContainer}>
         <Text style={[styles.progressTitle, {color: colors.text}]}>
@@ -325,28 +313,30 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
   // Exam icon mapping - matching the ExamsScreen structure
   const examIcons: Record<string, any> = {
     'cloud-digital-leader-exam': require('../assets/images/cloud-digital-leader.png'),
-    'cloud-data-engineer': require('../assets/images/data-engineer.png'),
-    'cloud-architect-exam': require('../assets/images/cloud-architect.png'),
-    'cloud-security-exam': require('../assets/images/security-engineer.png'),
+    // 'cloud-data-engineer': require('../assets/images/data-engineer.png'),
+    // 'cloud-architect-exam': require('../assets/images/cloud-architect.png'),
+    // 'cloud-security-exam': require('../assets/images/security-engineer.png'),
   };
 
   // Exam colors to match the icons
   const examColors: Record<string, string> = {
     'cloud-digital-leader-exam': '#4285F4', // Google Blue
-    'cloud-data-engineer-exam': '#0F9D58', // Google Green
-    'cloud-architect-exam': '#DB4437', // Google Red
-    'cloud-security-engineer-exam': '#F4B400', // Google Yellow
+    // 'cloud-data-engineer-exam': '#0F9D58', // Google Green
+    // 'cloud-architect-exam': '#DB4437', // Google Red
+    // 'cloud-security-engineer-exam': '#F4B400', // Google Yellow
   };
 
-  // Define the icon map for the quizzes
-  const iconMap: {[key: string]: React.FC} = {
-    'cloud-storage': CloudStorageIcon,
-    'compute-engine': ComputeEngineIcon,
-    'cloud-functions': CloudFunctionsIcon,
-    'kubernetes-engine': KubernetesEngineIcon,
-    'cloud-fundamentals': CloudGenericIcon,
-    'data-transformation': StreamingAnalyticsIcon,
-  };
+// Define the icon map for the modules
+const iconMap: { [key: string]: ImageSourcePropType } = {
+  'digital-transformation':  require('../assets/images/digital_transformation.jpeg'),
+  'artificial-intelligence':  require('../assets/images/artificial_intelligence.jpeg'),
+  'infrastructure-application':  require('../assets/images/infrastructure_application.jpeg'),
+  'scailing-operations':  require('../assets/images/scailing_operations.jpeg'),
+  'trust-security':  require('../assets/images/trust_security.jpeg'),
+  'data-transformation':  require('../assets/images/data_transformation.jpeg'),
+  'default': require('../assets/images/cloud_generic.png'), // Add a default
+};
+
 
   // Function to toggle the expanded state of a module
   const toggleModuleExpanded = (moduleId: string) => {
@@ -473,21 +463,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
         setLoading(false);
       }
     };
-
-    const fetchAvailableQuizzes = async () => {
-      try {
-        const response = await axios.get(
-          `${BASE_URL}/api/v1/quizzes/list-quizzes`,
-        );
-        console.log('Available Quizzes API Response:', response.data);
-        setQuizzes(response.data.availableQuizzes);
-      } catch (error) {
-        console.error('Error fetching available quizzes:', error);
-      }
-    };
-
     fetchUserData();
-    fetchAvailableQuizzes(); // Fetch available quizzes
   }, [navigation]);
 
   // Calculate overall progress
@@ -510,55 +486,16 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
       ? Math.round((completedModuleIds.length / totalModules) * 100)
       : 0;
 
-  // Map module IDs to icons, colors, and titles
+  // --- Update getModuleDetails to return imageIcon ---
   const getModuleDetails = (moduleId: string) => {
-    const moduleMap: {
-      [key: string]: {
-        icon: React.FC<React.SVGProps<SVGSVGElement>>;
-        color: string;
-        title: string;
-      };
-    } = {
-      'cloud-fundamentals': {
-        icon: CloudGenericIcon as React.FC<React.SVGProps<SVGSVGElement>>,
-        color: '#0000',
-        title: 'GCP Cloud Fundamentals',
-      },
-      'compute-engine': {
-        icon: ComputeEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>,
-        color: '#0000',
-        title: 'Compute Engine',
-      },
-      'cloud-storage': {
-        icon: CloudStorageIcon as React.FC<React.SVGProps<SVGSVGElement>>,
-        color: '#0000',
-        title: 'Cloud Storage',
-      },
-      'cloud-functions': {
-        icon: CloudFunctionsIcon as React.FC<React.SVGProps<SVGSVGElement>>,
-        color: '#0000',
-        title: 'Cloud Functions',
-      },
-      'kubernetes-engine': {
-        icon: KubernetesEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>,
-        color: '#0000',
-        title: 'Kubernetes Engine',
-      },
-      'data-transformation': {
-        icon: StreamingAnalyticsIcon as React.FC<React.SVGProps<SVGSVGElement>>,
-        color: '#0000',
-        title: 'Data Transformation',
-      },
-    };
-
     const module = modules.find(m => m.id === moduleId);
-    const mapped = moduleMap[moduleId] || {
-      icon: ComputeEngineIcon as React.FC<React.SVGProps<SVGSVGElement>>,
-      color: '#3b82f6',
-      title: module?.title || moduleId,
-    };
-    return {...mapped, title: module?.title || mapped.title};
+    const title = module?.title || moduleId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // Default title formatting
+    const imageIcon = iconMap[moduleId] || iconMap['default']; // Get image source
+    const color = '#3b82f6'; // Keep a default color or map colors if needed
+
+    return { imageIcon, color, title };
   };
+  // --- End Update getModuleDetails ---
 
   // Helper function to format date
   const formatDate = (dateString: string | number | Date) => {
@@ -712,7 +649,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
           </Text>
           {modules.length > 0 ? (
             modules.map(module => {
-              const {icon, color, title} = getModuleDetails(module.id);
+              const {imageIcon, color, title} = getModuleDetails(module.id);
               const isCompleted = completedModuleIds.includes(module.id);
               const isInProgress = progress.some(
                 p => p.moduleId === module.id && p.status === 'in_progress',
@@ -728,7 +665,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
                   title={title}
                   status={status}
                   color={color}
-                  icon={icon}
+                  imageIcon={imageIcon}
                   colors={colors}
                 />
               );
@@ -744,7 +681,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
           </Text>
           {Object.keys(quizzesByModule).length > 0 ? (
             Object.keys(quizzesByModule).map(moduleId => {
-              const {title, color, icon} = getModuleDetails(moduleId);
+              const {title, color, imageIcon} = getModuleDetails(moduleId);
               const moduleQuizzes = quizzesByModule[moduleId] || []; // Add fallback empty array
               const isExpanded = expandedModules[moduleId] || false;
               return (
@@ -765,14 +702,11 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
                     ]}
                     onPress={() => toggleModuleExpanded(moduleId)}>
                     <View style={styles.quizModuleTitleContainer}>
-                      <View
-                        style={[
-                          styles.progressIconCircle,
-                          {backgroundColor: color},
-                        ]}>
-                        {icon &&
-                          React.createElement(icon, {width: 20, height: 20})}
-                      </View>
+                    <Image
+                            source={imageIcon}
+                            style={styles.progressImageIcon} // Reuse style
+                            resizeMode="contain"
+                        />
                       <Text
                         style={[styles.quizModuleTitle, {color: colors.text}]}>
                         {title}
@@ -889,8 +823,7 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
             // If we have quizzes but they're not properly grouped, show them as a flat list
             <View>
               {quizzes.map(quiz => {
-                const IconComponent =
-                  iconMap[quiz.moduleId] || CloudGenericIcon;
+                const { imageIcon, color } = getModuleDetails(quiz.moduleId);
                 const status = learningProgress?.completedQuizzes?.includes(
                   quiz.id,
                 )
@@ -901,8 +834,8 @@ const DashboardScreen: FC<{navigation: any}> = ({navigation}) => {
                     key={quiz.id}
                     title={quiz.title}
                     status={status}
-                    color="#0000"
-                    icon={IconComponent}
+                    color={color}
+                    imageIcon={imageIcon}
                     colors={colors}
                   />
                 );
@@ -1001,7 +934,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   warningText: {
-    // Apply color in JSX
+    color: '#fff', // Keep warning text white
     flex: 1,
     fontSize: 14,
   },
@@ -1276,6 +1209,10 @@ const styles = StyleSheet.create({
   quizItemProgress: {
     height: '100%',
     borderRadius: 3,
+  },
+  imageIcon: { // Style for the Image component itself
+    width: 30, // Control image dimensions
+    height: 30,
   },
 });
 

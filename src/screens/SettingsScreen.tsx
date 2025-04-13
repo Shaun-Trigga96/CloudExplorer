@@ -250,7 +250,7 @@ const SettingsScreen: FC = () => {
             console.log('playback failed due to audio decoding errors');
           }
           // Optionally release immediately after playing for short effects
-          // newSound.release();
+          newSound.release();
         });
       });
       // Release previous sound if exists
@@ -334,9 +334,9 @@ const SettingsScreen: FC = () => {
 
   // Re-fetch settings if isDarkMode changes externally (e.g., system theme change)
   // This might be redundant if toggleDarkMode already handles state correctly
-  // useEffect(() => {
-  //   fetchUserSettings();
-  // }, [isDarkMode]);
+   useEffect(() => {
+     fetchUserSettings();
+   }, [isDarkMode]);
 
 
   // Settings groups definition (remains the same)

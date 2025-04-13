@@ -248,9 +248,9 @@ const ExamsScreen = () => {
   const getIconForExam = (examId: string) => {
     const iconMap: { [key: string]: any } = {
       'cloud-digital-leader-exam': require('../assets/images/cloud-digital-leader.png'),
-      'cloud-architect-exam': require('../assets/images/cloud-architect.png'),
-      'cloud-data-engineer': require('../assets/images/data-engineer.png'),
-      'cloud-security-exam': require('../assets/images/security-engineer.png'),
+      // 'cloud-architect-exam': require('../assets/images/cloud-architect.png'),
+      // 'cloud-data-engineer': require('../assets/images/data-engineer.png'),
+      // 'cloud-security-exam': require('../assets/images/security-engineer.png'),
     };
     const icon = iconMap[examId] || require('../assets/images/cloud_generic.png');
     return icon;

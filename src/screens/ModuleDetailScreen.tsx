@@ -1,6 +1,6 @@
 // c:\Users\thabi\Desktop\CloudExplorer\src\screens\ModuleDetailScreen.tsx
 import React, { useEffect, useState, useRef } from 'react';
-import { View, ScrollView, StyleSheet, Text, Animated, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, Text, Animated } from 'react-native';
 import axios from 'axios';
 import Markdown from 'react-native-markdown-display';
 import AsyncStorage from '@react-native-async-storage/async-storage';

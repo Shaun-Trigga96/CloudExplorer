@@ -1,7 +1,7 @@
 // backend/controllers/emailController.js
 const AppError = require('../utils/appError');
 const sgMail = require('@sendgrid/mail'); // Import SendGrid
-const {db, logger, sendgridApiKeyParam} = require('../../functions/src/config/config'); // Import SendGrid API key from config
+const {db, logger, sendgridApiKey} = require('../../functions/src/config/config'); // Import SendGrid API key from config
 
 
 // POST /update-subscription
@@ -43,7 +43,7 @@ exports.updateEmailSubscription = async (req, res, next) => {
     // --- Send Confirmation Email (if enabled) ---
     if (enabled && emailFromDoc) {
       try {
-        const apiKey = sendgridApiKeyParam.value(); // Get API key from config parameter
+        const apiKey = sendgridApiKey.value(); // Get API key from config parameter
         if (!apiKey) {
           logger.error(
             '[email.js] SendGrid API Key is missing or not configured properly. Cannot send welcome email.',

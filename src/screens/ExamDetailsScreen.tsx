@@ -117,7 +117,6 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
   const { isDarkMode } = useCustomTheme(); // Use your custom theme hook
   const colors = isDarkMode ? darkColors : lightColors; // Select color palette
   const paperTheme = usePaperTheme(); // Get Paper theme if needed
-
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

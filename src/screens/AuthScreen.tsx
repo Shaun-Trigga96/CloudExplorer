@@ -159,11 +159,11 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
               score: 0,
             },
             settings: {
-              notificationsEnabled: true,
+              notificationsEnabled: false,
               darkMode: false,
               emailUpdates: true,
-              syncData: true,
-              soundEffects: true,
+              syncData: false,
+              soundEffects: false,
             },
           }, { merge: true }); // Use merge: true just in case
       }
@@ -344,11 +344,11 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation }) => {
           </Button>
         </View>
          {/* Optional: Global loading indicator overlay if preferred over button indicators */}
-         {/* {loading && (
+         {loading && (
             <View style={styles.loadingOverlay}>
                 <ActivityIndicator size="large" color={colors.primary} />
             </View>
-         )} */}
+         )}
       </Animated.View>
     </KeyboardAvoidingView>
   );

@@ -1,4 +1,9 @@
 {
   "name": "CloudExplorer",
-  "displayName": "CloudExplorer"
+  "displayName": "CloudExplorer",
+  "extra": {
+    "eas": {
+      "projectId": "fd2ce668-b94c-43ff-8b6c-b9bc9e692f2a"
+    }
+  }
 }

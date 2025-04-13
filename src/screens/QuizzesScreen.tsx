@@ -5,14 +5,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  ImageSourcePropType,
+  Image,
 } from 'react-native';
 import { Card, Title, Paragraph, Button, Text } from 'react-native-paper';
-import CloudStorage from '../assets/icons/cloud_storage.svg';
-import ComputeEngine from '../assets/icons/compute_engine.svg';
-import CloudFunctions from '../assets/icons/cloud_functions.svg';
-import KubernetesEngine from '../assets/icons/google_kubernetes_engine.svg';
-import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
-import StreamingAnalyticsIcon from '../assets/icons/streaming_analytics.svg';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useNavigation } from '@react-navigation/native';
@@ -59,7 +55,7 @@ interface Quiz {
   title: string;
   description: string;
   questionCount: number;
-  icon: React.FC;
+  icon: any;
   moduleId: string;
 }
 
@@ -83,13 +79,14 @@ interface UserProgressResponse {
 }
 
 // Define the icon map for the quizzes
-const iconMap: { [key: string]: React.FC } = {
-  'cloud-storage': CloudStorage,
-  'compute-engine': ComputeEngine,
-  'cloud-functions': CloudFunctions,
-  'kubernetes-engine': KubernetesEngine,
-  'cloud-fundamentals': CloudGenericIcon,
-  'data-transformation': StreamingAnalyticsIcon,
+// Define the icon map for the modules
+const iconMap: { [key: string]: ImageSourcePropType } = {
+  'digital-transformation':  require('../assets/images/digital_transformation.jpeg'),
+  'artificial-intelligence':  require('../assets/images/artificial_intelligence.jpeg'),
+  'infrastructure-application':  require('../assets/images/infrastructure_application.jpeg'),
+  'scailing-operations':  require('../assets/images/scailing_operations.jpeg'),
+  'trust-security':  require('../assets/images/trust_security.jpeg'),
+  'data-transformation':  require('../assets/images/data_transformation.jpeg'),
 };
 
 type NavigationProp = StackNavigationProp<RootStackParamList, 'QuizzesDetail'>;
@@ -129,7 +126,7 @@ const QuizzesScreen = () => {
           title: String(quiz.title || ''),
           description: String(quiz.description || ''),
           questionCount: quiz.questions && Array.isArray(quiz.questions) ? quiz.questions.length : 0,
-          icon: iconMap[quiz.moduleId] || CloudGenericIcon,
+          icon: iconMap[quiz.moduleId],
           moduleId: String(quiz.moduleId || ''),
         }));
       } else {
@@ -278,7 +275,7 @@ const QuizzesScreen = () => {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {quizzes.length > 0 ? (
         quizzes.map(quiz => {
-          const Icon = quiz.icon;
+          const imageSource = iconMap[quiz.id] || iconMap['default'];
           const isCompleted = quizProgress[quiz.moduleId];
           const buttonLabel = getButtonLabel(quiz.moduleId);
           const buttonBackgroundColor = isCompleted
@@ -299,10 +296,13 @@ const QuizzesScreen = () => {
             >
               <Card.Content>
                 <View style={styles.headerRow}>
-                  <View style={styles.iconContainer}>
-                    {/* Apply theme color to SVG icon if possible, or ensure SVG itself adapts */}
-                    {Icon && <Icon width={34} height={34} {...(Icon as React.SVGProps<SVGSVGElement>)} />}
-                  </View>
+                <View style={styles.iconContainer}>
+                  <Image
+                    source={imageSource}
+                    style={styles.iconImage}
+                    resizeMode="contain" // Adjust resizeMode as needed
+                  />
+                </View>
                   <Title style={[styles.title, { color: colors.text }]}>{String(quiz.title)}</Title>
                 </View>
                 <Paragraph style={{ color: colors.textSecondary }}>{String(quiz.description)}</Paragraph>
@@ -412,6 +412,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     marginTop: 50, // Add some margin to center it better visually
+  },
+  iconImage: { // Style for the Image component itself
+    width: 30, // Control image dimensions
+    height: 30,
   },
   // Button styles are handled inline using theme colors
 });

@@ -1,13 +1,7 @@
-import React, { SVGProps, useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, ScrollView, StyleSheet, Alert, ActivityIndicator, ImageSourcePropType, Image } from 'react-native';
 import { Card, Title, Paragraph, Button, ProgressBar, Text } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
-import ComputeEngineIcon from '../assets/icons/compute_engine.svg';
-import CloudStorageIcon from '../assets/icons/cloud_storage.svg';
-import CloudFunctionsIcon from '../assets/icons/cloud_functions.svg';
-import KubernetesEngineIcon from '../assets/icons/google_kubernetes_engine.svg';
-import CloudGenericIcon from '../assets/icons/cloud_generic.svg';
-import StreamingAnalyticsIcon from '../assets/icons/streaming_analytics.svg';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -73,13 +67,13 @@ interface UserProgressResponse {
 }
 
 // Define the icon map for the modules
-const iconMap: { [key: string]: React.FC } = { // Added SVGProps type
-  'cloud-storage': CloudStorageIcon,
-  'compute-engine': ComputeEngineIcon,
-  'cloud-functions': CloudFunctionsIcon,
-  'kubernetes-engine': KubernetesEngineIcon,
-  'cloud-fundamentals': CloudGenericIcon,
-  'data-transformation': StreamingAnalyticsIcon,
+const iconMap: { [key: string]: ImageSourcePropType } = {
+  'digital-transformation':  require('../assets/images/digital_transformation.jpeg'),
+  'artificial-intelligence':  require('../assets/images/artificial_intelligence.jpeg'),
+  'infrastructure-application':  require('../assets/images/infrastructure_application.jpeg'),
+  'scailing-operations':  require('../assets/images/scailing_operations.jpeg'),
+  'trust-security':  require('../assets/images/trust_security.jpeg'),
+  'data-transformation':  require('../assets/images/data_transformation.jpeg'),
 };
 
 const ModulesScreen = () => {
@@ -298,7 +292,10 @@ const ModulesScreen = () => {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {availableModules.map((apiModule) => {
-        const IconComponent = iconMap[apiModule.id] || CloudGenericIcon;
+        // --- Get Image Source from updated iconMap ---
+        const imageSource = iconMap[apiModule.id] || iconMap['default'];
+        // --- End Get Image Source ---
+
         const progress = moduleProgress[apiModule.id] ?? 0;
         const progressColor = getProgressColor(progress);
         const buttonLabel = getButtonLabel(progress);
@@ -321,10 +318,15 @@ const ModulesScreen = () => {
           >
             <Card.Content>
               <View style={styles.headerRow}>
-                <View style={styles.icon}>
-                  {/* Pass fill color to SVG */}
-                  <IconComponent fill={colors.primary} width={30} height={30} {...(IconComponent as React.ComponentProps<typeof IconComponent>) as SVGProps<SVGSVGElement>} />
+                {/* --- Update Icon Rendering --- */}
+                <View style={styles.iconContainer}>
+                  <Image
+                    source={imageSource}
+                    style={styles.iconImage}
+                    resizeMode="contain" // Adjust resizeMode as needed
+                  />
                 </View>
+                {/* --- End Update Icon Rendering --- */}
                 <Title style={[styles.title, { color: colors.text }]}>{apiModule.title}</Title>
               </View>
               <Paragraph style={{ color: colors.textSecondary }}>{apiModule.description}</Paragraph>
@@ -378,13 +380,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  icon: {
-    marginRight: 12, // Increased margin
-    width: 30, // Match icon size
-    height: 30,
+  // --- Update Icon Styles ---
+  iconContainer: { // Container for layout
+    marginRight: 12,
+    width: 34, // Adjust size as needed
+    height: 34,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  iconImage: { // Style for the Image component itself
+    width: 30, // Control image dimensions
+    height: 30,
+  },
+  // --- End Update Icon Styles ---
   title: {
     marginLeft: 8,
     flex: 1, // Allow title to take remaining space
@@ -408,7 +416,6 @@ const styles = StyleSheet.create({
     // color applied dynamically
     alignSelf: 'flex-end', // Align percentage to the right
   },
-  // completedButton style removed, handled inline now
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
