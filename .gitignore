@@ -90,3 +90,4 @@ functions/firebase-debug.log
 functions/.env.cloud-explorer-c3d98
 firebase-debug.log
 *.log
+.env.cloud-explorer-c3d98
