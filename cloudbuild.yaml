@@ -13,7 +13,19 @@ steps:
   #   id: 'run-tests'
   #   entrypoint: 'npm'
   #   args: ['test']
-
+   # Step to fetch the SendGrid API key and create the .env file
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'create-functions-env'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Fetching SendGrid API Key..."
+        gcloud secrets versions access latest --secret="sendgrid-api-key" --project="$PROJECT_ID" > sendgrid_key_temp.txt
+        # Create the .env file inside the functions directory
+        # Ensure the variable name matches what defineString expects
+        echo "SENDGRID_KEY=$(cat sendgrid_key_temp.txt)" > functions/.env
+        echo "Created functions/.env file."
   # 2. Build and deploy Firebase functions
   - name: 'node:20'
     id: 'install-functions-dependencies'
