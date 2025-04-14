@@ -131,7 +131,7 @@ steps:
 
 # Images to be pushed to Container Registry
 images:
-  - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA' #tag was added here
   - 'gcr.io/$PROJECT_ID/react-native-builder:latest' # Builder image, consider if needed here
 
 # Additional options
