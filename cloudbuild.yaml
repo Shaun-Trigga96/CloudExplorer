@@ -8,7 +8,6 @@ steps:
     args: ['install']
     # Note: Review 'npm audit' locally for vulnerabilities found in logs.
     # Note: Resolve peer dependency warnings locally if possible.
-
   # - name: 'node:20' # <--- STEP 1 (TESTS) COMMENTED OUT
   #   id: 'run-tests'
   #   entrypoint: 'npm'
