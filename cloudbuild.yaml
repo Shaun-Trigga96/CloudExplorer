@@ -84,6 +84,8 @@ steps:
       - 'us-central1' # Or your preferred/newly configured build region
       - '--platform'
       - 'managed'
+      - '--port'  # <-- ADD THIS FLAG
+      - '5000'    # <-- Specify the port your app listens on
       - '--allow-unauthenticated'
 
   # 5. Build React Native app for Android
