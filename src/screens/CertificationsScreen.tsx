@@ -8,16 +8,16 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '../context/ThemeContext';
+import { useCustomTheme } from '../context/ThemeContext';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import axios, { AxiosError } from 'axios';
 import auth from '@react-native-firebase/auth';
 import { REACT_APP_BASE_URL } from '@env';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import CertificationCard   from '../components/CertificationCard';
-import AddCertificationModal from '../components/AddCertificationModal';
-import CredlyImportModal from '../components/CredlyImportModal';
-import Filters from '../components/Filters';
+import CertificationCard   from '../components/certification/CertificationCard';
+import AddCertificationModal from '../components/certification/AddCertificationModal';
+import CredlyImportModal from '../components/certification/CredlyImportModal';
+import Filters from '../components/certification/Filters';
 import { Alert } from 'react-native';
 
 
@@ -114,7 +114,7 @@ const determineCloudProvider = (title: string, issuer: string): string => {
 
 // --- Main Component ---
 const CertificationsScreen = () => {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode } = useCustomTheme();
   const [certifications, setCertifications] = useState<Certification[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isAddModalVisible, setIsAddModalVisible] = useState<boolean>(false);

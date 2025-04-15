@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useTheme } from '../../src/context/ThemeContext';
+import { useCustomTheme } from '../../context/ThemeContext';
 import axios from 'axios';
 
 interface CredlyBadge {
@@ -40,7 +40,7 @@ const CredlyImportModal: FC<CredlyImportModalProps> = ({
   onImport,
   baseUrl,
 }) => {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode } = useCustomTheme();
   const [credlyUsername, setCredlyUsername] = useState<string>('');
   const [isFetchingCredly, setIsFetchingCredly] = useState<boolean>(false);
   const [credlyBadges, setCredlyBadges] = useState<CredlyBadge[]>([]);

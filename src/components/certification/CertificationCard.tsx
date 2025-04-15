@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { useTheme } from '../../src/context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import Clipboard from '@react-native-clipboard/clipboard';
 
 interface Certification {

@@ -18,9 +18,10 @@ import messaging from '@react-native-firebase/messaging';
 import {useNavigation} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
 import {RootStackParamList} from '../navigation/RootNavigator';
-import {useTheme} from '../context/ThemeContext';
+import { useCustomTheme } from '../context/ThemeContext';
 import {REACT_APP_BASE_URL} from '@env';
 import Sound from 'react-native-sound'; // Import react-native-sound
+import { darkColors, lightColors } from '../styles/colors';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -37,35 +38,10 @@ type SettingsScreenNavigationProp = StackNavigationProp<
   'SettingsScreen'
 >;
 
-// --- Define Theme Colors (Matching ProfileScreen) ---
-const lightColors = {
-  background: '#F0F2F5', // Lighter grey background
-  surface: '#FFFFFF', // Card background
-  primary: '#007AFF', // Example primary blue
-  text: '#1C1C1E', // Dark text
-  textSecondary: '#6E6E73', // Grey text
-  border: '#D1D1D6',
-  error: '#FF3B30',
-  success: '#34C759',
-  buttonSecondaryBackground: '#E5E5EA',
-};
-
-const darkColors = {
-  background: '#000000', // Black background
-  surface: '#1C1C1E', // Dark grey card background
-  primary: '#0A84FF', // Brighter blue for dark mode
-  text: '#FFFFFF', // White text
-  textSecondary: '#8E8E93', // Lighter grey text
-  border: '#3A3A3C',
-  error: '#FF453A',
-  success: '#32D74B',
-  buttonSecondaryBackground: '#2C2C2E',
-};
-// --- End Theme Colors ---
 
 const SettingsScreen: FC = () => {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
-  const {isDarkMode, toggleDarkMode} = useTheme();
+  const {isDarkMode, toggleDarkMode} = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors; // Use theme colors
   const [userSettings, setUserSettings] = useState<UserSettings>({
     notificationsEnabled: false,

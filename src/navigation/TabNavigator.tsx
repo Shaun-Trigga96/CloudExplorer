@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 // Import useTheme from react-native-paper AND your custom context
 import { useTheme as usePaperTheme } from 'react-native-paper';
-import { useTheme as useCustomTheme } from '../context/ThemeContext'; // Import your custom hook
+import { useCustomTheme } from '../context/ThemeContext'; // Import your custom hook
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StyleSheet } from 'react-native'; // Import StyleSheet
 
@@ -19,6 +19,7 @@ import { RootStackParamList } from './RootNavigator';
 import QuizzesDetailScreen from '../screens/QuizzesDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import CertificationsScreen from '../screens/CertificationsScreen';
+import CommunityScreen from '../screens/CommunityScreen'
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator<RootStackParamList>();
@@ -54,7 +55,14 @@ function ExamsStackNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ExamsScreen" component={ExamsScreen} />
-      {/* Add ExamDetailScreen if needed within this stack */}
+    </Stack.Navigator>
+  );
+}
+
+function CommunityStackNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="CommunityScreen" component={CommunityScreen} />
     </Stack.Navigator>
   );
 }
@@ -65,6 +73,7 @@ function SettingsStackNavigator() {
       <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
       <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
       <Stack.Screen name="CertificationsScreen" component={CertificationsScreen} />
+      <Stack.Screen name="CommunityScreen" component={CommunityScreen} />
       {/* Add other settings-related screens here */}
     </Stack.Navigator>
   );
@@ -75,20 +84,20 @@ function SettingsStackNavigator() {
 const TabNavigator = () => {
   const theme = usePaperTheme(); // Use Paper's theme (now correctly provided by App.tsx)
   const { isDarkMode } = useCustomTheme(); // Use your custom hook to get the mode status
-  
+
   type MD3Colors = {
     primary: string;
     onSurfaceDisabled: string;
     border: string; // Add 'border' property to the type definition
   };
-  
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         // eslint-disable-next-line react/no-unstable-nested-components
         tabBarIcon: ({ color, size }) => {
           let iconName = 'alert'; // Default icon
-  
+
           // Using outline icons for potential consistency
           switch (route.name) {
             case 'Dashboard':
@@ -106,8 +115,11 @@ const TabNavigator = () => {
             case 'Settings':
               iconName = 'cog-outline';
               break;
+            case 'Community':
+              iconName = 'account-group-outline'; // Use a more appropriate icon for community
+              break;
           }
-  
+
           return <Icon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary, // Uses Paper theme primary
@@ -155,11 +167,17 @@ const TabNavigator = () => {
         options={{ title: 'Certify' }}
       />
       <Tab.Screen
+        name="Community"
+        component={CommunityStackNavigator}
+        options={{ title: 'Community' }}
+      />
+      <Tab.Screen
         name="Settings"
         component={SettingsStackNavigator}
         // Changed title to 'Profile' as it includes ProfileScreen & Certs
         options={{ title: 'Settings' }}
       />
+
       {/* --- End Tab Screens --- */}
     </Tab.Navigator>
   );

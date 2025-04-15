@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useTheme } from '../../src/context/ThemeContext';
+import { useCustomTheme } from '../../context/ThemeContext';
 import { Dropdown } from 'react-native-element-dropdown';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -69,7 +69,7 @@ const AddCertificationModal: FC<AddCertificationModalProps> = ({
   newCertification,
   setNewCertification,
 }) => {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode } = useCustomTheme();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<'issued' | 'expiry'>(
     'issued',

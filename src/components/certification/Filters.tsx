@@ -2,7 +2,7 @@ import React, { FC } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useTheme } from '../../src/context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 import Animated, { SlideInRight } from 'react-native-reanimated';
 
 interface CloudProvider {
