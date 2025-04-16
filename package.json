@@ -28,6 +28,7 @@
     "@react-native-firebase/storage": "^21.12.2",
     "@react-native-google-signin/google-signin": "^13.1.0",
     "@react-native-masked-view/masked-view": "^0.3.2",
+    "@react-native-picker/picker": "^2.11.0",
     "@react-navigation/bottom-tabs": "^6.5.11",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",

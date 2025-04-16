@@ -6,23 +6,21 @@ const communityController = require('../controllers/communityController');
 const router = express.Router();
 
 // --- Public Routes (or protected based on your app's logic) ---
-
-// GET /api/v1/community/posts - Fetch list of posts
+// Posts
 router.get('/posts', communityController.getCommunityPosts);
+router.post('/posts', communityController.createCommunityPost); // Needs auth
+router.post('/posts/:postId/like', communityController.likePost); // Needs auth
+router.delete('/posts/:postId/like', communityController.unlikePost); // Needs auth (use POST for unlike too for consistency or DELETE)
 
-// GET /api/v1/community/members - Fetch list of members
+// Members
 router.get('/members', communityController.getCommunityMembers);
 
-// --- Protected Routes (Example - Apply 'protect' middleware later) ---
-
-// POST /api/v1/community/posts - Create a new post
-router.post('/posts', /* protect, */ communityController.createCommunityPost);
-
-// POST /api/v1/community/posts/:postId/like - Like a post
-router.post('/posts/:postId/like', /* protect, */ communityController.likePost);
-
-// DELETE /api/v1/community/posts/:postId/like - Unlike a post
-router.delete('/posts/:postId/like', /* protect, */ communityController.unlikePost);
+// Events
+router.get('/events', communityController.getCommunityEvents); // May need userId query param
+// router.post('/events/:eventId/register', communityController.registerForEvent); // Needs auth
+// router.post('/events/:eventId/unregister', communityController.unregisterForEvent); // Needs auth
+// router.post('/events/:eventId/save', communityController.saveEvent); // Needs auth
+// router.post('/events/:eventId/unsave', communityController.unsaveEvent); // Needs auth
 
 
 module.exports = router;

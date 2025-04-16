@@ -1,189 +1,281 @@
-import React, { FC } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { Button, Chip } from 'react-native-paper';
+// src/components/community/EventCard.tsx
+import React, {FC, useState, useCallback} from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import { useCustomTheme } from '../../context/ThemeContext';
+import axios from 'axios';
+import {CommunityEvent} from '../../types/community'; // Use updated type if needed
+import {useCustomTheme} from '../../context/ThemeContext';
+import {formatDate} from '../../utils/formatDate'; // Assumes you have date formatting
 
-interface Event {
-  id: number;
-  title: string;
-  date: string;
-  isUpcoming?: boolean;
-  time?: string;
-  description?: string;
-  attending?: number;
-  interested?: number;
-  speakers?: number;
-  daysLeft?: number;
-}
 
 interface EventCardProps {
-  event: Event;
-  index?: number;
+  event: CommunityEvent & {isRegistered?: boolean; isSaved?: boolean}; // Expect status from API
+  userId: string | null; // Pass current user ID
+  // Add onPress prop later for navigating to event details
 }
 
-const EventCard: FC<EventCardProps> = ({ event, index = 0 }) => {
-  const { isDarkMode } = useCustomTheme();
-  const { colors, cardStyle } = useCustomTheme().theme;
+const EventCard: FC<EventCardProps> = ({event, userId}) => {
+  const {theme} = useCustomTheme();
+  const {colors} = theme;
 
-  if (event.isUpcoming) {
+  // Internal state to manage button loading and optimistic updates
+  const [isAttending, setIsAttending] = useState(event.isRegistered || false);
+  const [isSavedState, setIsSavedState] = useState(event.isSaved || false);
+  const [loadingAttend, setLoadingAttend] = useState(false);
+  const [loadingSave, setLoadingSave] = useState(false);
+
+  // --- Actions ---
+  const handleAttendToggle = useCallback(async () => {
+    if (!userId || loadingAttend) return;
+    if (!event.id) {
+      console.error('Event ID missing');
+      return;
+    }
+
+    setLoadingAttend(true);
+    const originalAttendState = isAttending;
+    setIsAttending(!originalAttendState); // Optimistic update
+
+    try {
+      const action = originalAttendState ? 'unregister' : 'register';
+      const url = `<span class="math-inline">\{BASE\_URL\}/api/v1/community/events/</span>{event.id}/${action}`;
+      await axios.post(url, {userId}); // Backend verifies userId via token ideally
+      // Success - state already updated optimistically
+    } catch (error) {
+      console.error(
+        `Error ${originalAttendState ? 'un' : ''}registering event:`,
+        error,
+      );
+      setIsAttending(originalAttendState); // Revert on error
+      Alert.alert(
+        'Error',
+        `Could not ${originalAttendState ? 'un' : ''}register for the event.`,
+      );
+    } finally {
+      setLoadingAttend(false);
+    }
+  }, [userId, event.id, isAttending, loadingAttend]);
+
+  const handleSaveToggle = useCallback(async () => {
+    if (!userId || loadingSave) return;
+    if (!event.id) {
+      console.error('Event ID missing');
+      return;
+    }
+
+    setLoadingSave(true);
+    const originalSaveState = isSavedState;
+    setIsSavedState(!originalSaveState); // Optimistic update
+
+    try {
+      const action = originalSaveState ? 'unsave' : 'save';
+      const url = `<span class="math-inline">\{BASE\_URL\}/api/v1/community/events/</span>{event.id}/${action}`;
+      await axios.post(url, {userId});
+      // Success
+    } catch (error) {
+      console.error(
+        `Error ${originalSaveState ? 'un' : ''}saving event:`,
+        error,
+      );
+      setIsSavedState(originalSaveState); // Revert on error
+      Alert.alert(
+        'Error',
+        `Could not ${originalSaveState ? 'un' : ''}save the event.`,
+      );
+    } finally {
+      setLoadingSave(false);
+    }
+  }, [userId, event.id, isSavedState, loadingSave]);
+
+  // --- Rendering ---
+  const isPastEvent = new Date(event.date) < new Date(); // Simple check
+
+  // Render different card styles based on upcoming/past or details available
+  if (!isPastEvent && event.description) {
+    // Detailed Upcoming Event Card
     return (
-      <Animated.View entering={FadeIn.duration(800)} style={[styles.upcomingCard, cardStyle, { backgroundColor: colors.surface }]}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.upcomingLabel, { color: colors.primary }]}>UPCOMING EVENT</Text>
-          <Chip style={{ backgroundColor: colors.warning }} textStyle={{ color: '#333' }}>
-            {event.daysLeft} day{event.daysLeft !== 1 ? 's' : ''} left
-          </Chip>
+      <View
+        style={[
+          styles.upcomingContainer,
+          {backgroundColor: colors.primary, borderColor: colors.border},
+        ]}>
+        {/* Optional: Add Save button/icon */}
+        <TouchableOpacity
+          onPress={handleSaveToggle}
+          style={styles.saveButton}
+          disabled={loadingSave}>
+          {loadingSave ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Icon
+              name={isSavedState ? 'bookmark' : 'bookmark'}
+              size={20}
+              color={isSavedState ? colors.primary : colors.textSecondary}
+            />
+          )}
+        </TouchableOpacity>
+
+        <Text style={[styles.title, {color: colors.text}]}>{event.title}</Text>
+        <View style={styles.dateTimeRow}>
+          <Icon name="calendar" size={14} color={colors.textSecondary} />
+          <Text style={[styles.detailText, {color: colors.textSecondary}]}>
+            {formatDate(event.date)}
+          </Text>
         </View>
-        <Text style={[styles.title, { color: colors.text }]}>{event.title}</Text>
-        <View style={styles.timeRow}>
-          <Icon name="calendar" size={16} color={colors.textSecondary} style={{ marginRight: 6 }} />
-          <Text style={[styles.timeText, { color: colors.textSecondary }]}>{event.time}</Text>
-        </View>
-        <Text style={[styles.description, { color: colors.text }]}>{event.description}</Text>
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: colors.primary }]}>{event.attending}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Attending</Text>
+        {event.time && (
+          <View style={styles.dateTimeRow}>
+            <Icon name="clock" size={14} color={colors.textSecondary} />
+            <Text style={[styles.detailText, {color: colors.textSecondary}]}>
+              {formatDate(event.time)}
+            </Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: colors.primary }]}>{event.interested}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Interested</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: colors.primary }]}>{event.speakers}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Speakers</Text>
-          </View>
+        )}
+        <Text style={[styles.description, {color: colors.textSecondary}]}>
+          {event.description}
+        </Text>
+
+        <View style={styles.footer}>
+          <Text style={[styles.attendeesText, {color: colors.textSecondary}]}>
+            {event.attending || 0} attending
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              isAttending
+                ? {
+                    backgroundColor: colors.background,
+                    borderColor: colors.primary,
+                    borderWidth: 1,
+                  }
+                : {backgroundColor: colors.primary},
+            ]}
+            onPress={handleAttendToggle}
+            disabled={loadingAttend}>
+            {loadingAttend ? (
+              <ActivityIndicator
+                size="small"
+                color={isAttending ? colors.primary : colors.background}
+              />
+            ) : (
+              <>
+                <Icon
+                  name={isAttending ? 'check-circle' : 'plus-circle'}
+                  size={16}
+                  color={isAttending ? colors.primary : colors.background}
+                />
+                <Text
+                  style={[
+                    styles.actionButtonText,
+                    {color: isAttending ? colors.primary : colors.background},
+                  ]}>
+                  {isAttending ? 'Attending' : 'Attend'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
-        <View style={styles.actions}>
-          <Button mode="contained" style={[styles.registerButton, { backgroundColor: colors.primary }]} labelStyle={{ color: colors.background }}>
-            Register Now
-          </Button>
-          <Button mode="outlined" style={[styles.saveButton, { borderColor: colors.primary }]} labelStyle={{ color: colors.primary }}>
-            Save for Later
-          </Button>
+      </View>
+    );
+  } else {
+    // Simplified Card (Past or less detail)
+    return (
+      <TouchableOpacity
+        style={[styles.pastContainer, {borderBottomColor: colors.border}]}>
+        <TouchableOpacity
+          onPress={handleSaveToggle}
+          style={styles.saveIconPast}
+          disabled={loadingSave}>
+          {loadingSave ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Icon
+              name={isSavedState ? 'bookmark' : 'bookmark'}
+              size={18}
+              color={isSavedState ? colors.primary : colors.textSecondary}
+            />
+          )}
+        </TouchableOpacity>
+        <View style={styles.pastDetails}>
+          <Text
+            style={[styles.pastTitle, {color: colors.text}]}
+            numberOfLines={1}>
+            {event.title}
+          </Text>
+          <Text style={[styles.pastDate, {color: colors.textSecondary}]}>
+            {formatDate(event.date)}
+          </Text>
         </View>
-      </Animated.View>
+        <Icon name="chevron-right" size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
     );
   }
-
-  return (
-    <Animated.View entering={FadeIn.duration(500).delay(300 + index * 100)} style={[styles.pastCard, cardStyle, { backgroundColor: colors.surface }]}>
-      <View style={styles.pastHeader}>
-        <Text style={[styles.pastTitle, { color: colors.text }]}>{event.title}</Text>
-        <Chip style={{ backgroundColor: colors.chipBackground }} textStyle={{ color: colors.textSecondary }}>
-          Recording Available
-        </Chip>
-      </View>
-      <View style={styles.timeRow}>
-        <Icon name="calendar" size={14} color={colors.textSecondary} style={{ marginRight: 6 }} />
-        <Text style={[styles.pastDate, { color: colors.textSecondary }]}>{event.date}</Text>
-      </View>
-      <TouchableOpacity style={styles.viewRecordingButton}>
-        <Text style={[styles.viewRecordingText, { color: colors.primary }]}>View Recording</Text>
-        <Icon name="chevron-right" size={16} color={colors.primary} />
-      </TouchableOpacity>
-    </Animated.View>
-  );
 };
 
+// --- Styles --- (Combine and adapt styles from previous versions)
 const styles = StyleSheet.create({
-  upcomingCard: {
+  upcomingContainer: {
     padding: 16,
-    marginBottom: 24,
-  },
-  pastCard: {
-    padding: 16,
+    borderRadius: 10,
     marginBottom: 16,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  headerRow: {
+  saveButton: {position: 'absolute', top: 10, right: 10, padding: 6, zIndex: 1},
+  saveIconPast: {
+    position: 'absolute',
+    top: 16,
+    right: 30,
+    padding: 4,
+    zIndex: 1,
+  },
+  title: {fontSize: 17, fontWeight: 'bold', marginBottom: 10, marginRight: 30},
+  dateTimeRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 5},
+  detailText: {marginLeft: 6, fontSize: 13},
+  description: {fontSize: 14, lineHeight: 20, marginTop: 8, marginBottom: 12},
+  footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  upcomingLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    lineHeight: 26,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  timeText: {
-    fontSize: 14,
-  },
-  description: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#000',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  registerButton: {
-    flex: 1,
-  },
-  saveButton: {
-    flex: 1,
-  },
-  pastHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  pastTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-    marginRight: 8,
-  },
-  pastDate: {
-    fontSize: 14,
-  },
-  viewRecordingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingTop: 12,
     marginTop: 12,
-    alignSelf: 'flex-start',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#ccc',
+  }, // Use theme border
+  attendeesText: {fontSize: 13, color: '#555'}, // use theme textSecondary
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    minWidth: 100,
+    height: 36,
   },
-  viewRecordingText: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginRight: 4,
+  actionButtonText: {marginLeft: 6, fontWeight: 'bold', fontSize: 13},
+  pastContainer: {
+    position: 'relative',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingRight: 10,
   },
+  pastDetails: {flex: 1, marginRight: 35}, // Space for save icon and chevron
+  pastTitle: {fontSize: 15, fontWeight: '500', marginBottom: 3},
+  pastDate: {fontSize: 13},
 });
 
 export default EventCard;

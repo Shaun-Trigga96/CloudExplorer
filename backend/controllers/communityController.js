@@ -6,7 +6,8 @@ const { serverTimestamp } = require('../utils/firestoreHelpers'); // Assuming yo
 const db = admin.firestore();
 const usersCollection = db.collection('users');
 const postsCollection = db.collection('posts'); // Let's assume a 'posts' collection
-
+const topicsCollection = db.collection('topics');
+const eventsCollection = db.collection('events');
 /**
  * Fetches user details needed for embedding in posts or member lists.
  * Avoids fetching sensitive data.
@@ -370,3 +371,118 @@ exports.unlikePost = async (req, res, next) => {
         next(error);
     }
 };
+
+// GET /api/v1/community/topics
+exports.getCommunityTopics = async (req, res, next) => {
+    try {
+      const { limit = 20, lastId, orderBy = 'count', orderDir = 'desc' } = req.query;
+      const parsedLimit = parseInt(limit, 10);
+  
+      if (isNaN(parsedLimit) || parsedLimit <= 0 || parsedLimit > 50) {
+        return next(new AppError('Invalid limit value (must be 1-50)', 400, 'INVALID_LIMIT'));
+      }
+      const validOrderBy = ['count', 'name'];
+      const validOrderDir = ['asc', 'desc'];
+      if (!validOrderBy.includes(orderBy) || !validOrderDir.includes(orderDir)) {
+        return next(new AppError('Invalid orderBy or orderDir parameter', 400, 'INVALID_SORT'));
+      }
+  
+      let query = topicsCollection.orderBy(orderBy, orderDir).limit(parsedLimit);
+  
+      if (lastId) {
+        const lastDocSnapshot = await topicsCollection.doc(lastId).get();
+        if (lastDocSnapshot.exists) {
+          query = query.startAfter(lastDocSnapshot);
+        } else {
+          console.warn(`Pagination lastId '${lastId}' not found for topics. Starting from beginning.`);
+        }
+      }
+  
+      const topicsSnapshot = await query.get();
+  
+      if (topicsSnapshot.empty) {
+        return res.json({ topics: [], hasMore: false, lastId: null });
+      }
+  
+      const topics = topicsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name || 'General',
+        count: doc.data().count || 0,
+      }));
+  
+      const newLastId = topics.length > 0 ? topics[topics.length - 1].id : null;
+  
+      res.json({
+        topics,
+        hasMore: topics.length === parsedLimit,
+        lastId: newLastId,
+      });
+    } catch (error) {
+      console.error('Error fetching community topics:', error);
+      next(error);
+    }
+  };
+  const communityEventsCollection = db.collection('communityEvents'); // <-- Add this line
+
+  // GET /api/v1/community/events
+  exports.getCommunityEvents = async (req, res, next) => {
+    try {
+      const { limit = 10, lastId, orderBy = 'date', orderDir = 'desc' } = req.query;
+      const parsedLimit = parseInt(limit, 10);
+  
+      if (isNaN(parsedLimit) || parsedLimit <= 0 || parsedLimit > 50) {
+        return next(new AppError('Invalid limit value (must be 1-50)', 400, 'INVALID_LIMIT'));
+      }
+      const validOrderBy = ['date', 'title'];
+      const validOrderDir = ['asc', 'desc'];
+      if (!validOrderBy.includes(orderBy) || !validOrderDir.includes(orderDir)) {
+        return next(new AppError('Invalid orderBy or orderDir parameter', 400, 'INVALID_SORT'));
+      }
+  
+      let query = communityEventsCollection.orderBy(orderBy, orderDir).limit(parsedLimit); // <-- Use the correct collection
+  
+      if (lastId) {
+        const lastDocSnapshot = await communityEventsCollection.doc(lastId).get(); // <-- Use the correct collection
+        if (lastDocSnapshot.exists) {
+          query = query.startAfter(lastDocSnapshot);
+        } else {
+          console.warn(`Pagination lastId '${lastId}' not found for events. Starting from beginning.`);
+        }
+      }
+  
+      const eventsSnapshot = await query.get();
+  
+      if (eventsSnapshot.empty) {
+        return res.json({ events: [], hasMore: false, lastId: null });
+      }
+  
+      const events = eventsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const eventDate = data.date?.toDate();
+        const isUpcoming = eventDate && eventDate > new Date();
+        return {
+          id: doc.id,
+          title: data.title || 'Untitled Event',
+          date: eventDate ? eventDate.toISOString().split('T')[0] : '',
+          time: data.time || '',
+          description: data.description || '',
+          attending: data.attending || 0,
+          interested: data.interested || 0,
+          speakers: data.speakers || 0,
+          daysLeft: isUpcoming && eventDate ? Math.ceil((eventDate - new Date()) / (1000 * 60 * 60 * 24)) : 0,
+          isUpcoming: isUpcoming,
+        };
+      });
+  
+      const newLastId = events.length > 0 ? events[events.length - 1].id : null;
+  
+      res.json({
+        events,
+        hasMore: events.length === parsedLimit,
+        lastId: newLastId,
+      });
+    } catch (error) {
+      console.error('Error fetching community events:', error);
+      next(error);
+    }
+  };

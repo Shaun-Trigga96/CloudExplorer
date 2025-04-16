@@ -13,14 +13,15 @@
 // Make sure the paths are correct relative to index.js
 const authFunctions = require("./src/auth/auth"); // Loads exports from auth.js [cite: uploaded:src/auth/auth.js]
 const emailFunctions = require("./src/email/email"); // Loads exports from email.js [cite: uploaded:src/email/email.js]
-// If you add more function groups (e.g., ./src/payments/payments.js), require them here:
-// const paymentFunctions = require("./src/payments/payments");
+const cloudEventsFunctions = require("./src/events/cloudEvents"); // Loads exports from cloudEvents.js
+const communityPostFunctions = require("./src/events/posts"); // <-- Add this line
 
 // Export all the loaded functions together.
 // Firebase CLI will look at the exports of this file.
 module.exports = {
   ...authFunctions, // This includes initializeNewUser as exported by auth.js
   ...emailFunctions, // This includes updateEmailSubscription as exported by email.js
-  // ...paymentFunctions, // Include other groups if you add them
+  ...cloudEventsFunctions, // This includes fetchCloudEvents and manualFetchCloudEvents
+  ...communityPostFunctions, // <-- Export the post-related functions
 };
 

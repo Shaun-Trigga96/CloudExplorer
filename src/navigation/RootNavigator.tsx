@@ -7,7 +7,7 @@ import ModuleDetailScreen from '../screens/ModuleDetailScreen';
 import QuizzesDetailScreen from '../screens/QuizzesDetailScreen';
 import ExamDetailsScreen from '../screens/ExamDetailsScreen';
 import DashboardScreen from './../screens/DashboardScreen';
-import CommunityScreen from '../screens/CommunityScreen';
+import CreatePostScreen from '../screens/CreatePostScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -24,6 +24,7 @@ export type RootStackParamList = {
   DashboardScreen: undefined;
   ExamsScreen: undefined;
   CommunityScreen: undefined;
+  CreatePostScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -49,7 +50,17 @@ const RootNavigator = () => {
       <Stack.Screen name="ProfileScreen" component={TabNavigator} />
       <Stack.Screen name="DashboardScreen" component={DashboardScreen} />
       <Stack.Screen name="CommunityScreen" component={TabNavigator} />
-
+      <Stack.Screen name="CreatePostScreen" component={CreatePostScreen}
+        options={{
+          headerShown: true,
+          title: 'Create Post',
+          headerTitleAlign: 'center',
+          headerTintColor: '#fff',
+          headerStyle: {
+            backgroundColor: '#6200ee',
+          },
+        }}  
+      />
     </Stack.Navigator>
   );
 }

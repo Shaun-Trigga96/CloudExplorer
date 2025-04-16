@@ -80,9 +80,6 @@ yarn-error.log
 
 # Start Up Script
 script-start-push-images.sh
-/cloud-explorer-c3d98-firebase-adminsdk-4tota-5a332e02f6.json
-/src/config/cloud-explorer-c3d98-firebase-adminsdk-4tota-5a332e02f6.json
-/src/config/credentials.json
 /dist
 /backend/src/config/cloud-explorer-c3d98-firebase-adminsdk-4tota-5a332e02f6.json
 /backend/src/config/credentials.json

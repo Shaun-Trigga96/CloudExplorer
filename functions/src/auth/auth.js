@@ -41,7 +41,7 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
     settings: {
       notificationsEnabled: false,
       darkMode: false,
-      emailUpdates: true,
+      emailUpdates: false,
       syncData: false,
       soundEffects: false,
     },

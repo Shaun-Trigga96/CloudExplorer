@@ -38,3 +38,9 @@ export const handleAxiosError = (error: unknown, context: string = 'Operation') 
     Alert.alert('Error', `${context} failed: ${errorMessage}`);
   }
 };
+
+export const handleApiError = (error: any, defaultMessage: string) => {
+  console.error('API Error:', error);
+  const message = error.response?.data?.message || defaultMessage;
+  Alert.alert('Error', message);
+};

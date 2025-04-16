@@ -30,7 +30,7 @@ const PostItem: FC<PostItemProps> = ({ post, onLike }) => {
             <Text style={[styles.userRole, { color: colors.textSecondary }]}>{post.user?.level || 'Member'}</Text>
           </View>
         </View>
-        <Text style={[styles.postTime, { color: colors.textSecondary }]}>{formatRelativeTime(post.timestamp)}</Text>
+        <Text style={[styles.postTime, { color: colors.textSecondary }]}>{formatRelativeTime(post.timestamp.toString())}</Text>
       </View>
 
       <Text style={[styles.content, { color: colors.text }]}>{post.content}</Text>
