@@ -1,11 +1,26 @@
-export interface LearningProgress {
+import { FieldValue, Timestamp } from "@react-native-firebase/firestore";
+
+export interface LearningPath {
+  providerId: string;
+  pathId: string;
+  startedAt: string | null; // Converted to ISO string on frontend
+  lastAccessedAt: string | null; // Converted to ISO string on frontend
+  completed: boolean;
+  completedAt?: string | null; // Converted to ISO string on frontend
+  learningProgress: {
     completedModules: string[];
     completedQuizzes: string[];
     completedExams: string[];
-    modulesInProgress: string[];
-    score: number | null;
-  }
-  
+    score: number;
+  };
+}
+
+export interface OverallProgress {
+  totalModulesCompleted: number;
+  totalQuizzesCompleted: number;
+  totalScore: number;
+}
+
   export interface ProgressEntry {
     moduleId: string;
     quizId: string;
@@ -31,6 +46,7 @@ export interface LearningProgress {
   export interface QuizResult {
     id: string;
     moduleId: string;
+    quizId: string; // <--- ADD THIS LINE
     score: number;
     totalQuestions: number;
     percentage: number;

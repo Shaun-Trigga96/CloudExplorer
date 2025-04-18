@@ -12,5 +12,8 @@
       ],
      "predeploy": []
     }
-  ]
+  ],
+"firestore": {
+  "indexes": "functions/firestore.indexes.json"
+}
 }

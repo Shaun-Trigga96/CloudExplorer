@@ -89,9 +89,10 @@ export const useAuth = (
       // TEMPORARY CHANGE: Log Google Sign-In errors instead of showing an Alert
       // (Useful for debugging the 'activity is null' issue without the secondary alert error)
       if (method === 'Google Sign-In') {
+        
         console.error(`Authentication Error (${method}):`, errorMessage, error);
         // If you want to show an alert *specifically* for Google errors later, uncomment below
-        // Alert.alert('Authentication Error', errorMessage);
+        Alert.alert('Authentication Error', `${errorMessage}\n\nPlease check console for details.`);
         return; // Prevent the default alert for Google Sign-In errors for now
       }
   
@@ -121,12 +122,11 @@ export const useAuth = (
               email: userCredential.user.email,
               displayName: userCredential.user.email?.split('@')[0] || 'New User',
               createdAt: firestore.FieldValue.serverTimestamp(),
-              learningProgress: {
-                completedModules: [],
-                completedQuizzes: [],
-                completedExams: [],
-                score: 0,
-              },
+              bio: "",
+              lastLogin: firestore.FieldValue.serverTimestamp(),
+              learningPathsCount: 0,
+              hasActivePath: false,
+              activePath: null,
               settings: {
                 notificationsEnabled: false,
                 darkMode: false,
@@ -139,8 +139,11 @@ export const useAuth = (
           );
       }
       await saveUserId(userCredential.user.uid);
-      navigation.navigate('Home');
-    } catch (error: any) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });    } 
+      catch (error: any) {
       handleAuthError(error, 'Email authentication');
     } finally {
       setLoading(false);
@@ -152,7 +155,10 @@ export const useAuth = (
     try {
       const userCredential = await googleAuthService.signIn();
       await saveUserId(userCredential.user.uid);
-      navigation.navigate('Home');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });    
     } catch (error: any) {
       handleAuthError(error, 'Google Sign-In');
     } finally {
@@ -166,8 +172,11 @@ export const useAuth = (
     try {
       const userCredential = await appleAuthService.signIn();
       await saveUserId(userCredential.user.uid);
-      navigation.navigate('Home');
-    } catch (error: any) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });
+        } catch (error: any) {
       handleAuthError(error, 'Apple Sign-In');
     } finally {
       setLoading(false);

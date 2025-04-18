@@ -18,7 +18,11 @@ export const useAuthCheck = (
     const subscriber = auth().onAuthStateChanged(async (user) => {
       const storedUserId = await AsyncStorage.getItem('userId');
       if (user || storedUserId) {
-        navigation.replace('MainApp');
+        navigation.replace('Home');
+        setCheckingAuth(false);
+      } else if (navigation.canGoBack()) {
+        navigation.popToTop();
+        navigation.navigate('Auth');
       } else {
         setCheckingAuth(false);
       }

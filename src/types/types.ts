@@ -31,11 +31,11 @@ interface Question { // Assuming structure from AI parser
     photoURL?: string;
     createdAt: Date;
     lastLogin: Date;
-    learningProgress: {
-      completedModules: string[];
-      completedQuizzes: string[];
-      completedExams: string[];
-      score: number;
+    learningPaths: LearningPath[];
+    overallProgress: {
+      totalModulesCompleted: number;
+      totalQuizzesCompleted: number;
+      totalScore: number;
     };
     settings: {
       notificationsEnabled: boolean;
@@ -43,6 +43,17 @@ interface Question { // Assuming structure from AI parser
       emailUpdates: boolean,
       syncData: boolean,
       soundEffects: boolean,
+    };
+  }
+
+  export interface LearningPath {
+    id: string;           // Unique identifier
+    name: string;         // Display name of the path
+    providerId: string;   // Reference to the provider
+    pathId: string;       // Identifier within the provider's system
+    logoUrl?: string;     // Optional logo URL (add this to fix your type error)
+    progress: {
+      completionPercentage: number;  // Overall completion percentage (0-100)
     };
   }
 
@@ -67,9 +78,6 @@ interface Question { // Assuming structure from AI parser
     sections?: Section[]; // Array of sections with title, content, and order
 }
 
-export interface ModuleWithContent extends Module {
-    rawContent: any; // Raw Google Doc content
-  }
 
   interface Section {
     id?: string; // ID will be generated or based on order

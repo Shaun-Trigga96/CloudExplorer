@@ -1,5 +1,4 @@
 // src/types/quiz.ts
-import { ImageSourcePropType } from 'react-native';
 
 export interface Quiz {
   id: string;

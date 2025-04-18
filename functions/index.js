@@ -15,6 +15,8 @@ const authFunctions = require("./src/auth/auth"); // Loads exports from auth.js 
 const emailFunctions = require("./src/email/email"); // Loads exports from email.js [cite: uploaded:src/email/email.js]
 const cloudEventsFunctions = require("./src/events/cloudEvents"); // Loads exports from cloudEvents.js
 const communityPostFunctions = require("./src/events/posts"); // <-- Add this line
+const populateLearningOptions = require("./src/events/populateLearningOptions"); // <-- Add this line
+const indexes = require("./firestore.indexes.json");
 
 // Export all the loaded functions together.
 // Firebase CLI will look at the exports of this file.
@@ -23,5 +25,7 @@ module.exports = {
   ...emailFunctions, // This includes updateEmailSubscription as exported by email.js
   ...cloudEventsFunctions, // This includes fetchCloudEvents and manualFetchCloudEvents
   ...communityPostFunctions, // <-- Export the post-related functions
+  ...populateLearningOptions, // <-- Export the admin functions (includes populateLearningOptions)
+  ...indexes,
 };
 

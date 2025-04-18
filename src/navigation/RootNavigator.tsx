@@ -1,3 +1,4 @@
+// c:\Users\thabi\Desktop\CloudExplorer\src\navigation\RootNavigator.tsx
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import AuthScreen from '../screens/AuthScreen';
@@ -6,61 +7,85 @@ import TabNavigator from './TabNavigator';
 import ModuleDetailScreen from '../screens/ModuleDetailScreen';
 import QuizzesDetailScreen from '../screens/QuizzesDetailScreen';
 import ExamDetailsScreen from '../screens/ExamDetailsScreen';
-import DashboardScreen from './../screens/DashboardScreen';
 import CreatePostScreen from '../screens/CreatePostScreen';
+import { useCustomTheme } from '../context/ThemeContext'; // Import theme hook
 
 export type RootStackParamList = {
   Auth: undefined;
   Home: undefined;
   ModuleDetail: { moduleId: string };
-  MainApp: undefined;
-  ModulesScreen: undefined;
-  QuizzesScreen: undefined;
+  MainApp: { provider: string; path: string }; // Define the expected parameters
+  ModulesScreen: { provider: string; path: string }; // Direct access, likely within TabNavigator
+  QuizzesScreen: undefined; // Direct access, likely within TabNavigator
   QuizzesDetail: { moduleId: string };
   ExamDetail: { examId: string; title: string };
-  SettingsScreen: undefined;
-  CertificationsScreen: undefined;
-  ProfileScreen: undefined;
-  DashboardScreen: undefined;
-  ExamsScreen: undefined;
-  CommunityScreen: undefined;
+  SettingsScreen: undefined; // Direct access, likely within TabNavigator
+  CertificationsScreen: undefined; // Direct access, likely within TabNavigator
+  ProfileScreen: undefined; // Direct access, likely within TabNavigator
+  DashboardScreen: undefined; // Direct access, likely within TabNavigator
+  ExamsScreen: undefined; // Direct access, likely within TabNavigator
+  CommunityScreen: undefined; // Direct access, likely within TabNavigator
   CreatePostScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 const RootNavigator = () => {
+  const { colors } = useCustomTheme().theme; // Get theme colors
+
   return (
     <Stack.Navigator
-      initialRouteName="Auth"
       screenOptions={{
-        headerShown: false, gestureEnabled: false,
+        headerShown: false,
+        gestureEnabled: false, 
       }}
     >
+      {/* Screens accessible before/during authentication */}
       <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="ModulesScreen" component={TabNavigator} />
-      <Stack.Screen name="ModuleDetail" component={ModuleDetailScreen}/>
-      <Stack.Screen name="QuizzesScreen" component={TabNavigator} />
-      <Stack.Screen name="QuizzesDetail" component={QuizzesDetailScreen} />
-      <Stack.Screen name="ExamDetail" component={ExamDetailsScreen} />
+
+      {/* Main application screens, grouped under TabNavigator */}
+      {/* The 'MainApp' route points to the TabNavigator component */}
       <Stack.Screen name="MainApp" component={TabNavigator} />
-      <Stack.Screen name="SettingsScreen" component={TabNavigator} />
-      <Stack.Screen name="CertificationsScreen" component={TabNavigator} />
-      <Stack.Screen name="ProfileScreen" component={TabNavigator} />
-      <Stack.Screen name="DashboardScreen" component={DashboardScreen} />
-      <Stack.Screen name="CommunityScreen" component={TabNavigator} />
-      <Stack.Screen name="CreatePostScreen" component={CreatePostScreen}
+
+      {/* Detail Screens - These are pushed on top of the current stack (including tabs) */}
+      <Stack.Screen
+        name="ModulesScreen"
+        component={TabNavigator}
+        options={{ headerShown: true, title: 'Modules' }} // Example: Show header for detail screens
+      />
+      <Stack.Screen
+        name="ModuleDetail"
+        component={ModuleDetailScreen}
+        options={{ headerShown: true, title: 'Module Details' }} // Example: Show header for detail screens
+      />
+      <Stack.Screen
+        name="QuizzesDetail"
+        component={QuizzesDetailScreen}
+        options={{ headerShown: true, title: 'Quiz' }}
+      />
+      <Stack.Screen
+        name="ExamDetail"
+        component={ExamDetailsScreen}
+        options={{ headerShown: true, title: 'Exam Practice' }}
+      />
+      <Stack.Screen
+        name="CreatePostScreen"
+        component={CreatePostScreen}
         options={{
           headerShown: true,
           title: 'Create Post',
           headerTitleAlign: 'center',
-          headerTintColor: '#fff',
+          // Use theme colors for the header
+          headerTintColor: colors.background, // Color for title and back button
           headerStyle: {
-            backgroundColor: '#6200ee',
+            backgroundColor: colors.background, // Background color from theme
           },
-        }}  
+          // Optionally customize back button behavior/appearance if needed
+          headerBackTitleVisible: false,
+        }}
       />
+
     </Stack.Navigator>
   );
 }

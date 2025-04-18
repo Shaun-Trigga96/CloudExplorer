@@ -1,5 +1,15 @@
 import React, { FC, useEffect, useState, useRef } from 'react';
-import { ScrollView, StyleSheet, View, Text } from 'react-native';
+import { 
+  ScrollView, 
+  StyleSheet, 
+  View, 
+  Text, 
+  findNodeHandle, 
+  Alert,
+  TouchableOpacity,
+  NativeScrollEvent,
+  NativeSyntheticEvent
+} from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,7 +23,7 @@ import HeaderCard from '../components/moduleDetail/HeaderCard';
 import SectionCard from '../components/moduleDetail/SectionCard';
 import CompleteButton from '../components/moduleDetail/CompleteButton';
 import { ErrorView, LoadingView } from '../components/common';
-import { useIsContentRead } from '../utils/useIsContentRead';
+import { useIsContentRead } from '../components/hooks/useIsContentRead';
 import { Module, Section } from '../types/moduleDetail';
 import { useCustomTheme } from '../context/ThemeContext';
 import { handleError } from '../utils/handleError';
@@ -30,6 +40,7 @@ interface ModuleDetailScreenProps {
   navigation: ModuleDetailScreenNavigationProp;
 }
 
+// --- preprocessMarkdownWithIcons function remains the same ---
 const preprocessMarkdownWithIcons = (
   content: string,
   colors: typeof lightColors | typeof darkColors
@@ -104,10 +115,11 @@ const preprocessMarkdownWithIcons = (
         </Text>,
       ];
 };
+// --- End of preprocessMarkdownWithIcons ---
+
 
 const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) => {
   const { moduleId } = route.params;
-  const { isDarkMode } = useCustomTheme();
   const { colors } = useCustomTheme().theme;
   const [module, setModule] = useState<Module | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
@@ -116,14 +128,20 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
 
+  // Track last scroll position to detect when user reaches bottom
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+
+
   const fadeAnim = useSharedValue(0);
 
   const sectionRefs = useRef<React.RefObject<View>[]>([]);
   const scrollViewRef = useRef<ScrollView>(null);
-  const [, setVisibleSections] = useState<Set<number>>(new Set());
 
-  const { sectionsRead, markSectionAsRead, allContentRead } = useIsContentRead(sectionRefs.current);
-
+  const { sectionsRead, markSectionAsRead, markAllSectionsAsRead, allContentRead } = useIsContentRead(sectionRefs.current);
+  
+  // Load user ID on mount
   useEffect(() => {
     const loadUserId = async () => {
       const id = await AsyncStorage.getItem('userId');
@@ -131,7 +149,8 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
     };
     loadUserId();
   }, []);
-
+  
+  // Fetch module data and sections
   useEffect(() => {
     const fetchModuleData = async () => {
       try {
@@ -147,12 +166,16 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
         const sectionsResponse = await axios.get<Section[]>(`${BASE_URL}/api/v1/modules/${moduleId}/sections`, {
           timeout: 10000,
         });
-        setSections(sectionsResponse.data);
         sectionRefs.current = sectionsResponse.data.map(() => React.createRef<View>());
+        setSections(sectionsResponse.data);
       } catch (err) {
         handleError(err, setError);
       }
     };
+
+    setIsFetching(true);
+    setError(null);
+    fadeAnim.value = 0;
 
     Promise.all([fetchModuleData(), fetchSections()])
       .then(() => {
@@ -160,62 +183,144 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
         setTimeout(() => setIsFetching(false), 600);
       })
       .catch(err => {
-        handleError(err, setError);
         setIsFetching(false);
       });
   }, [moduleId, fadeAnim]);
 
-  const handleScroll = ({ nativeEvent }: { nativeEvent: any }) => {
-    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-    const paddingToBottom = 20;
+// Simple and reliable approach - mark sections read based on time and scroll position
+const [sectionTimeTracking, setSectionTimeTracking] = useState<{[key: number]: number}>({});
 
-    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
-      sectionRefs.current.forEach((_, index) => markSectionAsRead(index));
-    }
+// Called when a section becomes visible
+const startTrackingSection = (index: number) => {
+  if (!sectionTimeTracking[index]) {
+    setSectionTimeTracking(prev => ({
+      ...prev,
+      [index]: Date.now()
+    }));
+  }
+};
 
-    const visibleStart = contentOffset.y;
-    const visibleEnd = visibleStart + layoutMeasurement.height;
-    const newVisibleSections = new Set<number>();
+// On scroll, check what sections are now visible
+const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+  
+  // Check if we've scrolled to bottom (mark all read)
+  const isNearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 50;
+  if (isNearBottom) {
+    markAllSectionsAsRead();
+    return;
+  }
+  
+  // Simplified approach: as user scrolls, assume they're reading sections in order
+  // Start with the first section
+  const scrollProgress = contentOffset.y / (contentSize.height - layoutMeasurement.height);
+  const estimatedSectionIndex = Math.floor(scrollProgress * sections.length);
+  
+  // Mark current and previous sections as being viewed
+  for (let i = 0; i <= Math.min(estimatedSectionIndex, sections.length - 1); i++) {
+    startTrackingSection(i);
+  }
+};
 
-    sections.forEach((_, index) => {
-      const approximateSectionHeight = contentSize.height / sections.length;
-      const sectionStart = index * approximateSectionHeight;
-      const sectionEnd = sectionStart + approximateSectionHeight;
-
-      if (
-        (sectionStart >= visibleStart && sectionStart <= visibleEnd) ||
-        (sectionEnd >= visibleStart && sectionEnd <= visibleEnd)
-      ) {
-        newVisibleSections.add(index);
+// Check every second if sections have been viewed long enough to mark as read
+useEffect(() => {
+  const interval = setInterval(() => {
+    const now = Date.now();
+    const readThreshold = 2000; // 2 seconds of viewing time to mark as read
+    
+    Object.entries(sectionTimeTracking).forEach(([indexStr, startTime]) => {
+      const index = parseInt(indexStr);
+      if (now - startTime > readThreshold && !sectionsRead[index]) {
         markSectionAsRead(index);
       }
     });
-
-    setVisibleSections(newVisibleSections);
+  }, 1000);
+  
+  return () => clearInterval(interval);
+}, [sectionTimeTracking, sectionsRead, markSectionAsRead]);
+  // Handle scroll end event for better detection
+  const handleScrollEnd = () => {
+    // Additional check when scrolling ends
+    const isAtBottom = lastScrollY + viewportHeight >= contentHeight - 50;
+    
+    if (isAtBottom) {
+      markAllSectionsAsRead();
+    }
+    
+    // Check if the user has scrolled through at least 90% of content
+    const scrollPercentage = (lastScrollY + viewportHeight) / contentHeight;
+    if (scrollPercentage > 0.9) {
+      markAllSectionsAsRead();
+    }
   };
 
+  // Handle module completion
   const handleModuleCompletion = async () => {
     if (!userId) {
       setError('User not logged in');
       return;
     }
+  // Additional check to prevent false positives
+  if (!allContentRead) {
+    Alert.alert(
+      "Not Finished", 
+      "Please scroll through all the content before completing.",
+      [
+        { 
+          text: "Keep Reading", 
+          style: "cancel" 
+        },
+        {
+          text: "Mark All Read",
+          onPress: () => {
+            markAllSectionsAsRead();
+          }
+        }
+      ]
+    );
+    return;
+  }
 
-    setIsLoading(true);
-    try {
-      await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, {
-        resourceType: 'module',
-        resourceId: moduleId,
-        action: 'complete',
-        timestamp: new Date().toISOString(),
-      });
-      navigation.navigate('QuizzesDetail', { moduleId });
-    } catch (err) {
-      handleError(err, setError);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  setIsLoading(true);
+  try {
+    await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, {
+      resourceType: 'module',
+      resourceId: moduleId,
+      action: 'complete',
+      timestamp: new Date().toISOString(),
+    });
+    
+    // Navigate to quiz after successful completion
+    navigation.navigate('QuizzesDetail', { moduleId });
+  } catch (err) {
+    handleError(err, setError);
+    Alert.alert("Error", "Failed to mark module as complete. Please try again.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
+// Force mark all content as read (debug/accessibility feature)
+const forceMarkAllAsRead = () => {
+  markAllSectionsAsRead();
+  Alert.alert("Success", "All content marked as read.");
+};
+
+// Render loading state
+if (isFetching) {
+  return <LoadingView message="Loading module content..." />;
+}
+
+// Render error state
+if (error) {
+  return <ErrorView message={error} onRetry={() => {
+    // Reset error and trigger fetch again
+    setError(null);
+    setIsFetching(true);
+  }} />;
+}
+
+  // Handle retry on error
   const handleRetry = () => {
     setError(null);
     setIsFetching(true);
@@ -237,8 +342,8 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
         const sectionsResponse = await axios.get<Section[]>(`${BASE_URL}/api/v1/modules/${moduleId}/sections`, {
           timeout: 10000,
         });
-        setSections(sectionsResponse.data);
         sectionRefs.current = sectionsResponse.data.map(() => React.createRef<View>());
+        setSections(sectionsResponse.data);
       } catch (err) {
         handleError(err, setError);
       }
@@ -255,10 +360,12 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
       });
   };
 
+  // Render loading state
   if (isFetching) {
-    return <LoadingView />;
+    return <LoadingView message="Loading module content..." />;
   }
 
+  // Render error state
   if (error) {
     return <ErrorView message={error} onRetry={handleRetry} />;
   }
@@ -270,20 +377,39 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         onScroll={handleScroll}
-        scrollEventThrottle={400}
+        onScrollEndDrag={handleScrollEnd}
+        onMomentumScrollEnd={handleScrollEnd}
+        scrollEventThrottle={100} // More frequent updates
+        showsVerticalScrollIndicator={true}
       >
+        {/* Header Card */}
         <HeaderCard
-          title={module?.title || 'No title'}
-          description={module?.description || 'No description'}
+          title={module?.title || 'Module Title'}
+          description={module?.description || 'Module description.'}
           fadeAnim={fadeAnim}
         />
+
+        {/* Debug info (remove in production) */}
+        <View style={styles.readStatusContainer}>
+          <Text style={{ color: colors.primary }}>
+            Read progress: {sectionsRead.filter(Boolean).length}/{sectionsRead.length}
+          </Text>
+          <TouchableOpacity 
+            style={styles.debugButton}
+            onPress={forceMarkAllAsRead}
+          >
+            <Text style={styles.debugButtonText}>Mark All Read</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Section Cards */}
         {sections.length > 0 ? (
           sections.map((section, index) => {
-            const content = preprocessMarkdownWithIcons(section.content || 'No content available', colors);
             return (
               <SectionCard
-                key={section.id}
-                content={content}
+                key={section.id || `section-${index}`}
+                title={section.title || `Section ${index + 1}`}
+                content={preprocessMarkdownWithIcons(section.content || '', colors)}
                 isRead={sectionsRead[index] || false}
                 fadeAnim={fadeAnim}
                 innerRef={sectionRefs.current[index]}
@@ -292,12 +418,13 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
           })
         ) : (
           <SectionCard
+            title="No Content"
             content={[
               <Text
-                key="no-content"
+                key="no-sections"
                 style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 16, fontFamily: 'System' }}
               >
-                No content available
+                No sections found for this module.
               </Text>,
             ]}
             isRead={false}
@@ -306,7 +433,13 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
           />
         )}
       </ScrollView>
-      <CompleteButton isLoading={isLoading} allContentRead={allContentRead} onPress={handleModuleCompletion} />
+
+      {/* Complete Button */}
+      <CompleteButton
+        isLoading={isLoading}
+        allContentRead={allContentRead}
+        onPress={handleModuleCompletion}
+      />
     </View>
   );
 };
@@ -319,9 +452,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 20,
-    paddingBottom: 80,
+    padding: 16,
+    paddingBottom: 90,
   },
+  readStatusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  debugButton: {
+    backgroundColor: '#006699',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+  },
+  debugButtonText: {
+    color: 'white',
+    fontSize: 14,
+  }
 });
 
 export default ModuleDetailScreen;

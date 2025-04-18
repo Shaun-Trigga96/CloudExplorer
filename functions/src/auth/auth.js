@@ -32,12 +32,9 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     bio: "",
     lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-    learningProgress: {
-      completedModules: [],
-      completedQuizzes: [],
-      completedExams: [],
-      score: 0,
-    },
+    learningPathsCount: 0,
+    hasActivePath: false,
+    activePath: null,
     settings: {
       notificationsEnabled: false,
       darkMode: false,
@@ -84,7 +81,7 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
           to: userRecord.email,
           from: "cloudexplorer1996@gmail.com", // Your verified sender
           subject: "Welcome to Cloud Explorer!",
-          text: `Welcome aboard, ${newUserProfile.displayName}!\n\nWe're excited to have you join Cloud Explorer. Start exploring GCP concepts today!\n\nHappy Learning,\nThe Cloud Explorer Team`,
+          text: `Welcome aboard, ${newUserProfile.displayName}!\n\nWe're excited to have you join Cloud Explorer. Start exploring cloud concepts today!\n\nHappy Learning,\nThe Cloud Explorer Team`,
           html: `
           <!DOCTYPE html>
           <html lang="en">
@@ -139,7 +136,7 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
                   <img src="https://firebasestorage.googleapis.com/v0/b/cloud-explorer-c3d98.firebasestorage.app/o/cloud_explorer.png?alt=media&token=cb42c19a-5be2-4b3d-a8ec-fef71d02a698" alt="Cloud Explorer Logo" class="logo">
                   <h1>Welcome to Cloud Explorer, ${newUserProfile.displayName}!</h1>
                   <p>We're thrilled to welcome you to the Cloud Explorer community! Your journey into the world of cloud computing starts now.</p>
-                  <p>Get ready to explore, learn, and master the concepts of GCP. We've got a ton of resources to help you on your way.</p>
+                  <p>Get ready to explore, learn, and master the concepts of cloud platforms. We've got a ton of resources to help you on your way.</p>
                   <a href="https://your-cloud-explorer-app-url.com" class="button">Start Exploring</a>
                   <div class="footer">
                       <p>Happy Learning,</p>
@@ -156,13 +153,13 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
         // Add detailed error capture
         try {
           const [response] = await sgMail.send(msg);
-          logger.info(`[auth.js] Welcome email successfully sent to ${userRecord.email}. Status: ${response.data.statusCode}`);
+          logger.info(`[auth.js] Welcome email successfully sent to ${userRecord.email}. Status: ${response.statusCode || "Unknown"}`);
         } catch (sendError) {
           // Log detailed error information
           logger.error(`[auth.js] SendGrid send error:`, {
             message: sendError.message,
             code: sendError.code,
-            response: sendError.response.data.body || null,
+            response: (sendError.response && sendError.response.data && sendError.response.data.body) || null,
           });
           throw sendError; // Re-throw to be caught by outer catch
         }

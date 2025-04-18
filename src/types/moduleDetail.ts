@@ -5,6 +5,7 @@ export interface Module {
   }
   
   export interface Section {
+    title: string;
     id: string;
     content: string;
   }

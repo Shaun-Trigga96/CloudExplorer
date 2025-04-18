@@ -20,4 +20,5 @@ export const handleError = (err: any, setError: (error: string | null) => void) 
   }
   Alert.alert('Error', message, [{ text: 'OK' }]);
   setError(message);
+  return null; 
 };

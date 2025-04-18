@@ -208,44 +208,45 @@ const CommunityScreen: FC<CommunityScreenProps> = ({ navigation }) => {
           }
           setPostsLastId(postsResponse.data.lastId);
           setHasMorePosts(postsResponse.data.hasMore);
-        } catch (error) { 
-          console.error('Error fetching posts:', error); 
-          setHasMorePosts(false); 
-        }
-      }
-  
-      // Fetch Members
-      if ((refresh || selectedTab === 'members') && hasMoreMembers) {
-        try {
-          const membersParams = { limit: 15, lastId: refresh ? undefined : membersLastId };
-          const membersResponse = await axios.get(`${BASE_URL}/api/v1/community/members`, { params: membersParams });
-          const newMembers = membersResponse.data.members || [];
-  
-          if (!refresh) {
-            // Filter out members that already exist in the current state before adding
-            setMembers(prev => {
-              const existingIds = new Set(prev.map(m => m.id));
-              // Ensure newMembers is typed correctly if needed, assuming it's CommunityMember[]
-              const trulyNewMembers = newMembers.filter((member: CommunityMember) => !existingIds.has(member.id));
-              // Optional: Log if duplicates were filtered
-              if (trulyNewMembers.length < newMembers.length) {
-                console.log(`Filtered out ${newMembers.length - trulyNewMembers.length} duplicate members during load more.`);
-              }
-              return [...prev, ...trulyNewMembers];
-            });
-          } else {
-            // Refresh logic replaces the array
-            setMembers(newMembers);
-          }
-  
-          setMembersLastId(membersResponse.data.lastId);
-          setHasMoreMembers(membersResponse.data.hasMore);
         } catch (error) {
-          console.error('Error fetching members:', error);
-          setHasMoreMembers(false); // Stop trying to load more if an error occurs
+          console.error('Error fetching posts:', error);
+          setHasMorePosts(false);
         }
       }
-  
+
+   // Fetch Members
+if ((refresh || selectedTab === 'members') && hasMoreMembers) {
+  try {
+    const membersParams = { limit: 15, lastId: refresh ? undefined : membersLastId };
+    const membersResponse = await axios.get(`${BASE_URL}/api/v1/community/members`, { params: membersParams });
+    const newMembers = membersResponse.data.members || [];
+
+    if (!refresh) {
+      // Filter out members that already exist in the current state before adding
+      setMembers(prev => {
+        const existingIds = new Set(prev.map(m => m.id));
+        // Ensure newMembers is typed correctly if needed, assuming it's CommunityMember[]
+        const trulyNewMembers = newMembers.filter((member: CommunityMember) => !existingIds.has(member.id));
+        // Optional: Log if duplicates were filtered
+        // if (trulyNewMembers.length < newMembers.length) {
+        //   console.log(`Filtered out ${newMembers.length - trulyNewMembers.length} duplicate members during load more.`);
+        // }
+        return [...prev, ...trulyNewMembers];
+      });
+    } else {
+      // Refresh logic replaces the array
+      setMembers(newMembers);
+    }
+
+    setMembersLastId(membersResponse.data.lastId);
+    setHasMoreMembers(membersResponse.data.hasMore);
+  } catch (error) {
+    console.error('Error fetching members:', error);
+    setHasMoreMembers(false); // Stop trying to load more if an error occurs
+  }
+}
+
+
       // Fetch Events - Fix 2: Fix indentation and structure
       if ((refresh || selectedTab === 'events') && hasMoreEvents) {
         try {
@@ -256,7 +257,7 @@ const CommunityScreen: FC<CommunityScreenProps> = ({ navigation }) => {
           };
           const eventsResponse = await axios.get(`${BASE_URL}/api/v1/community/events`, { params: eventsParams });
           const newEvents = eventsResponse.data.events || [];
-     
+
           if (!refresh) {
             setEvents(prev => {
               const existingIds = new Set(prev.map(e => e.id));
@@ -272,7 +273,7 @@ const CommunityScreen: FC<CommunityScreenProps> = ({ navigation }) => {
             // Refresh logic replaces the array
             setEvents(newEvents);
           }
-     
+
           setEventsLastId(eventsResponse.data.lastId);
           setHasMoreEvents(eventsResponse.data.hasMore);
         } catch (error) {
@@ -287,20 +288,20 @@ const CommunityScreen: FC<CommunityScreenProps> = ({ navigation }) => {
       setIsFetchingMore(false);
     }
   };
-  
+
   // Fix 4: Update these callbacks to use the proper function reference
   const handleLoadMorePosts = useCallback(() => {
     if (!isFetchingMore && hasMorePosts) {
       fetchCommunityData(false, userId);
     }
   }, [isFetchingMore, hasMorePosts, userId]);
-  
+
   const handleLoadMoreMembers = useCallback(() => {
     if (!isFetchingMore && hasMoreMembers) {
       fetchCommunityData(false, userId);
     }
   }, [isFetchingMore, hasMoreMembers, userId]);
-  
+
   const handleLoadMoreEvents = useCallback(() => {
     if (!isFetchingMore && hasMoreEvents) {
       fetchCommunityData(false, userId);

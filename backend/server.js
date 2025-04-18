@@ -91,6 +91,7 @@ const appRoutes = require('./routes/appRoutes'); // Added
 const emailRoutes = require('./routes/emailRoutes'); // Import email routes
 const credlyRoutes = require('./routes/credlyRoutes');
 const communityRoutes = require('./routes/communityRoutes'); // <-- Import new routes
+const providerPathRoutes = require('./routes/providerPathRoutes'); // Import the new routes
 
 // --- Express App Setup ---
 const app = express();
@@ -118,6 +119,8 @@ app.use('/api/v1/exams', examRoutes); // Added/Updated: /api/v1/exams/...
 app.use('/api/v1/email', emailRoutes); // Mount email routes under /api/v1/email
 app.use('/api/v1/credly', credlyRoutes);
 app.use('/api/v1/community', communityRoutes); // <-- Add community routes
+app.use('/api/v1', providerPathRoutes);
+app.use('/api/v1', require('./routes/appRoutes')); // General routes like /health
 
 // --- Health Check Route ---
 app.get('/health', (req, res) => {

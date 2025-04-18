@@ -7,3 +7,4 @@ export * from './common';
 export * from './dashboard';
 export * from './examDetail';
 export * from './moduleDetail';
+export * from './community';

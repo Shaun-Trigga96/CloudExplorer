@@ -5,6 +5,8 @@ import { getTheme } from '../styles/theme'; // Import getTheme from your theme f
 // Define the shape of the theme object (based on getTheme return type)
 interface Theme {
   colors: {
+    textPrimary: string;
+    disabled: string 
     background: string;
     surface: string;
     primary: string;

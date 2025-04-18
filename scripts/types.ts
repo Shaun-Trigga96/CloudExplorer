@@ -1,4 +1,4 @@
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 export interface Exam {
   examId: string;
@@ -11,25 +11,42 @@ export interface Exam {
   updatedAt: Timestamp
 }
 
+
 export interface User {
   uid: string;
+  bio: string;
   email: string;
   displayName: string;
   photoURL?: string;
   createdAt: Date;
   lastLogin: Date;
+  learningPaths: LearningPath[];
+  overallProgress: {
+    totalModulesCompleted: number;
+    totalQuizzesCompleted: number;
+    totalScore: number;
+  };
+  settings: {
+    notificationsEnabled: boolean;
+    darkMode: boolean;
+    emailUpdates: boolean,
+    syncData: boolean,
+    soundEffects: boolean,
+  };
+}
+
+interface LearningPath {
+  providerId: string;      // e.g., 'gcp', 'aws', 'azure'
+  pathId: string;          // e.g., 'cdl', 'ace', 'solutions-architect'
+  startedAt:  Timestamp | FieldValue
+  lastAccessedAt:  Timestamp | FieldValue
+  completed: boolean;
+  completedAt?:  Timestamp | FieldValue
   learningProgress: {
     completedModules: string[];
     completedQuizzes: string[];
     completedExams: string[];
     score: number;
-  };
-  settings: {
-    notificationsEnabled: boolean;
-    darkMode: boolean;
-    emailUpdates: boolean;
-    syncData: boolean;
-    soundEffect: boolean;
   };
 }
 

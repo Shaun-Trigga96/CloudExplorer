@@ -61,19 +61,24 @@ exports.saveQuizResult = async (req, res, next) => {
     const batch = db.batch();
 
     // --- Prepare Quiz Result Data ---
-    const resultTimestamp = timestamp
-      ? admin.firestore.Timestamp.fromDate(new Date(timestamp))
-      : serverTimestamp();
-    const percentage =
-      totalQuestions > 0
-        ? parseFloat(((score / totalQuestions) * 100).toFixed(1))
-        : 0; // Calculate percentage
-    const passingThreshold = 0.7; // 70%
-    const passed = percentage >= passingThreshold * 100;
+    const resultTimestampForDoc = timestamp
+    ? admin.firestore.Timestamp.fromDate(new Date(timestamp))
+    : serverTimestamp();
 
-    // Create a new document in 'quizResults' collection
-    const quizResultRef = db.collection('quizResults').doc(); // Auto-generate ID
-    const finalQuizId = quizId || quizResultRef.id; // Use provided quizId or the new result ID
+  // Timestamp for the array element (MUST be a concrete Timestamp)
+  const completionTimestampForArray = timestamp
+    ? admin.firestore.Timestamp.fromDate(new Date(timestamp)) // Use client time if available
+    : admin.firestore.Timestamp.now(); // Use server's current time as a concrete Timestamp
+
+  const percentage =
+    totalQuestions > 0
+      ? parseFloat(((score / totalQuestions) * 100).toFixed(1))
+      : 0;
+  const passingThreshold = 0.7; // 70%
+  const passed = percentage >= passingThreshold * 100;
+
+  const quizResultRef = db.collection('quizResults').doc();
+  const finalQuizId = quizId || quizResultRef.id;
 
     batch.set(quizResultRef, {
       userId,
@@ -84,100 +89,76 @@ exports.saveQuizResult = async (req, res, next) => {
       percentage,
       passed, // Store if the user passed this attempt
       answers: answers || {}, // Store user's answers if provided
-      timestamp: resultTimestamp,
+      timestamp: resultTimestampForDoc,
     });
-
-    // --- Update User's Learning Progress ---
-    // Check if user exists (optional but good for robustness)
+// --- Update User's Learning Progress ---
+    // NOTE: Reading the user doc inside the batch is generally better practice
+    //       if you need its current state for the update logic.
+    //       However, for arrayUnion, it's less critical. We'll keep the read outside for now.
     const userDoc = await userRef.get();
     const updateData = {};
 
-    // Update array of completed quizzes for the user
+    // Create the record with the CONCRETE timestamp for the array
     const quizCompletionRecord = {
       moduleId,
       quizId: finalQuizId,
       percentage,
       passed,
-      completedAt: resultTimestamp,
+      completedAt: completionTimestampForArray, // <--- FIXED: Use the concrete timestamp
     };
-    // Use FieldValue.arrayUnion to avoid duplicates if same quiz is somehow saved again
-    // Note: arrayUnion compares entire objects. If timestamps differ slightly, it won't be a duplicate.
-    // Consider storing only quizId if strict uniqueness is needed per quiz definition.
+
     updateData['learningProgress.completedQuizzes'] =
       admin.firestore.FieldValue.arrayUnion(quizCompletionRecord);
 
-    // Update last activity timestamp
-    updateData['lastActivity'] = serverTimestamp(); // Use server time for last activity
+    updateData['lastActivity'] = serverTimestamp(); // OK (top-level)
 
-    // If the user passed this quiz, potentially mark the module as completed *based on quiz*
-    // This logic might be complex: Does completing one quiz complete the module? Or is there a final exam?
-    // Assuming passing *this* quiz contributes to module completion, but might not be the sole condition.
-    // Let's just record the quiz completion here. Module completion might be handled elsewhere (e.g., after an exam or all required activities).
-     if (passed) {
+    if (passed) {
+       // Consider if this logic is correct - does passing one quiz complete the module?
        updateData['learningProgress.completedModules'] = admin.firestore.FieldValue.arrayUnion(moduleId);
-     }
+    }
 
     if (userDoc.exists) {
       batch.update(userRef, updateData);
     } else {
-      // If user doesn't exist, create them with this progress
       console.warn(
         `User ${userId} not found. Creating user record with quiz result.`,
       );
-      // Initialize learningProgress structure carefully
       batch.set(
         userRef,
         {
           userId,
+          // Ensure email, displayName etc. are set if available from auth context during signup
           learningProgress: {
-            completedQuizzes: [quizCompletionRecord], // Start with this quiz
-            completedModules: [],
+            completedQuizzes: [quizCompletionRecord], // <--- FIXED: Uses record with concrete timestamp
+            completedModules: passed ? [moduleId] : [], // Initialize based on current result
             completedExams: [],
           },
-          lastActivity: serverTimestamp(),
-          createdAt: serverTimestamp(),
-          // Add other default user fields if necessary (email, displayName from auth?)
+          lastActivity: serverTimestamp(), // OK (top-level)
+          createdAt: serverTimestamp(), // OK (top-level)
         },
         {merge: true},
-      ); // Merge in case another process creates the user concurrently
+      );
     }
 
-    // --- Commit Batch ---
     await batch.commit();
     console.log(
       `Quiz result ${quizResultRef.id} saved for user ${userId}, module ${moduleId}. Passed: ${passed}`,
     );
 
-    // --- Respond to Client ---
     res.status(201).json({
       message: 'Quiz result saved successfully.',
-      resultId: quizResultRef.id, // Return the ID of the saved result document
-      passed: passed, // Inform client if they passed this attempt
+      resultId: quizResultRef.id,
+      passed: passed,
     });
   } catch (error) {
-    if (error.message?.includes('firestore')) {
-      // More specific error check
-      console.error(
-        `Firestore error saving quiz result for user ${req.body.userId}:`,
-        error,
-      );
-      next(
-        new AppError(
-          `Database error saving quiz result: ${error.message}`,
-          500,
-          'DB_SAVE_ERROR',
-        ),
-      );
-    } else {
-      console.error(
-        `Unexpected error saving quiz result for user ${req.body.userId}:`,
+     // ... (keep error handling as is) ...
+     console.error(
+        `Error saving quiz result for user ${req.body.userId}:`,
         error,
       );
       next(error); // Pass to global handler
-    }
   }
 };
-
 // GET /user/:userId/quiz-history
 exports.getQuizHistory = async (req, res, next) => {
   try {

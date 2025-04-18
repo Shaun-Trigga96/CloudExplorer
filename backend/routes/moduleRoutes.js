@@ -1,6 +1,5 @@
 const express = require('express');
 const moduleController = require('../controllers/moduleController');
-// Add auth middleware if needed
 
 const router = express.Router();
 

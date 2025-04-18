@@ -2,72 +2,12 @@ const admin = require('firebase-admin');
 const axios = require('axios');
 const AppError = require('../utils/appError');
 const {
-  serverTimestamp,
   isValidFirebaseStorageUrl,
 } = require('../utils/firestoreHelpers');
-
+const { FieldValue } = require('firebase-admin/firestore');
+const {serverTimestamp,} = require('../utils/firestoreHelpers');
 const db = admin.firestore();
 const storage = admin.storage(); // Initialize storage
-
-// POST /user/:userId/module/start
-exports.startModuleProgress = async (req, res, next) => {
-  try {
-    const {userId} = req.params;
-    const {moduleId} = req.body;
-
-    if (!userId || typeof userId !== 'string') {
-      return next(
-        new AppError('Invalid userId parameter', 400, 'INVALID_PARAM'),
-      );
-    }
-    if (!moduleId || typeof moduleId !== 'string') {
-      return next(
-        new AppError(
-          'Invalid moduleId in request body',
-          400,
-          'INVALID_BODY_PARAM',
-        ),
-      );
-    }
-
-    const userRef = db.collection('users').doc(userId);
-    const userDoc = await userRef.get();
-    if (!userDoc.exists) {
-      return next(new AppError('User not found', 404, 'USER_NOT_FOUND'));
-    }
-
-    // Check if module exists (optional, but good practice)
-    const moduleRef = db.collection('modules').doc(moduleId);
-    const moduleDoc = await moduleRef.get();
-    if (!moduleDoc.exists) {
-      return next(new AppError('Module not found', 404, 'MODULE_NOT_FOUND'));
-    }
-
-    await userRef.collection('progress').doc(moduleId).set(
-      {
-        
-        // Use moduleId as doc ID for easier querying
-        moduleId, // Store moduleId for reference if needed
-        startedAt: serverTimestamp(),
-        status: 'in_progress',
-        lastAccessed: serverTimestamp(), // Could add this too
-      },
-      {merge: true},
-    ); // Merge in case progress already exists
-
-    res
-      .status(200)
-      .send({
-        message: `Module ${moduleId} progress started or updated for user ${userId}`,
-      });
-  } catch (error) {
-    console.error(
-      `Error starting module progress for user ${req.params.userId}, module ${req.body.moduleId}:`,
-      error,
-    );
-    next(error);
-  }
-};
 
 // GET /user/:userId/settings
 exports.getUserSettings = async (req, res, next) => {
@@ -462,304 +402,351 @@ exports.updateUserProfile = async (req, res, next) => {
   }
 };
 
-// --- NEW: Track Generic Progress (Start/Complete Content) ---
-// POST /progress
+// Utility to check if a learning path is complete (stubbed for now)
+const checkIfPathComplete = (learningProgress, pathDefinition) => {
+  return false; // Placeholder
+};
+
+/**
+ * Tracks user progress for a resource within a specific learning path.
+ * Updates the corresponding document in the user's 'learningPaths' subcollection.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
 exports.trackProgress = async (req, res, next) => {
   try {
-    const {userId} = req.params;
-    // Expect resourceType (e.g., 'module', 'section', 'video'), resourceId, action ('start', 'complete')
-    const {resourceType = 'module', resourceId, action, timestamp} = req.body;
+    const { userId } = req.params;
+    const {
+      resourceType = 'module', // path, module, quiz, exam
+      resourceId,             // ID of the module, quiz, or exam completed
+      action,                 // 'start' or 'complete'
+      providerId,             // ID of the provider (e.g., 'gcp') - needed for context?
+      pathId,                 // ID of the path definition (e.g., 'cdl')
+      // timestamp,           // Optional client timestamp - Removed for simplicity, use server time
+    } = req.body;
 
     // --- Input Validation ---
-    if (!userId || typeof userId !== 'string')
-      return next(
-        new AppError(
-          'Valid userId parameter is required',
-          400,
-          'INVALID_USER_ID_PARAM',
-        ),
-      );
-    if (!resourceId || typeof resourceId !== 'string')
-      return next(
-        new AppError(
-          'Valid resourceId is required in body',
-          400,
-          'MISSING_RESOURCE_ID',
-        ),
-      );
-    if (!action || !['start', 'complete'].includes(action))
-      return next(
-        new AppError(
-          "Action must be 'start' or 'complete'",
-          400,
-          'INVALID_ACTION',
-        ),
-      );
-    if (!resourceType || typeof resourceType !== 'string')
-      return next(
-        new AppError(
-          'Valid resourceType is required',
-          400,
-          'MISSING_RESOURCE_TYPE',
-        ),
-      );
+    if (!userId || typeof userId !== 'string') {
+      return next(new AppError('Valid userId parameter is required', 400, 'INVALID_USER_ID_PARAM'));
+    }
+    if (!resourceId || typeof resourceId !== 'string') {
+      // Allow 'start' action for 'path' resourceType without resourceId? No, path start is handled by providerPathController.
+      // This endpoint is for *within* a path.
+      return next(new AppError('Valid resourceId (module, quiz, or exam ID) is required', 400, 'MISSING_RESOURCE_ID'));
+    }
+    if (!action || !['start', 'complete'].includes(action)) {
+      // 'start' might just update lastAccessedAt, 'complete' updates progress arrays
+      return next(new AppError("Action must be 'start' or 'complete'", 400, 'INVALID_ACTION'));
+    }
+    if (!['module', 'quiz', 'exam'].includes(resourceType)) {
+      // Removed 'path' as starting/activating is handled elsewhere. This tracks items *within* a path.
+      return next(new AppError('Valid resourceType (module, quiz, exam) is required', 400, 'INVALID_RESOURCE_TYPE'));
+    }
+    // providerId might not be strictly needed if pathId is unique, but good for context/querying
+    if (!providerId || typeof providerId !== 'string') {
+      return next(new AppError('Valid providerId is required', 400, 'MISSING_PROVIDER_ID'));
+    }
+    if (!pathId || typeof pathId !== 'string') {
+      return next(new AppError('Valid pathId is required', 400, 'MISSING_PATH_ID'));
+    }
 
     const userRef = db.collection('users').doc(userId);
-    const batch = db.batch();
-    const progressTimestamp = timestamp
-      ? admin.firestore.Timestamp.fromDate(new Date(timestamp))
-      : serverTimestamp();
+    // Reference to the subcollection
+    const learningPathsCollectionRef = userRef.collection('learningPaths');
 
-    // Document ID in 'progress' subcollection: `${resourceType}_${resourceId}`
-    const progressDocId = `${resourceType}_${resourceId}`;
-    const progressRef = userRef.collection('progress').doc(progressDocId);
+    console.log(`[trackProgress] User: ${userId}, PathDefID: ${pathId}, Resource: ${resourceType}/${resourceId}, Action: ${action}`);
 
-    // Data to save/update in the progress document
-    const progressData = {
-      resourceType,
-      resourceId,
-      lastUpdatedAt: progressTimestamp,
-    };
+    // --- Transaction for Atomic Updates ---
+    await db.runTransaction(async (transaction) => {
+      console.log(`[trackProgress TX] Starting transaction for user ${userId}, pathDefId ${pathId}`);
 
-    if (action === 'start') {
-      progressData.startedAt = progressTimestamp;
-      progressData.status = 'in_progress';
-    } else if (action === 'complete') {
-      // Mark specific resource as completed
-      progressData.completedAt = progressTimestamp;
-      progressData.status = 'completed';
-    }
+      // 1. Find the specific learning path document for this user and path definition
+      const pathQuery = learningPathsCollectionRef.where('pathId', '==', pathId).limit(1);
+      const pathQuerySnapshot = await transaction.get(pathQuery);
 
-    // Update general user lastActivity
-    batch.update(userRef, {lastActivity: serverTimestamp()});
+      if (pathQuerySnapshot.empty) {
+        console.error(`[trackProgress TX] Learning path with pathId ${pathId} not found for user ${userId}. User must start path first.`);
+        throw new AppError(`Learning path not started. Please start the path first.`, 404, 'LEARNING_PATH_NOT_STARTED');
+      }
 
-    // Set/Merge the specific progress document
-    batch.set(progressRef, progressData, {merge: true});
+      const pathDoc = pathQuerySnapshot.docs[0];
+      const pathRef = pathDoc.ref; // Get the actual document reference
+      const pathData = pathDoc.data();
+      console.log(`[trackProgress TX] Found learning path document: ${pathRef.path}`);
 
-    // Check if user exists before committing? Transaction might be safer.
-    const userDoc = await userRef.get();
-    if (!userDoc.exists) {
-      // If user doesn't exist, initialize them within the batch/transaction
-      console.warn(
-        `User ${userId} not found while tracking progress. Creating user record.`,
-      );
-      batch.set(
-        userRef,
-        {
-          userId,
-          learningProgress: {
-            // Initialize structure
-            completedModules: [],
-            completedQuizzes: [],
-            completedExams: [],
-          },
-          lastActivity: serverTimestamp(),
-          createdAt: serverTimestamp(),
-        },
-        {merge: true},
-      ); // Merge avoids race condition if created elsewhere
-    } else {
-        // If user exists, update the learningProgress based on the action and resourceType
-        const userLearningProgress = userDoc.data().learningProgress || {};
-        const completedModules = new Set(userLearningProgress.completedModules || []);
-        if (action === 'complete' && resourceType === 'module') {
-            completedModules.add(resourceId);
+      // 2. Fetch user document (needed for lastActivity update)
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) {
+        // Should not happen if pathDoc exists, but good check
+        console.error(`[trackProgress TX] User ${userId} not found during transaction.`);
+        throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+      }
+      console.log(`[trackProgress TX] User ${userId} exists.`);
+
+      // 3. Prepare updates for the specific learning path document
+      const pathUpdatePayload = {
+        lastAccessedAt: serverTimestamp(), // Always update last accessed time
+      };
+      let needsPercentageRecalc = false;
+
+      if (action === 'complete') {
+        console.log(`[trackProgress TX] Processing 'complete' action for ${resourceType} ${resourceId}`);
+        const currentProgress = pathData.learningProgress || { completedModules: [], completedQuizzes: [], completedExams: [] };
+
+        switch (resourceType) {
+          case 'module':
+            // Use FieldValue.arrayUnion for atomic update if not already present
+            if (!currentProgress.completedModules?.includes(resourceId)) {
+              pathUpdatePayload['learningProgress.completedModules'] = FieldValue.arrayUnion(resourceId);
+              needsPercentageRecalc = true;
+              console.log(`[trackProgress TX] Adding module ${resourceId} to completedModules.`);
+            }
+            break;
+          case 'quiz':
+            if (!currentProgress.completedQuizzes?.includes(resourceId)) {
+              pathUpdatePayload['learningProgress.completedQuizzes'] = FieldValue.arrayUnion(resourceId);
+              needsPercentageRecalc = true;
+              console.log(`[trackProgress TX] Adding quiz ${resourceId} to completedQuizzes.`);
+            }
+            break;
+          case 'exam':
+            if (!currentProgress.completedExams?.includes(resourceId)) {
+              pathUpdatePayload['learningProgress.completedExams'] = FieldValue.arrayUnion(resourceId);
+              needsPercentageRecalc = true;
+              console.log(`[trackProgress TX] Adding exam ${resourceId} to completedExams.`);
+            }
+            break;
         }
-        batch.update(userRef, {
-            'learningProgress.completedModules': Array.from(completedModules),
-        });
-    }
 
-    await batch.commit();
+        // 4. Recalculate Completion Percentage if needed
+        if (needsPercentageRecalc) {
+          // Simulate the update locally to calculate new counts
+          const currentModules = currentProgress.completedModules || [];
+          const currentQuizzes = currentProgress.completedQuizzes || [];
+          const currentExams = currentProgress.completedExams || [];
+
+          const newModulesCount = resourceType === 'module' && !currentModules.includes(resourceId) ? currentModules.length + 1 : currentModules.length;
+          const newQuizzesCount = resourceType === 'quiz' && !currentQuizzes.includes(resourceId) ? currentQuizzes.length + 1 : currentQuizzes.length;
+          const newExamsCount = resourceType === 'exam' && !currentExams.includes(resourceId) ? currentExams.length + 1 : currentExams.length;
+
+          // Use totals stored on the path document
+          const totalModules = pathData.totalModules || 0;
+          const totalQuizzes = pathData.totalQuizzes || 0;
+          const totalExams = pathData.totalExams || 0;
+          const totalItems = totalModules + totalQuizzes + totalExams;
+          const completedItems = newModulesCount + newQuizzesCount + newExamsCount;
+
+          let newCompletionPercentage = pathData.learningProgress?.completionPercentage || 0; // Default to existing
+
+          if (totalItems > 0) {
+              newCompletionPercentage = Math.round((completedItems / totalItems) * 100);
+          } else if (totalItems === 0) {
+              // If no items defined, consider it 100%? Or 0? Let's default to 0 unless explicitly marked complete later.
+              newCompletionPercentage = 0;
+          }
+
+          // Ensure percentage doesn't exceed 100
+          newCompletionPercentage = Math.min(newCompletionPercentage, 100);
+          pathUpdatePayload['learningProgress.completionPercentage'] = newCompletionPercentage;
+          console.log(`[trackProgress TX] New completion percentage calculated: ${newCompletionPercentage}%`);
+
+          // Check if path is now complete based on percentage
+          if (newCompletionPercentage === 100 && !pathData.completed) {
+            pathUpdatePayload.completed = true;
+            pathUpdatePayload.completedAt = serverTimestamp();
+            console.log(`[trackProgress TX] Path marked as complete based on percentage.`);
+          }
+        }
+      } // End if (action === 'complete')
+
+      // 5. Commit updates to the path document
+      console.log(`[trackProgress TX] Updating path data for ${pathRef.path}:`, JSON.stringify(pathUpdatePayload));
+      transaction.update(pathRef, pathUpdatePayload);
+
+      // 6. Commit update to the user document (only lastActivity)
+      const userUpdatePayload = {
+        lastActivity: serverTimestamp() // Use serverTimestamp sentinel here
+      };
+      console.log(`[trackProgress TX] Updating user data for ${userRef.path}:`, JSON.stringify(userUpdatePayload));
+      transaction.update(userRef, userUpdatePayload);
+
+      console.log(`[trackProgress TX] Transaction updates prepared for user ${userId}.`);
+    }); // End Transaction
+
     console.log(
-      `Progress tracked for user ${userId}, resource ${resourceType}/${resourceId}, action: ${action}`,
+      `[trackProgress] Successfully tracked progress for user ${userId}, pathDefId ${pathId}, resource ${resourceType}/${resourceId}, action: ${action}`
     );
 
-    res.status(200).json({message: 'Progress tracked successfully.'});
+    res.status(200).json({
+      status: 'success',
+      message: 'Progress tracked successfully',
+    });
   } catch (error) {
-    console.error(
-      `Error tracking progress for user ${req.params.userId}:`,
-      error,
-    );
-    // Handle Firestore errors specifically
-    if (
-      error.message?.includes('firestore') ||
-      error.name?.includes('FirebaseError')
-    ) {
-      next(
-        new AppError(
-          `Database error tracking progress: ${error.message}`,
-          500,
-          'DB_SAVE_ERROR',
-        ),
-      );
-    } else {
-      next(error); // Pass others to global handler
+    console.error(`[trackProgress] Error tracking progress for user ${req.params.userId}:`, {
+      message: error.message,
+      code: error.code,
+      // stack: error.stack, // Stack might be too verbose for regular logs
+    });
+    console.error(`[trackProgress] Failed request body:`, req.body);
+
+    if (error instanceof AppError) {
+      return next(error);
     }
+    // Provide more specific error message if possible
+    return next(new AppError(`Database error tracking progress: ${error.message}`, 500, 'DB_SAVE_ERROR'));
   }
 };
 
-// --- NEW: Get User Overall Progress Summary ---
-// GET /progress
+
+/**
+ * Retrieves comprehensive user progress, including learning paths, quiz/exam results, and available content.
+ * Uses a subcollection for learningPaths.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
 exports.getUserProgress = async (req, res, next) => {
   try {
-    const {userId} = req.params;
-
-    console.log(`[getUserProgress] Starting progress fetch for user: ${userId}`); // Log 1: Start of function
+    // Decide whether to use authenticated user or param. Using param for now as per original Express code.
+    // Consider switching to req.user.uid for better security if route is protected.
+    const { userId } = req.params;
 
     if (!userId || typeof userId !== 'string') {
-      console.error(`[getUserProgress] Invalid userId: ${userId}`); // Log 2: Invalid user ID
-      return next(
-        new AppError(
-          'Valid User ID parameter is required',
-          400,
-          'INVALID_USER_ID_PARAM',
-        ),
-      );
+      return next(new AppError('Valid User ID parameter is required', 400, 'INVALID_USER_ID_PARAM'));
     }
 
-    // Use Promise.all for parallel fetching
-    const [
-      userDoc,
-      progressSnapshot, // Detailed start/complete status per resource
-      quizResultsSnapshot,
-      examResultsSnapshot,
-      modulesSnapshot,
-      examsSnapshot,
-      quizzesSnaphost,
-    ] = await Promise.all([
-      db.collection('users').doc(userId).get(),
-      db.collection('users').doc(userId).collection('progress').get(), // Get all progress docs
-      db
-        .collection('quizResults')
-        .where('userId', '==', userId)
-        .orderBy('timestamp', 'desc')
-        .get(),
-      db
-        .collection('examResults')
-        .where('userId', '==', userId)
-        .orderBy('timestamp', 'desc')
-        .get(),
-      db.collection('modules').get(),
-      db.collection('exams').get(),
-      db.collection('quizzes').get(),
-    ]);
-
-    console.log(`[getUserProgress] Data fetched from Firestore for user: ${userId}`); // Log 3: Data fetch complete
+    // Check if user exists first
+    const userRef = db.collection('users').doc(userId);
+    const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      console.warn(`[getUserProgress] User ${userId} not found.`); // Log 4: User not found
-      console.log(`[getUserProgress] Returning default progress structure.`);
-      return res.json({
-        // Return a structure indicating user not found or default state
-        userExists: false,
-        learningProgress: {
-          completedModules: [],
-          completedQuizzes: [],
-          completedExams: [],
-          modulesInProgress: [],
-          score: 0,
-        },
-        detailedProgress: [],
-        quizResults: [],
-        examResults: [],
-        availableModules: [],
-        exams: [],
-        availableQuizzes: []
+      // User not found, return specific structure indicating this
+      console.log(`[providerPathCtrl] User ${userId} not found when fetching progress.`);
+      return res.status(200).json({ // 200 OK, but indicate user doesn't exist
+        status: 'success', // Or 'not_found'? 'success' is okay if data structure indicates status
+        data: {
+          userExists: false,
+          learningPaths: [],
+          overallProgress: { // Default empty progress
+            totalModulesCompleted: 0,
+            totalQuizzesCompleted: 0,
+            totalExamsCompleted: 0, // Added exams
+            totalScore: 0
+          }
+        }
       });
-      // OR: return next(new AppError('User not found', 404, 'USER_NOT_FOUND')); // If user must exist
+    }
+    const userData = userDoc.data(); // Get user data for overall progress later if needed
+
+    // Get user's learning paths subcollection
+    const pathsSnapshot = await userRef.collection('learningPaths').orderBy('lastAccessedAt', 'desc').get();
+
+    const learningPaths = [];
+    let overallModulesCompleted = 0;
+    let overallQuizzesCompleted = 0;
+    let overallExamsCompleted = 0; // Added
+    let overallScore = 0;
+
+    // Process each learning path document
+    // Use Promise.all for potentially fetching path details concurrently if needed,
+    // but sequential might be okay for moderate number of paths.
+    for (const doc of pathsSnapshot.docs) {
+      const pathData = doc.data();
+      const pathId = pathData.pathId; // The ID of the path definition in 'paths' collection
+
+      // --- Fetch Path Definition Details (Optional but good for name/logo/totals) ---
+      let pathDetails = { name: 'Unknown Path', logoUrl: null, totalModules: 0, totalQuizzes: 0, totalExams: 0 };
+      if (pathId) {
+          const pathDefDoc = await db.collection('paths').doc(pathId).get();
+          if (pathDefDoc.exists) {
+              const defData = pathDefDoc.data();
+              pathDetails.name = defData.name || pathDetails.name;
+              pathDetails.logoUrl = defData.logoUrl || pathDetails.logoUrl;
+              // Use totals from definition if not stored on user's path doc, or prefer definition's?
+              pathDetails.totalModules = defData.totalModules || 0;
+              pathDetails.totalQuizzes = defData.totalQuizzes || 0;
+              pathDetails.totalExams = defData.totalExams || 0;
+          } else {
+              console.warn(`[providerPathCtrl] Path definition ${pathId} not found for user ${userId}'s path ${doc.id}`);
+          }
+      }
+      // Use totals stored on the user's path document if available, otherwise fallback to definition
+      const totalModules = pathData.totalModules ?? pathDetails.totalModules;
+      const totalQuizzes = pathData.totalQuizzes ?? pathDetails.totalQuizzes;
+      const totalExams = pathData.totalExams ?? pathDetails.totalExams;
+      // --- End Fetch Path Definition ---
+
+
+      const progress = pathData.learningProgress || {};
+      const completedModules = progress.completedModules || [];
+      const completedQuizzes = progress.completedQuizzes || [];
+      const completedExams = progress.completedExams || [];
+      const score = progress.score || 0;
+
+      // Use the stored completion percentage if available, otherwise calculate
+      let completionPercentage = progress.completionPercentage; // Prefer stored value
+
+      if (completionPercentage === undefined || completionPercentage === null) {
+          // Calculate if not stored
+          const totalItems = totalModules + totalQuizzes + totalExams;
+          const completedItems = completedModules.length + completedQuizzes.length + completedExams.length;
+          completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : (pathData.completed ? 100 : 0);
+          completionPercentage = Math.min(completionPercentage, 100); // Ensure max 100
+      }
+
+
+      // Aggregate overall progress
+      overallModulesCompleted += completedModules.length;
+      overallQuizzesCompleted += completedQuizzes.length;
+      overallExamsCompleted += completedExams.length; // Added
+      overallScore += score;
+
+      learningPaths.push({
+        id: doc.id, // ID of the user's specific learning path instance
+        name: pathData.name || pathDetails.name, // Prefer name stored on user path, fallback to definition
+        providerId: pathData.providerId,
+        pathId: pathData.pathId, // ID of the path definition
+        logoUrl: pathData.logoUrl || pathDetails.logoUrl, // Prefer logo stored on user path
+        progress: {
+          completionPercentage: completionPercentage,
+          completedModules: completedModules,
+          completedQuizzes: completedQuizzes,
+          completedExams: completedExams,
+          score: score,
+        },
+        // Include totals for context
+        totalModules: totalModules,
+        totalQuizzes: totalQuizzes,
+        totalExams: totalExams,
+        // Timestamps and completion status
+        startedAt: pathData.startedAt?.toDate()?.toISOString() || null,
+        lastAccessedAt: pathData.lastAccessedAt?.toDate()?.toISOString() || null,
+        completed: pathData.completed || false,
+        completedAt: pathData.completedAt?.toDate()?.toISOString() || null,
+      });
     }
 
-    const userData = userDoc.data() || {};
-    console.log(`[getUserProgress] User data:`, userData); // Log 5: User data
-
-    // Provide defaults for learningProgress structure if missing
-    const learningProgress = {
-      completedModules: userData.learningProgress?.completedModules || [],
-      completedQuizzes: userData.learningProgress?.completedQuizzes || [], // This might be summary, not full history
-      completedExams: userData.learningProgress?.completedExams || [], // This might be summary, not full history
-      modulesInProgress: [],
-      score: userData.learningProgress?.score || 0, // Example overall score
-    };
-    console.log(`[getUserProgress] Initial learningProgress:`, learningProgress); // Log 6: Initial learningProgress
-
-    // Process detailed progress snapshot (start/complete actions)
-    const detailedProgress = progressSnapshot.docs.map(doc => {
-      const data = doc.data();
-      console.log(`[getUserProgress] Detailed progress doc data:`, data); // Log 7: Detailed progress data
-      if(data.status === 'in_progress' && data.resourceType === 'module'){
-        learningProgress.modulesInProgress.push(data.resourceId);
+    // Construct final response
+    res.status(200).json({
+      status: 'success',
+      data: {
+        userExists: true, // We confirmed user exists at the start
+        learningPaths,
+        overallProgress: {
+          // Use aggregated counts
+          totalModulesCompleted: overallModulesCompleted,
+          totalQuizzesCompleted: overallQuizzesCompleted,
+          totalExamsCompleted: overallExamsCompleted, // Added
+          totalScore: overallScore,
+          // You might also get overall progress from the main user document if stored there
+          // e.g., ... (userData.overallProgress || {})
+        }
       }
-      return {
-        id: doc.id, // e.g., "module_mod123"
-        resourceType: data.resourceType,
-        resourceId: data.resourceId,
-        status: data.status, // 'in_progress', 'completed'
-        startedAt: data.startedAt?.toDate()?.toISOString() || null,
-        completedAt: data.completedAt?.toDate()?.toISOString() || null,
-        lastUpdatedAt: data.lastUpdatedAt?.toDate()?.toISOString() || null,
-      };
     });
 
-    console.log(`[getUserProgress] Detailed progress processed:`, detailedProgress); // Log 8: Detailed progress processed
-    console.log(`[getUserProgress] learningProgress after detailed progress:`, learningProgress); // Log 9: learningProgress after detailed progress
-
-    // Process quiz results (full history)
-    const quizResults = quizResultsSnapshot.docs.map(doc => {
-      const data = doc.data();
-      console.log(`[getUserProgress] Quiz result data:`, data); // Log 10: Quiz result data
-      return {
-        id: doc.id,
-        moduleId: data.moduleId,
-        quizId: data.quizId,
-        score: data.score,
-        totalQuestions: data.totalQuestions,
-        percentage: data.percentage,
-        passed: data.passed,
-        timestamp: data.timestamp?.toDate()?.toISOString() || null,
-      };
-    });
-
-    console.log(`[getUserProgress] Quiz results processed:`, quizResults); // Log 11: Quiz results processed
-
-    // Process exam results (full history)
-    const examResults = examResultsSnapshot.docs.map(doc => {
-      const data = doc.data();
-      console.log(`[getUserProgress] Exam result data:`, data); // Log 12: Exam result data
-      return {
-        id: doc.id,
-        examId: data.examId,
-        score: data.score,
-        totalQuestions: data.totalQuestions,
-        percentage: data.percentage,
-        passed: data.passed, // Field name consistency
-        timestamp: data.timestamp?.toDate()?.toISOString() || null,
-      };
-    });
-
-    console.log(`[getUserProgress] Exam results processed:`, examResults); // Log 13: Exam results processed
-
-    // --- Construct Response ---
-    // Return a comprehensive object
-    console.log(`[getUserProgress] Final learningProgress:`, learningProgress); // Log 14: Final learningProgress
-    console.log(`[getUserProgress] Sending response to client.`); // Log 15: Sending response
-    res.json({
-      userExists: true,
-      learningProgress, // Summary data from user doc
-      detailedProgress, // Start/complete status for individual resources
-      quizResults, // Full history of quiz attempts
-      examResults, // Full history of exam attempts
-      availableQuizzes: quizzesSnaphost ? quizzesSnaphost.docs.map(d => ({ id: d.id, ...d.data() })) : [],
-      availableModules: modulesSnapshot ? modulesSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) : [],
-      exams: examsSnapshot ? examsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })) : [],
-    });
   } catch (error) {
-    console.error(
-      `[getUserProgress] Error fetching overall progress for user ${req.params.userId}:`,
-      error,
-    );
-    next(
-      new AppError('Failed to retrieve user progress.', 500, 'DB_FETCH_ERROR'),
-    );
+    console.error(`[providerPathCtrl] Error fetching user progress for ${params.userId}:`, error);
+    next(new AppError('Failed to retrieve user progress', 500, 'PROGRESS_FETCH_ERROR'));
   }
 };

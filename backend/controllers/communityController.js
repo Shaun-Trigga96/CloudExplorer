@@ -458,12 +458,12 @@ exports.getCommunityTopics = async (req, res, next) => {
   
       const events = eventsSnapshot.docs.map(doc => {
         const data = doc.data();
-        const eventDate = data.date?.toDate();
+        const eventDate = data.date;
         const isUpcoming = eventDate && eventDate > new Date();
         return {
           id: doc.id,
           title: data.title || 'Untitled Event',
-          date: eventDate ? eventDate.toISOString().split('T')[0] : '',
+          date: eventDate,
           time: data.time || '',
           description: data.description || '',
           attending: data.attending || 0,

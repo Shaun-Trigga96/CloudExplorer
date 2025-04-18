@@ -1,7 +1,5 @@
 const express = require('express');
 const examController = require('../controllers/examController');
-const { validateExamInput } = require('../middleware/validation');
-const { hfApiLimiter } = require('../middleware/middleware'); // Import limiter
 // const { protect, adminOnly } = require('../middleware/authMiddleware'); // Auth/Admin checks
 
 const router = express.Router();
@@ -9,14 +7,6 @@ const router = express.Router();
 //console.log('DEBUG: Imported examController:', examController);
 
 // --- Static routes first ---
-
-// Create a new exam definition (Google Doc) - Admin only
-// POST /api/v1/exams/create
-router.post('/create', /* protect, adminOnly, */ validateExamInput, examController.createExamDoc);
-
-// Generate exam questions based on an exam definition - Admin/Instructor only? Rate limited.
-// POST /api/v1/exams/generate
-//router.post('/generate', hfApiLimiter, /* protect, adminOnly, */ examController.generateExamQuestions);
 
 // Save a user's exam result - Protected
 // POST /api/v1/exams/save-result

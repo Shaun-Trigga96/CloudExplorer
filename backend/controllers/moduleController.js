@@ -3,171 +3,216 @@ const AppError = require('../utils/appError');
 
 const db = admin.firestore();
 
-// GET /list-modules
+/**
+ * Lists modules with pagination and sorting.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
 exports.listModules = async (req, res, next) => {
+  console.log('Fetching modules...');
   try {
     const {
       limit = 10,
       lastId,
       orderBy = 'updatedAt',
       orderDir = 'desc',
+      providerId, // Optional filter for provider (e.g., 'gcp')
     } = req.query;
-    const parsedLimit = parseInt(limit, 10);
 
+    // --- Input Validation ---
+    const parsedLimit = parseInt(limit, 10);
     if (isNaN(parsedLimit) || parsedLimit <= 0 || parsedLimit > 50) {
-      // Sensible max limit
-      return next(
-        new AppError(
-          'Invalid limit value (must be 1-50)',
-          400,
-          'INVALID_LIMIT',
-        ),
-      );
+      return next(new AppError('Limit must be between 1 and 50', 400, 'INVALID_LIMIT'));
     }
-    const validOrderBy = ['title', 'createdAt', 'updatedAt', 'duration']; // Allowed sort fields
+
+    const validOrderBy = ['title', 'createdAt', 'updatedAt', 'duration'];
     const validOrderDir = ['asc', 'desc'];
     if (!validOrderBy.includes(orderBy) || !validOrderDir.includes(orderDir)) {
-      return next(
-        new AppError(
-          'Invalid orderBy or orderDir parameter',
-          400,
-          'INVALID_SORT',
-        ),
-      );
+      return next(new AppError('Invalid orderBy or orderDir parameter', 400, 'INVALID_SORT'));
     }
 
-    let query = db
-      .collection('modules')
-      .orderBy(orderBy, orderDir)
-      .limit(parsedLimit);
+    if (lastId && typeof lastId !== 'string') {
+      return next(new AppError('lastId must be a valid string', 400, 'INVALID_LAST_ID'));
+    }
+
+    if (providerId && typeof providerId !== 'string') {
+      return next(new AppError('providerId must be a valid string', 400, 'INVALID_PROVIDER_ID'));
+    }
+
+    // --- Build Query ---
+    let query = db.collection('modules').orderBy(orderBy, orderDir).limit(parsedLimit);
+
+    if (providerId) {
+      query = query.where('providerId', '==', providerId);
+    }
 
     if (lastId) {
       const lastDocSnapshot = await db.collection('modules').doc(lastId).get();
-      if (lastDocSnapshot.exists) {
-        query = query.startAfter(lastDocSnapshot); // Use snapshot for pagination cursor
+      if (!lastDocSnapshot.exists) {
+        console.warn(`Pagination lastId '${lastId}' not found. Starting from beginning.`);
       } else {
-        // Don't throw error, just ignore invalid lastId and start from beginning
-        console.warn(
-          `Pagination lastId '${lastId}' not found. Starting from beginning.`,
-        );
-        // return next(new AppError('Invalid lastId provided for pagination', 400, 'INVALID_LAST_ID'));
+        query = query.startAfter(lastDocSnapshot);
       }
     }
 
+    // --- Execute Query ---
     const modulesSnapshot = await query.get();
-    const modules = modulesSnapshot.docs.map(doc => {
+    const modules = modulesSnapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
-        title: data.title,
+        title: data.title || 'Untitled Module',
         description: data.description || null,
-        content: data.content, // Google Doc URL or other content identifier
-        duration: data.duration || null, // e.g., "2 hours", 120 (minutes)
-        quizzes: data.quizzes || [], // Array of quiz IDs/references
-        prerequisites: data.prerequisites || [], // Array of module IDs
-        createdAt: data.createdAt?.toDate() || null,
-        updatedAt: data.updatedAt?.toDate() || null,
-        // Add other relevant fields like thumbnail URL, tags, etc.
+        content: data.content || null,
+        duration: data.duration || null,
+        quizzes: data.quizzes || [],
+        prerequisites: data.prerequisites || [],
+        providerId: data.providerId,
+        createdAt: data.createdAt?.toDate()?.toISOString() || null,
+        updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
       };
     });
 
-    // Determine the last ID for the next page request
-    const newLastId =
-      modules.length > 0 ? modules[modules.length - 1].id : null;
+    // --- Pagination Metadata ---
+    const newLastId = modules.length > 0 ? modules[modules.length - 1].id : null;
+    const hasMore = modules.length === parsedLimit;
 
-    res.json({
-      modules,
-      hasMore: modules.length === parsedLimit, // If we fetched the max limit, there might be more
-      lastId: newLastId,
+    // --- Log Success ---
+    console.log(`Fetched ${modules.length} modules for providerId=${providerId || 'all'}, lastId=${lastId || 'none'}`);
+
+    // --- Send Response ---
+    res.status(200).json({
+      status: 'success',
+      data: {
+        modules,
+        hasMore,
+        lastId: newLastId,
+      },
     });
   } catch (error) {
-    console.error('Error listing modules:', error);
-    next(error);
+    console.error('Error listing modules:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
+    return next(new AppError(`Failed to list modules: ${error.message}`, 500, 'DB_FETCH_ERROR'));
   }
 };
 
-// GET /module/:id
+/**
+* Retrieves a module by its ID.
+* @param {Object} req - Express request object
+* @param {Object} res - Express response object
+* @param {Function} next - Express next middleware function
+*/
+
 exports.getModuleById = async (req, res, next) => {
-  try {
-    const moduleId = req.params.moduleId;
-    console.log('moduleId:', moduleId);
-    const moduleDoc = await db.collection('modules').doc(moduleId).get();
+ try {
+   const { moduleId } = req.params;
 
-    if (!moduleDoc.exists) {
-      return next(
-        new AppError(
-          `Module with ID ${moduleId} not found`,
-          404,
-          'MODULE_NOT_FOUND',
-        ),
-      );
-    }
+   // --- Input Validation ---
+   if (!moduleId || typeof moduleId !== 'string') {
+     return next(new AppError('Valid moduleId parameter is required', 400, 'INVALID_MODULE_ID_PARAM'));
+   }
 
-    const data = moduleDoc.data();
-    res.json({
-      id: moduleDoc.id,
-      title: data.title,
-      description: data.description || null,
-      content: data.content,
-      duration: data.duration || null,
-      quizzes: data.quizzes || [],
-      prerequisites: data.prerequisites || [],
-      createdAt: data.createdAt?.toDate() || null,
-      updatedAt: data.updatedAt?.toDate() || null,
-      // Include other fields as needed
-    });
-  } catch (error) {
-    console.error(`Error getting module by ID ${req.params.moduleId}:`, error);
-    next(error);
-  }
+   // --- Fetch Module ---
+   const moduleDoc = await db.collection('modules').doc(moduleId).get();
+
+   if (!moduleDoc.exists) {
+     return next(new AppError(`Module with ID ${moduleId} not found`, 404, 'MODULE_NOT_FOUND'));
+   }
+
+   const data = moduleDoc.data();
+
+   // --- Construct Response ---
+   const module = {
+     id: moduleDoc.id,
+     title: data.title || 'Untitled Module',
+     description: data.description || null,
+     content: data.content || null,
+     duration: data.duration || null,
+     quizzes: data.quizzes || [],
+     prerequisites: data.prerequisites || [],
+     providerId: data.providerId || null,
+     createdAt: data.createdAt?.toDate()?.toISOString() || null,
+     updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
+   };
+
+   // --- Log Success ---
+   console.log(`Fetched module ${moduleId}`);
+
+   // --- Send Response ---
+   res.status(200).json({
+     status: 'success',
+     data: module,
+   });
+ } catch (error) {
+   console.error(`Error fetching module ${req.params.moduleId}:`, {
+     message: error.message,
+     code: error.code,
+     stack: error.stack,
+   });
+   return next(new AppError(`Failed to fetch module: ${error.message}`, 500, 'DB_FETCH_ERROR'));
+ }
 };
 
-// GET /module/:id/sections
+/**
+ * Retrieves sections for a specific module, sorted by order.
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ */
 exports.getModuleSections = async (req, res, next) => {
   try {
-    const moduleId = req.params.moduleId;
+    const { moduleId } = req.params;
+
+    // --- Input Validation ---
     if (!moduleId || typeof moduleId !== 'string') {
-      return next(
-        new AppError(
-          'Invalid module ID parameter',
-          400,
-          'INVALID_MODULE_ID_PARAM',
-        ),
-      );
+      return next(new AppError('Valid moduleId parameter is required', 400, 'INVALID_MODULE_ID_PARAM'));
     }
 
+    // --- Check Module Existence ---
     const moduleRef = db.collection('modules').doc(moduleId);
-    const moduleDoc = await moduleRef.get(); // Check if module exists
+    const moduleDoc = await moduleRef.get();
     if (!moduleDoc.exists) {
-      return next(
-        new AppError(
-          `Module with ID ${moduleId} not found`,
-          404,
-          'MODULE_NOT_FOUND',
-        ),
-      );
+      return next(new AppError(`Module with ID ${moduleId} not found`, 404, 'MODULE_NOT_FOUND'));
     }
 
+    // --- Fetch Sections ---
     const sectionsSnapshot = await moduleRef
       .collection('sections')
-      .orderBy('order', 'asc') // Assume 'order' field exists for sorting
+      .orderBy('order', 'asc')
       .get();
 
-    const sections = sectionsSnapshot.docs.map(doc => {
+    const sections = sectionsSnapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
-        moduleId: data.moduleId,
-        title: data.title,
-        content: data.content, // Could be text, markdown, video URL, quiz ID etc.
-        order: data.order,
-        // durationEstimate: data.durationEstimate, // Optional time estimate
+        moduleId: data.moduleId || moduleId,
+        title: data.title || 'Untitled Section',
+        content: data.content || null,
+        order: data.order || 0,
+        durationEstimate: data.durationEstimate || null,
+        createdAt: data.createdAt?.toDate()?.toISOString() || null,
+        updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
       };
     });
 
-    res.json(sections); // Returns empty array [] if no sections, which is fine
+    // --- Log Success ---
+    console.log(`Fetched ${sections.length} sections for module ${moduleId}`);
+
+    // --- Send Response ---
+    res.status(200).json({
+      status: 'success',
+      data: sections,
+    });
   } catch (error) {
-    console.error(`Error getting sections for module ${req.params.id}:`, error);
-    next(error);
+    console.error(`Error fetching sections for module ${req.params.moduleId}:`, {
+      message: error.message,
+      code: error.code,
+      stack: error.stack,
+    });
+    return next(new AppError(`Failed to fetch sections: ${error.message}`, 500, 'DB_FETCH_ERROR'));
   }
 };

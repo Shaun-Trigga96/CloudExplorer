@@ -2,7 +2,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-// Import useTheme from react-native-paper AND your custom context
 import { useTheme as usePaperTheme } from 'react-native-paper';
 import { useCustomTheme } from '../context/ThemeContext'; // Import your custom hook
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -174,7 +173,6 @@ const TabNavigator = () => {
       <Tab.Screen
         name="Settings"
         component={SettingsStackNavigator}
-        // Changed title to 'Profile' as it includes ProfileScreen & Certs
         options={{ title: 'Settings' }}
       />
 

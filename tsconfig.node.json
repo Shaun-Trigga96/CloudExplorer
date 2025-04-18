@@ -10,8 +10,9 @@
       "outDir": "./dist",
       "rootDir": "./",
       "baseUrl": "./",
-      "resolveJsonModule": true
+      "resolveJsonModule": true,
+      "sourceMap": true // Optional: for debugging built code
     },
-    "include": ["create-schema-content-only.ts", "src/**/*.ts", "scripts/**/*"],
-    "exclude": ["node_modules", "dist"]
+    "include": ["create-schema-content-only.ts", "src/**/*.ts", "scripts/**/*", "scripts/**/*.ts","backend/**/*.ts","server.ts" ],
+    "exclude": ["node_modules", "dist", "src"]
   }

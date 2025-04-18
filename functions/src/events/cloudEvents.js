@@ -1,7 +1,5 @@
 /* eslint-disable linebreak-style */
-// eslint-disable-next-line linebreak-style
 /* eslint-disable padded-blocks */
-/* eslint-disable linebreak-style */
 /* eslint-disable max-len */
 /* eslint-disable linebreak-style */
 // functions/src/events/cloudEvents.js
@@ -18,8 +16,6 @@ const cheerio = require("cheerio");
 const {getFirestore, FieldValue, Timestamp} = require("firebase-admin/firestore"); // Use specific Firestore imports
 
 // Initialize Admin SDK if not already initialized
-// Use initializeApp from firebase-admin/app for better practice if needed elsewhere
-// but the simple check is often sufficient if only used here.
 if (!admin.apps.length) {
   admin.initializeApp();
 }
@@ -27,67 +23,98 @@ if (!admin.apps.length) {
 const db = getFirestore(); // Use getFirestore()
 
 /**
- * Fetch latest GCP events from Google Cloud events page
+ * WARNING: WEB SCRAPING IS FRAGILE. Selectors must be verified against the live page.
+ * Fetch latest GCP events from Google Cloud OnAir events page
  * @returns {Promise<Array>} Array of GCP event objects
  */
 async function fetchGCPEvents() {
+  const gcpUrl = "https://cloudonair.withgoogle.com/events"; // Updated URL for static event listings
+  logger.info(`Scraping GCP events from: ${gcpUrl}`);
   try {
-    const response = await axios.get("https://cloud.google.com/events");
+    const response = await axios.get(gcpUrl);
     const $ = cheerio.load(response.data);
     const events = [];
 
-    // Extract events from the page
-    $(".event-card").each((i, element) => {
-      const title = $(element).find(".event-title").text().trim();
-      const description = $(element).find(".event-description").text().trim();
-      const dateText = $(element).find(".event-date").text().trim();
-      const link = $(element).find("a").attr("href");
+    // >>> IMPORTANT: Verify these selectors by inspecting https://cloudonair.withgoogle.com/events <<<
+    const eventCardSelector = "ul.events-list > li.event-item"; // Targets event list items
+    const titleSelector = "a.event-title"; // Title within link
+    const descriptionSelector = "p.event-description"; // Description paragraph
+    const dateSelector = "span.event-date"; // Date element
+    const linkSelector = "a.event-title"; // Link to event details
 
-      // Only add events with valid titles
-      if (title) {
+    $(eventCardSelector).each((i, element) => {
+      const title = $(element).find(titleSelector).text().trim();
+      const description = $(element).find(descriptionSelector).text().trim();
+      const dateText = $(element).find(dateSelector).text().trim();
+      let link = $(element).find(linkSelector).attr("href");
+
+      if (title && link) {
+        // Ensure link is absolute
+        if (!link.startsWith("http")) {
+          const baseUrl = "https://cloudonair.withgoogle.com";
+          link = link.startsWith("/") ? `${baseUrl}${link}` : `${baseUrl}/${link}`;
+        }
+
         events.push({
           title,
-          description: description || "Google Cloud event",
-          date: dateText || new Date().toISOString(), // Consider parsing dateText more robustly if possible
-          link: link && link.startsWith("http") ? link : `https://cloud.google.com${link || "/events"}`,
+          description: description || "Google Cloud event", // Default description
+          date: dateText || new Date().toISOString(), // Fallback date
+          link: link,
           platform: "GCP",
-          createdAt: FieldValue.serverTimestamp(), // Use FieldValue
+          createdAt: FieldValue.serverTimestamp(),
         });
+      } else {
+        if (!title) logger.warn(`GCP Scraper: Skipping card ${i} due to missing title.`);
+        if (!link) logger.warn(`GCP Scraper: Skipping card ${i} ("${title}") due to missing link.`);
       }
     });
 
-    return events;
+    logger.info(`GCP Scraper found ${events.length} potential events.`);
+    // Filter unique events by title and link
+    const uniqueEvents = Array.from(new Map(events.map((e) => [`${e.title}-${e.link}`, e])).values());
+    if (uniqueEvents.length < events.length) {
+      logger.info(`GCP Scraper filtered down to ${uniqueEvents.length} unique events.`);
+    }
+
+    return uniqueEvents;
   } catch (error) {
-    logger.error("Error fetching GCP events:", error); // Use logger
+    logger.error(`Error fetching GCP events from ${gcpUrl}:`, error.message, {stack: error.stack});
     return [];
   }
 }
 
 /**
+ * WARNING: WEB SCRAPING IS FRAGILE. Selectors must be verified against the live page.
  * Fetch latest AWS events from AWS events page
  * @returns {Promise<Array>} Array of AWS event objects
  */
 async function fetchAWSEvents() {
+  const awsUrl = "https://aws.amazon.com/events/"; // URL remains valid
+  logger.info(`Scraping AWS events from: ${awsUrl}`);
   try {
-    const response = await axios.get("https://aws.amazon.com/events/");
+    const response = await axios.get(awsUrl);
     const $ = cheerio.load(response.data);
     const events = [];
 
-    // Extract events from the page
-    // Note: AWS event page structure might change, selectors need verification
-    $(".aws-card, .event-card, .lb-card, .card").each((i, element) => { // Added more potential selectors
-      const title = $(element).find(".title, .headline, h3, h4").first().text().trim(); // Try common title elements
-      const description = $(element).find(".description, .abstract, p").first().text().trim();
-      const dateText = $(element).find(".date, .event-date, .timestamp").first().text().trim();
-      let link = $(element).find("a").first().attr("href");
+    // >>> IMPORTANT: Verify these selectors by inspecting https://aws.amazon.com/events/ <<<
+    const eventCardSelector = "div.m-event-card"; // Targets event card container
+    const titleSelector = "h3.m-event-title"; // Event title
+    const descriptionSelector = "p.m-event-description"; // Event description
+    const dateSelector = "span.m-event-date"; // Event date
+    const linkSelector = "a.m-event-link"; // Link to event details
 
-      // Basic validation
+    $(eventCardSelector).each((i, element) => {
+      const title = $(element).find(titleSelector).text().trim();
+      const description = $(element).find(descriptionSelector).text().trim();
+      const dateText = $(element).find(dateSelector).text().trim();
+      let link = $(element).find(linkSelector).attr("href");
+
       if (title && link) {
         // Ensure link is absolute
-        if (link && !link.startsWith("http")) {
-          link = `https://aws.amazon.com${link.startsWith("/") ? "" : "/"}${link}`;
+        if (!link.startsWith("http")) {
+          const baseUrl = "https://aws.amazon.com";
+          link = link.startsWith("/") ? `${baseUrl}${link}` : `${baseUrl}/${link}`;
         }
-
         events.push({
           title,
           description: description || "AWS event",
@@ -96,44 +123,57 @@ async function fetchAWSEvents() {
           platform: "AWS",
           createdAt: FieldValue.serverTimestamp(),
         });
+      } else {
+        if (!title) logger.warn(`AWS Scraper: Skipping card ${i} due to missing title.`);
+        if (!link) logger.warn(`AWS Scraper: Skipping card ${i} ("${title}") due to missing link.`);
       }
     });
 
-    // Filter out potential duplicates based on title/link if scraping is messy
+    logger.info(`AWS Scraper found ${events.length} potential events.`);
+    // Filter unique events by title and link
     const uniqueEvents = Array.from(new Map(events.map((e) => [`${e.title}-${e.link}`, e])).values());
-
+    if (uniqueEvents.length < events.length) {
+      logger.info(`AWS Scraper filtered down to ${uniqueEvents.length} unique events.`);
+    }
 
     return uniqueEvents;
   } catch (error) {
-    logger.error("Error fetching AWS events:", error); // Use logger
+    logger.error(`Error fetching AWS events from ${awsUrl}:`, error.message, {stack: error.stack});
     return [];
   }
 }
 
-
 /**
+ * WARNING: WEB SCRAPING IS FRAGILE. Selectors should be verified periodically.
  * Fetch latest Azure events from Microsoft Azure events page
  * @returns {Promise<Array>} Array of Azure event objects
  */
 async function fetchAzureEvents() {
+  const azureUrl = "https://azure.microsoft.com/en-us/community/events/"; // Verify URL
+  logger.info(`Workspaceing Azure events from: ${azureUrl}`);
   try {
-    // Updated URL as the previous one might be less specific
-    const response = await axios.get("https://azure.microsoft.com/en-us/community/events/");
+    const response = await axios.get(azureUrl);
     const $ = cheerio.load(response.data);
     const events = [];
 
-    // Adjust selectors based on the current structure of the Azure events page
-    $(".event-card, .card, .column").each((i, element) => { // Example selectors, inspect the page
-      const title = $(element).find(".card-title, h3, h4").first().text().trim();
-      const description = $(element).find(".card-body, p").first().text().trim();
-      // Date might be harder to find consistently, look for specific patterns or elements
-      const dateText = $(element).find(".event-date, .date").first().text().trim();
-      let link = $(element).find("a").first().attr("href");
+    // >>> IMPORTANT: Verify these selectors periodically, even if they work now <<<
+    const eventCardSelector = ".event-card, .card, .column, .event-item"; // Examples
+    const titleSelector = ".card-title, h3, h4"; // Examples
+    const descriptionSelector = ".card-body, p, .description"; // Examples
+    const dateSelector = ".event-date, .date"; // Examples
+    const linkSelector = "a"; // Examples
+
+    $(eventCardSelector).each((i, element) => {
+      const title = $(element).find(titleSelector).first().text().trim();
+      const description = $(element).find(descriptionSelector).first().text().trim();
+      const dateText = $(element).find(dateSelector).first().text().trim();
+      let link = $(element).find(linkSelector).first().attr("href");
 
       if (title && link) {
         // Ensure link is absolute
-        if (link && !link.startsWith("http")) {
-          link = `https://azure.microsoft.com${link.startsWith("/") ? "" : "/"}${link}`;
+        if (!link.startsWith("http")) {
+          const baseUrl = "https://azure.microsoft.com"; // Azure Base URL
+          link = link.startsWith("/") ? `${baseUrl}${link}` : `${baseUrl}/${link}`;
         }
 
         events.push({
@@ -144,19 +184,25 @@ async function fetchAzureEvents() {
           platform: "Azure",
           createdAt: FieldValue.serverTimestamp(),
         });
+      } else {
+        if (!title) logger.warn(`Azure Scraper: Skipping card ${i} due to missing title.`);
+        if (!link) logger.warn(`Azure Scraper: Skipping card ${i} ("${title}") due to missing link.`);
       }
     });
 
+    logger.info(`Azure Scraper found ${events.length} potential events.`);
     // Filter out potential duplicates
     const uniqueEvents = Array.from(new Map(events.map((e) => [`${e.title}-${e.link}`, e])).values());
+    if (uniqueEvents.length < events.length) {
+      logger.info(`Azure Scraper filtered down to ${uniqueEvents.length} unique events.`);
+    }
 
     return uniqueEvents;
   } catch (error) {
-    logger.error("Error fetching Azure events:", error); // Use logger
+    logger.error(`Error fetching Azure events from ${azureUrl}:`, error.message, {stack: error.stack});
     return [];
   }
 }
-
 
 /**
  * Save events to Firestore
@@ -164,42 +210,55 @@ async function fetchAzureEvents() {
  * @returns {Promise<void>}
  */
 async function saveEventsToFirestore(events) {
-  if (events.length === 0) {
+  if (!events || events.length === 0) {
     logger.info("No events provided to saveEventsToFirestore.");
     return;
   }
   const batch = db.batch();
   let savedCount = 0;
+  const processedIds = new Set();
+
+  logger.info(`Starting save process for ${events.length} fetched events.`);
 
   events.forEach((event) => {
-    // Create a more robust unique ID based on platform and link (links are usually more unique than titles)
-    // Use a simple hash or sanitize the link if it's very long or has many invalid chars
-    const idSource = `${event.platform}-${event.link}`;
-    // Basic sanitization for Firestore ID
-    const eventId = idSource.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 400); // Limit length
-
-    if (!eventId) {
-      logger.warn("Could not generate valid eventId for event:", event.title);
-      return; // Skip if ID generation failed
+    if (!event.platform || !event.link || !event.title) {
+      logger.warn("Skipping event due to missing platform, link, or title:", event);
+      return;
     }
 
-    const eventRef = db.collection("communityEvents").doc(eventId); // Changed collection name to match previous suggestion
+    const normalizedLink = event.link.replace(/\/$/, "");
+    const idSource = `${event.platform}-${normalizedLink}`;
+    const eventId = idSource.replace(/[^a-zA-Z0-9_.~-]/g, "_").substring(0, 450);
 
-    // Add event to batch, using merge to update existing events
+    if (!eventId) {
+      logger.warn("Could not generate valid eventId for event:", event.title, event.link);
+      return;
+    }
+
+    if (processedIds.has(eventId)) {
+      logger.warn(`Duplicate event ID detected in batch, skipping: ${eventId} for title: ${event.title}`);
+      return;
+    }
+    processedIds.add(eventId);
+
+    const eventRef = db.collection("communityEvents").doc(eventId);
+
     batch.set(eventRef, {
       ...event,
-      // Add an 'id' field within the document itself for easier client-side access
       id: eventId,
-      // Use Timestamp for consistency if needed elsewhere, otherwise serverTimestamp is fine
       updatedAt: FieldValue.serverTimestamp(),
     }, {merge: true});
+
     savedCount++;
   });
 
   if (savedCount > 0) {
-    // Commit the batch
-    await batch.commit();
-    logger.info(`Attempted to save/update ${savedCount} events to Firestore.`);
+    try {
+      await batch.commit();
+      logger.info(`Successfully committed batch to save/update ${savedCount} events to Firestore.`);
+    } catch (commitError) {
+      logger.error("Firestore batch commit failed:", commitError);
+    }
   } else {
     logger.info("No valid events were added to the Firestore batch.");
   }
@@ -207,222 +266,224 @@ async function saveEventsToFirestore(events) {
 
 /**
  * Notify users about new events based on their preferences
- * @param {Array} newEvents Array of new event objects (assumes they have an 'id' field now)
+ * @param {Array} newEvents Array of new event objects (MUST have an 'id' field)
  * @returns {Promise<void>}
  */
 async function notifyUsersAboutEvents(newEvents) {
-  if (newEvents.length === 0) return;
+  if (!newEvents || newEvents.length === 0) {
+    logger.info("No new events provided for notification.");
+    return;
+  }
+
+  logger.info(`Checking ${newEvents.length} new/updated events for notifications.`);
 
   try {
-    // Get users with notification preferences
     const usersSnapshot = await db.collection("users")
         .where("preferences.notifications.events", "==", true)
         .get();
 
     if (usersSnapshot.empty) {
-      logger.info("No users with event notification preferences found");
+      logger.info("No users found with event notification preferences enabled.");
       return;
     }
 
+    logger.info(`Found ${usersSnapshot.size} users with event notifications enabled.`);
+
     const notifications = [];
-    const now = Timestamp.now(); // Use Firestore Timestamp
+    const now = Timestamp.now();
 
     usersSnapshot.forEach((userDoc) => {
       const userData = userDoc.data();
-      // Default to all platforms if preference not set
-      const userPlatformPreferences = userData.preferences && userData.preferences.platforms || ["GCP", "AWS", "Azure"];
+      const userId = userDoc.id;
 
-      // Filter events based on user platform preferences
+      let userPlatformPreferences = ["GCP", "AWS", "Azure"];
+      if (userData && userData.preferences && Array.isArray(userData.preferences.platforms)) {
+        userPlatformPreferences = userData.preferences.platforms;
+      }
+
       const relevantEvents = newEvents.filter((event) =>
-        userPlatformPreferences.includes(event.platform),
+        event.id && event.platform && userPlatformPreferences.includes(event.platform),
       );
 
       if (relevantEvents.length > 0) {
-        // Create notification for this user
+        logger.info(`User ${userId} matches ${relevantEvents.length} events based on preferences: ${userPlatformPreferences.join(", ")}`);
+
         notifications.push({
-          userId: userDoc.id,
+          userId: userId,
           title: "New Cloud Events Available",
-          // Generate a more specific body if possible
-          body: `${relevantEvents.length} new event${relevantEvents.length > 1 ? "s" : ""} matching your preferences.`,
-          data: { // Data payload for client-side handling
+          body: `${relevantEvents.length} new event${relevantEvents.length > 1 ? "s" : ""} matching your preferences (${relevantEvents.map((e) => e.platform).filter((v, i, a) => a.indexOf(v) === i).join(", ")}).`,
+          data: {
             type: "events",
-            count: relevantEvents.length.toString(), // Data payload values should be strings
-            // Pass IDs generated in saveEventsToFirestore
-            eventIds: JSON.stringify(relevantEvents.map((e) => e.id || e.title)), // Ensure ID exists, fallback to title
+            count: relevantEvents.length.toString(),
+            eventIds: JSON.stringify(relevantEvents.map((e) => e.id)),
           },
           read: false,
-          createdAt: now, // Use consistent timestamp
+          createdAt: now,
         });
       }
     });
 
-    // Save notifications in a batch
     if (notifications.length > 0) {
       const batch = db.batch();
       notifications.forEach((notification) => {
-        // Store notifications in a subcollection under the user for better querying?
-        // Or keep a central collection as is.
-        // const notifRef = db.collection("users").doc(notification.userId).collection("notifications").doc();
-        const notifRef = db.collection("notifications").doc(); // Central collection
+        const notifRef = db.collection("notifications").doc();
         batch.set(notifRef, notification);
       });
-      await batch.commit();
-      logger.info(`Created ${notifications.length} notifications for users.`);
+
+      try {
+        await batch.commit();
+        logger.info(`Successfully created ${notifications.length} event notifications in Firestore.`);
+      } catch (commitError) {
+        logger.error("Failed to commit notification batch:", commitError);
+      }
+    } else {
+      logger.info("No relevant events found matching any user preferences for notifications.");
     }
   } catch (error) {
-    logger.error("Error notifying users about events:", error);
+    logger.error("Error querying users or processing notifications:", error);
   }
 }
 
 // --- V2 Scheduled Function ---
 exports.fetchCloudEvents = onSchedule(
     {
-      schedule: "0 */12 * * *", // Run twice daily (00:00 and 12:00)
+      schedule: "0 */12 * * *",
       timeZone: "UTC",
-      timeoutSeconds: 540, // Extend timeout for scraping
-      memory: "1GiB", // Increase memory for scraping if needed
-      // region: 'us-central1' // Specify region if needed
+      timeoutSeconds: 540,
+      memory: "1GiB",
     },
-    async (event) => { // V2 uses 'event' argument
-      logger.info("Starting cloud events fetch job (v2)"); // Use logger
+    async (event) => {
+      const executionId = event.jobName;
+      logger.info(`Starting scheduled cloud events fetch job (v2). Execution: ${executionId}`);
 
       try {
-      // Fetch events from all platforms in parallel
         const [gcpEvents, awsEvents, azureEvents] = await Promise.all([
           fetchGCPEvents(),
           fetchAWSEvents(),
           fetchAzureEvents(),
         ]);
 
-        // Combine all events
         const allEvents = [...gcpEvents, ...awsEvents, ...azureEvents];
 
         if (allEvents.length === 0) {
-          logger.info("No events found across all platforms."); // Use logger
-          return null; // Explicitly return null for success
+          logger.info("Scheduled job found no events across all platforms.");
+          return null;
         }
 
-        logger.info(`Found ${allEvents.length} events (GCP: ${gcpEvents.length}, AWS: ${awsEvents.length}, Azure: ${azureEvents.length})`); // Use logger
+        logger.info(`Scheduled job found ${allEvents.length} total events (GCP: ${gcpEvents.length}, AWS: ${awsEvents.length}, Azure: ${azureEvents.length})`);
 
-        // Save events to database - this function now adds the 'id' field
         await saveEventsToFirestore(allEvents);
 
-        // Prepare events with IDs for notification function
-        // Re-read or assume saveEventsToFirestore adds the ID correctly (less efficient but simpler)
-        // Or modify saveEventsToFirestore to return the events with IDs
-        // For now, we assume the structure passed to notifyUsersAboutEvents is correct
-        // (requires saveEventsToFirestore to add the 'id' field reliably)
-
-        // Let's refine this: Fetch the IDs after saving or modify saveEvents to return them
-        // Simple approach: Assume saveEventsToFirestore added the 'id' field based on link/platform
         const eventsWithIds = allEvents.map((event) => {
-          const idSource = `${event.platform}-${event.link}`;
-          const eventId = idSource.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 400);
+          if (!event.platform || !event.link) return null;
+          const normalizedLink = event.link.replace(/\/$/, "");
+          const idSource = `${event.platform}-${normalizedLink}`;
+          const eventId = idSource.replace(/[^a-zA-Z0-9_.~-]/g, "_").substring(0, 450);
           return {...event, id: eventId};
-        }).filter((e) => e.id); // Filter out any events where ID generation failed
+        }).filter((e) => e && e.id);
 
-
-        // Notify users about new events
         await notifyUsersAboutEvents(eventsWithIds);
 
-        logger.info("Cloud events fetch job completed successfully (v2)"); // Use logger
-        return null; // Explicitly return null for success
+        logger.info(`Scheduled cloud events fetch job completed successfully (v2). Execution: ${executionId}`);
+        return null;
       } catch (error) {
-        logger.error("Error in cloud events fetch job (v2):", error); // Use logger
-        // V2 scheduled functions don't explicitly return errors like this,
-        // logging the error is the primary way to indicate failure.
-        // Throwing the error might cause retries depending on configuration.
-        return null; // Return null even on error to prevent unwanted retries unless configured
+        logger.error(`FATAL Error in scheduled cloud events fetch job (v2): ${error.message}`, {error: error, stack: error.stack, executionId: executionId});
+        return null;
       }
     });
 
 // --- V2 Callable Function ---
 exports.manualFetchCloudEvents = onCall(
     {
-      timeoutSeconds: 300,
+      timeoutSeconds: 540,
       memory: "1GiB",
-      // region: 'us-central1' // Specify region if needed
     },
-    async (request) => { // V2 uses 'request' argument
-      logger.info("Manual fetch triggered", {auth: request.auth}); // Log auth info if present
+    async (request) => {
+      logger.info("Manual fetchCloudEvents triggered", {auth: request.auth});
 
-      // Check if request is made by an authenticated user (basic check)
       if (!request.auth) {
-        // Throwing an HttpsError is the correct way to return errors from onCall functions.
+        logger.error("Manual fetch attempt failed: Unauthenticated.");
         throw new HttpsError(
             "unauthenticated",
-            "The function must be called while authenticated.",
+            "Authentication required to trigger manual fetch.",
         );
       }
 
-      // Verify admin role if needed (using Firestore read)
+      const uid = request.auth.uid;
+
       try {
-        const userSnapshot = await db.collection("users").doc(request.auth.uid).get();
+        const userSnapshot = await db.collection("users").doc(uid).get();
+        if (!userSnapshot.exists) {
+          logger.error(`Manual fetch attempt failed: User ${uid} not found.`);
+          throw new HttpsError("not-found", `User ${uid} not found.`);
+        }
         const userData = userSnapshot.data();
-        if (!userData || userData.role !== "admin") {
+        if (userData.role !== "admin") {
+          logger.error(`Manual fetch attempt failed: User ${uid} lacks admin role.`);
           throw new HttpsError(
               "permission-denied",
-              "This function can only be called by admins.",
+              "Admin privileges required to trigger manual fetch.",
           );
         }
+        logger.info(`Manual fetch authorized for admin user: ${uid}`);
       } catch (error) {
-        logger.error("Error verifying admin role:", error);
+        logger.error(`Error verifying admin role for user ${uid}:`, error);
+        if (error instanceof HttpsError) throw error;
         throw new HttpsError("internal", "Could not verify user role.");
       }
 
-
-      logger.info(`Manual fetch requested by admin: ${request.auth.uid}`);
-
       try {
-        // Fetch events from all platforms in parallel
+        logger.info(`Admin user ${uid} starting manual fetch...`);
         const [gcpEvents, awsEvents, azureEvents] = await Promise.all([
           fetchGCPEvents(),
           fetchAWSEvents(),
           fetchAzureEvents(),
         ]);
 
-        // Combine all events
         const allEvents = [...gcpEvents, ...awsEvents, ...azureEvents];
 
-        if (allEvents.length === 0) {
-          logger.info("Manual fetch found no events.");
-          return {success: true, message: "No events found"}; // Return success object
+        const totalCount = allEvents.length;
+        const gcpCount = gcpEvents.length;
+        const awsCount = awsEvents.length;
+        const azureCount = azureEvents.length;
+
+        if (totalCount === 0) {
+          logger.info(`Manual fetch by ${uid} found no events.`);
+          return {success: true, message: "Manual fetch completed. No events found.", count: {total: 0, gcp: 0, aws: 0, azure: 0}};
         }
 
-        logger.info(`Manual fetch found ${allEvents.length} events.`);
+        logger.info(`Manual fetch by ${uid} found ${totalCount} events (GCP: ${gcpCount}, AWS: ${awsCount}, Azure: ${azureCount})`);
 
-        // Save events to database
         await saveEventsToFirestore(allEvents);
 
-        // Prepare events with IDs for notification
         const eventsWithIds = allEvents.map((event) => {
-          const idSource = `${event.platform}-${event.link}`;
-          const eventId = idSource.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 400);
+          if (!event.platform || !event.link) return null;
+          const normalizedLink = event.link.replace(/\/$/, "");
+          const idSource = `${event.platform}-${normalizedLink}`;
+          const eventId = idSource.replace(/[^a-zA-Z0-9_.~-]/g, "_").substring(0, 450);
           return {...event, id: eventId};
-        }).filter((e) => e.id);
+        }).filter((e) => e && e.id);
 
-        // Notify users about new events
         await notifyUsersAboutEvents(eventsWithIds);
 
-        logger.info("Manual fetch completed successfully.");
-        // Return success object
+        logger.info(`Manual fetch by ${uid} completed successfully.`);
         return {
           success: true,
-          message: `Successfully fetched and processed ${allEvents.length} events`,
+          message: `Successfully fetched and processed ${totalCount} events`,
           count: {
-            total: allEvents.length,
-            gcp: gcpEvents.length,
-            aws: awsEvents.length,
-            azure: azureEvents.length,
+            total: totalCount,
+            gcp: gcpCount,
+            aws: awsCount,
+            azure: azureCount,
           },
         };
       } catch (error) {
-        logger.error("Error in manual cloud events fetch:", error);
-        // Throw HttpsError for client feedback
+        logger.error(`Error during manual fetch triggered by ${uid}:`, error);
+        if (error instanceof HttpsError) throw error;
         throw new HttpsError(
-            "internal", // Generic error code
-            "An internal error occurred while fetching cloud events.",
-            error.message, // Optionally include details (be careful about leaking info)
+            "internal",
+            "An internal error occurred during the manual fetch process.",
+            error.message,
         );
       }
     });

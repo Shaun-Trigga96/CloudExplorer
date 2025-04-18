@@ -38,6 +38,8 @@ export const lightColors = {
   troubleshootingBackground: '#f8f8f8',
   examInfoBackground: '#f8f8f8',
   examRulesBackground: '#e8f5e9',
+  textPrimary: '#1C1C1E',
+  disabled: '#6E6E73',
 };
 
 export const darkColors = {
@@ -80,4 +82,6 @@ export const darkColors = {
   troubleshootingBackground: '#2C2C2E',
   examInfoBackground: '#2C2C2E',
   examRulesBackground: 'rgba(50, 215, 75, 0.15)', // Darker green rule background
+  textPrimary: '#FFFFFF',
+  disabled: '#8E8E93',
 };

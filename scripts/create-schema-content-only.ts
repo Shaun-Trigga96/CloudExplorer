@@ -22,6 +22,7 @@ interface Module {
   moduleId: string;
   title: string;
   description: string;
+  providerId: string ;
   duration: number | null;
   prerequisites: string[];
   contentType?: 'markdown' | 'google_doc'; // Add this field
@@ -485,6 +486,7 @@ function defineModules(): ScriptModuleDef[] {
     {
       moduleId: 'digital-transformation',
       title: 'Digital Transformation with Google Cloud',
+      providerId: 'gcp',
       description:
         'Understand core cloud computing concepts (IaaS, PaaS, SaaS), benefits, and key Google Cloud services and infrastructure.', // Added Description
       duration: 30, // Example duration in minutes
@@ -507,6 +509,7 @@ function defineModules(): ScriptModuleDef[] {
     {
       moduleId: 'data-transformation',
       title: 'Exploring Data Transformation with Google Cloud',
+      providerId: 'gcp',
       description:
         'Understanding the value of data is essential for leveraging its full potential.',
       duration: 30,
@@ -535,6 +538,7 @@ function defineModules(): ScriptModuleDef[] {
     {
       moduleId: 'artificial-intelligence',
       title: 'Innovating with Google Cloud Artificial Intelligence',
+      providerId: 'gcp',
       description:
         'Understanding AI and Machine Learning key concepts and how they benefit business.', // Added Description
       duration: 30, // Example duration in minutes
@@ -557,6 +561,7 @@ function defineModules(): ScriptModuleDef[] {
     {
       moduleId: 'infrastructure-application',
       title: 'Infrastructure and Application Modernization with Google Cloud',
+      providerId: 'gcp',
       description:
         'Understanding cloud infrastructure and cloud migration strategies .', // Added Description
       duration: 30, // Example duration in minutes
@@ -585,6 +590,7 @@ function defineModules(): ScriptModuleDef[] {
     {
       moduleId: 'trust-security',
       title: 'Trust and Security in the Cloud with Google Cloud',
+      providerId: 'gcp',
       description:
         'Understand why trust and security are central to Googles design and development philosophy.', // Added Description
       duration: 30, // Example duration in minutes
@@ -613,6 +619,7 @@ function defineModules(): ScriptModuleDef[] {
     {
       moduleId: 'scailing-operations',
       title: 'Scaling with Google Cloud Operations',
+      providerId: 'gcp',
       description:
         'Cloud operations encompass the practices and strategies that ensure the smooth functioning, optimization, and scalability of cloud-based systems.', // Added Description
       duration: 30, // Example duration in minutes
@@ -627,7 +634,7 @@ function defineModules(): ScriptModuleDef[] {
         {
           title: 'Financial Governance and Managing Cloud Costs',
           contentPath:
-            '/Cloud Digital Leader Learning Path/06 Scaling with Google Cloud Operations/2. Google’s Trusted Infrastructure.md',
+            '/Cloud Digital Leader Learning Path/06 Scaling with Google Cloud Operations/2. Financial Governance and Managing Cloud Costs.md',
           order: 2,
         },
         {
@@ -644,52 +651,6 @@ function defineModules(): ScriptModuleDef[] {
         },
       ],
     },
-
-    // {
-    //   moduleId: 'compute-engine',
-    //   title: 'Compute Engine',
-    //   description: 'Explore Google Cloud\'s scalable virtual machine (VM) service, instance types, pricing models, and basic management.', // Added Description
-    //   duration: 60,
-    //   prerequisites: ['cloud-fundamentals'], // Example prerequisite
-    //   sections: [
-    //     { title: 'Introduction to Compute Engine', contentPath: 'computeEngine.md', order: 1 },
-    //     { title: 'Understanding Virtual Machine Types', contentPath: 'virtualMachineNotes.md', order: 2 } // Fixed Order
-    //   ]
-    // },
-    // {
-    //   moduleId: 'cloud-storage',
-    //   title: 'Cloud Storage',
-    //   description: 'Learn about Google Cloud\'s unified, scalable, and durable object storage service, including storage classes and use cases.', // Added Description
-    //   duration: 45,
-    //   prerequisites: ['cloud-fundamentals'], // Example prerequisite
-    //   sections: [
-    //     { title: 'Overview of Cloud Storage', contentPath: 'cloudStorage.md', order: 1 },
-    //     { title: 'Object Storage Concepts & Classes', contentPath: 'storageConceptsNotes.md', order: 2 } // Fixed Order
-    //   ]
-    // },
-    // {
-    //   moduleId: 'cloud-functions',
-    //   title: 'Cloud Functions',
-    //   description: 'Build and deploy event-driven serverless microservices that automatically scale with Google Cloud Functions.', // Added Description
-    //   duration: 60,
-    //   prerequisites: ['cloud-fundamentals'], // Example prerequisite
-    //   sections: [
-    //     { title: 'Introduction to Serverless Computing', contentPath: 'cloudFunctions.md', order: 1 },
-    //     { title: 'Developing & Deploying Cloud Functions', contentPath: 'buildingServerlessFunctionsNotes.md', order: 2 } // Fixed Order
-    //   ]
-    // },
-    // {
-    //   moduleId: 'kubernetes-engine',
-    //   title: 'Kubernetes Engine (GKE)',
-    //   description: 'Deploy, manage, and scale containerized applications using Google Kubernetes Engine, Google Cloud\'s managed Kubernetes service.', // Added Description
-    //   duration: 75, // Example duration
-    //   prerequisites: ['cloud-fundamentals', 'compute-engine'], // Example prerequisites
-    //   sections: [
-    //     { title: 'Introduction to Kubernetes & Containers', contentPath: 'kubernetes.md', order: 1 },
-    //     { title: 'Container Orchestration with GKE', contentPath: 'containerOrchestrationNotes.md', order: 2 } // Fixed Order
-    //   ]
-    // },
-    // Add definitions for any other modules you have .md files for...
   ];
 }
 
@@ -722,41 +683,6 @@ function defineExams(): ScriptExamDef[] {
       numberOfQuestions: 30, // Adjusted number of questions for practice CDL
       passingRate: 70, // Adjusted passing rate for CDL
     },
-    // {
-    //   examId: 'cloud-architect-exam',
-    //   title: 'Google Cloud Architect Practice Exam',
-    //   description: 'Assesses ability to design, develop, and manage robust, secure, scalable, highly available, and dynamic solutions on Google Cloud.', // Updated Description
-    //   duration: 120,
-    //   // Suggested prerequisites based on broad scope
-    //   prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'], // Add others like networking if available
-    //   // Include all available core modules for broad architect context
-    //   associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'],
-    //   numberOfQuestions: 30,
-    //   passingRate: 70 // Adjusted passing rate for CDL
-    // },
-    // {
-    //   examId: 'cloud-data-engineer', // NOTE: Requires relevant data modules to be defined for optimal generation
-    //   title: 'Google Cloud Data Engineer Practice Exam',
-    //   description: 'Assesses ability to design, build, operationalize, secure, and monitor data processing systems, focusing on data pipelines and machine learning models.', // Updated Description
-    //   duration: 120,
-    //   prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'], // Core prerequisites
-    //   // Focus context on modules relevant to data storage, processing, serverless triggers
-    //   associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'],
-    //   numberOfQuestions: 30,
-    //   passingRate: 70 // Adjusted passing rate for CDL
-    // },
-    // {
-    //   examId: 'cloud-security-exam', // NOTE: Requires relevant security modules to be defined for optimal generation
-    //   title: 'Google Cloud Security Practice Exam',
-    //   description: 'Assesses ability to design and implement a secure infrastructure on Google Cloud Platform using Google Cloud security technologies.', // Updated Description
-    //   duration: 120,
-    //   prerequisites: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'], // Add networking, IAM modules if available
-    //   // Focus context on infrastructure modules that need securing
-    //   associatedModules: ['cloud-fundamentals', 'compute-engine', 'cloud-storage', 'kubernetes-engine', 'cloud-functions', 'data-transformation'],
-    //   numberOfQuestions: 30,
-    //   passingRate: 70 // Adjusted passing rate for CDL
-    // },
-    // Add other exam definitions here...
   ];
 }
 
@@ -822,12 +748,6 @@ function defineQuizzes(): ScriptQuizDef[] {
   ];
 }
 
-// --- REMEMBER ---
-// 1. The 'associatedModules' field in defineExams is crucial for providing relevant context to the AI when generating exam questions. Ensure these IDs match your defined 'moduleId's. The quality of generated questions depends heavily on the relevance and content of these associated modules.
-// 2. The 'quizId' in defineQuizzes must be unique and persistent. Re-running the script will target the document with this ID for updates.
-// 3. Ensure the 'Exam' and 'Quiz' types used elsewhere match the properties being defined here.
-// 4. Make sure the rest of the seeding script uses these functions correctly to seed metadata and trigger AI generation + saving.
-
 // --- Seeding Logic Functions ---
 
 async function seedModules(
@@ -871,6 +791,7 @@ async function seedModules(
       title: modDef.title,
       description: modDef.description,
       duration: modDef.duration || null,
+      providerId: modDef.providerId,
       prerequisites: modDef.prerequisites || [],
       contentType: 'markdown',
       updatedAt: serverTimestamp(),
@@ -1227,22 +1148,35 @@ async function generateAndSaveExamQuestions(
 
 // --- Main Execution Function ---
 async function runSeeding() {
-  console.log('\n--- Starting Firestore Content Seeding Script ---');
+  // Updated log message for clarity
+  console.log('\n--- Starting Firestore Module-Only Seeding Script ---');
   try {
+    // Define modules (still needed)
     const modules = defineModules();
-    const exams = defineExams();
-    const quizzes = defineQuizzes();
 
+    // Define exams and quizzes (commented out - no longer needed for this run)
+    // const exams = defineExams();
+    // const quizzes = defineQuizzes();
+
+    // Seed modules and their sections (KEEP THIS)
     await seedModules(modules);
-    await seedExamMetadata(exams);
-    await generateAndSaveQuizQuestions(quizzes);
-    await generateAndSaveExamQuestions(exams); // Pass exams array for context
 
+    // Seed exam metadata (commented out)
+    // await seedExamMetadata(exams);
+
+    // Generate and save quiz questions (commented out)
+    // await generateAndSaveQuizQuestions(quizzes);
+
+    // Generate and save exam questions (commented out)
+    // await generateAndSaveExamQuestions(exams);
+
+    // Updated log message
     console.log(
-      '\n--- Firestore Content Seeding Script Completed Successfully ---',
+      '\n--- Firestore Module-Only Seeding Script Completed Successfully ---',
     );
   } catch (error) {
-    console.error('\n--- Firestore Content Seeding Script Failed ---');
+    // Updated log message
+    console.error('\n--- Firestore Module-Only Seeding Script Failed ---');
     console.error('Error:', error);
     process.exit(1);
   }
