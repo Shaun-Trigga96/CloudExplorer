@@ -19,6 +19,8 @@ export interface Question {
 export interface Exam {
   examId: string;
   title: string;
+  providerId: string; // ADDED
+  pathId: string;     // ADDED
   description: string;
   duration: number | null;
   prerequisites: string[];
@@ -51,17 +53,24 @@ export interface ExamTimingData {
   timeSpent: number;
 }
 
-export interface Exam {
-  examId: string;
-  title: string;
-  description: string;
-  duration: number | null;
-  prerequisites: string[];
-  associatedModules?: string[];
-  questions?: Question[];
-  questionsGeneratedAt?: Timestamp | FieldValue;
-  createdAt?: Timestamp | FieldValue;
-  updatedAt?: Timestamp | FieldValue;
+export interface ExamDetail extends Exam {
+  questions: Question[]; // Assuming QuestionType is defined elsewhere
   passingRate: number;
-  icon: any;
+  // ... other detail fields
+}
+
+// If you have an ExamResult type
+export interface ExamResult {
+    examId: string;
+    providerId: string; // ADDED
+    pathId: string;     // ADDED
+    userId: string;
+    score: number;
+    percentage: number;
+    passed: boolean;
+    answers: Record<string, string>; // { questionId: userAnswerLetter }
+    startTime?: any; // Firestore Timestamp or ISO String
+    endTime?: any;   // Firestore Timestamp or ISO String
+    timeSpent?: number; // in seconds
+    timestamp?: any; // Completion timestamp
 }

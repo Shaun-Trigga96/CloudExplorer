@@ -4,7 +4,6 @@ import {
   StyleSheet, 
   View, 
   Text, 
-  findNodeHandle, 
   Alert,
   TouchableOpacity,
   NativeScrollEvent,

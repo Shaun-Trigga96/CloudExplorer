@@ -1,280 +1,153 @@
 const admin = require('firebase-admin');
 const AppError = require('../utils/appError');
+const { FieldValue } = require('firebase-admin/firestore'); // Import FieldValue
+const { serverTimestamp } = require('../utils/firestoreHelpers'); // Import serverTimestamp
 
 const db = admin.firestore();
 
-// --- NEW: Save Exam Result ---
 // POST /save-result
+// RESPONSIBILITY: Saves the details of a specific exam attempt to the 'examResults' collection.
+// Does NOT update the user's overall learning path progress directly anymore.
 exports.saveExamResult = async (req, res, next) => {
   console.log('saveExamResult: Received request body:', req.body);
   try {
-    const {userId, examId, result} = req.body;
+    // Destructure providerId and pathId from the main body, not nested in result
+    const {
+        userId,
+        examId,
+        providerId, // ADDED
+        pathId,     // ADDED
+        result      // Keep result object for attempt details
+    } = req.body;
+
     // --- Input Validation ---
     if (!userId || typeof userId !== 'string')
-      return next(
-        new AppError('Valid userId is required.', 400, 'INVALID_USER_ID'),
-      );
+      return next(new AppError('Valid userId is required.', 400, 'INVALID_USER_ID'));
     if (!examId || typeof examId !== 'string')
-      return next(
-        new AppError('Valid examId is required.', 400, 'INVALID_EXAM_ID'),
-      );
+      return next(new AppError('Valid examId is required.', 400, 'INVALID_EXAM_ID'));
+    // ADDED Validation
+    if (!providerId || typeof providerId !== 'string')
+      return next(new AppError('Valid providerId is required.', 400, 'INVALID_PROVIDER_ID'));
+    if (!pathId || typeof pathId !== 'string')
+      return next(new AppError('Valid pathId is required.', 400, 'INVALID_PATH_ID'));
+    // --- End ADDED Validation ---
     if (!result || typeof result !== 'object')
-      return next(
-        new AppError(
-          'Exam result object is required.',
-          400,
-          'MISSING_RESULT_OBJECT',
-        ),
-      );
+      return next(new AppError('Exam result object is required.', 400, 'MISSING_RESULT_OBJECT'));
 
     // Validate required fields within the result object
     const {
       totalQuestions,
-      correctAnswers,
-      score,
-      isPassed,
-      answeredQuestions,
-      timestamp,
+      correctAnswers, // Use correctAnswers for raw score
+      percentage,     // Expect percentage (0-100) from frontend or calculate
+      passed,         // Expect boolean from frontend
+      answers,        // Renamed from answeredQuestions for consistency
+      startTime,      // Optional ISO string
+      endTime,        // Optional ISO string
+      timeSpent,      // Optional number in seconds
+      timestamp,      // Optional completion timestamp ISO string
     } = result;
-    if (
-      totalQuestions === undefined ||
-      typeof totalQuestions !== 'number' ||
-      totalQuestions <= 0
-    )
-      return next(
-        new AppError(
-          'Valid result.totalQuestions is required.',
-          400,
-          'INVALID_TOTAL_QUESTIONS',
-        ),
-      );
-    if (
-      correctAnswers === undefined ||
-      typeof correctAnswers !== 'number' ||
-      correctAnswers < 0
-    )
-      return next(
-        new AppError(
-          'Valid result.correctAnswers is required.',
-          400,
-          'INVALID_CORRECT_ANSWERS',
-        ),
-      );
-    // 'score' in the input seems to be percentage already? Let's clarify. Assuming input 'score' is percentage.
-    if (
-      score === undefined ||
-      typeof score !== 'number' ||
-      score < 0 ||
-      score > 100
-    )
-      return next(
-        new AppError(
-          'Valid result.score (percentage 0-100) is required.',
-          400,
-          'INVALID_SCORE_PERCENTAGE',
-        ),
-      );
-    if (isPassed === undefined || typeof isPassed !== 'boolean')
-      return next(
-        new AppError(
-          'Valid result.isPassed (boolean) is required.',
-          400,
-          'INVALID_IS_PASSED',
-        ),
-      );
-    // answeredQuestions is optional but should be an object/array if provided
-    if (answeredQuestions && typeof answeredQuestions !== 'object')
-      return next(
-        new AppError(
-          'result.answeredQuestions should be an object or array if provided.',
-          400,
-          'INVALID_ANSWERED_QUESTIONS',
-        ),
-      );
+
+    if (totalQuestions === undefined || typeof totalQuestions !== 'number' || totalQuestions <= 0)
+      return next(new AppError('Valid result.totalQuestions is required.', 400, 'INVALID_TOTAL_QUESTIONS'));
+    if (correctAnswers === undefined || typeof correctAnswers !== 'number' || correctAnswers < 0)
+      return next(new AppError('Valid result.correctAnswers is required.', 400, 'INVALID_CORRECT_ANSWERS'));
+    if (percentage === undefined || typeof percentage !== 'number' || percentage < 0 || percentage > 100)
+      return next(new AppError('Valid result.percentage (0-100) is required.', 400, 'INVALID_SCORE_PERCENTAGE'));
+    if (passed === undefined || typeof passed !== 'boolean')
+      return next(new AppError('Valid result.passed (boolean) is required.', 400, 'INVALID_IS_PASSED'));
+    if (answers && typeof answers !== 'object')
+      return next(new AppError('result.answers should be an object if provided.', 400, 'INVALID_ANSWERS'));
+    if (timeSpent !== undefined && typeof timeSpent !== 'number')
+        return next(new AppError('result.timeSpent should be a number (seconds) if provided.', 400, 'INVALID_TIME_SPENT'));
 
     // --- Prepare Exam Result Data ---
     const examResultRef = db.collection('examResults').doc(); // Auto-generate ID
+
+    // Use client completion timestamp if provided, otherwise server time
     const resultTimestamp = timestamp
       ? admin.firestore.Timestamp.fromDate(new Date(timestamp))
-      : admin.firestore.FieldValue.serverTimestamp();
-    const percentage =
-      totalQuestions > 0
-        ? parseFloat(((correctAnswers / totalQuestions) * 100).toFixed(1)) // Use correctAnswers here
-        : 0; // Calculate percentage
-    const passingThreshold = 0.7; // 70%
-    const passed = percentage >= passingThreshold * 100;
+      : serverTimestamp(); // Use serverTimestamp for the main record timestamp
+
     const examResultData = {
       userId,
       examId,
+      providerId, // ADDED
+      pathId,     // ADDED
       totalQuestions,
-      score: correctAnswers, // Store raw number of correct answers
+      score: correctAnswers, // Store raw number of correct answers as 'score'
       percentage, // Store calculated/provided percentage
-      passed,
-      answeredQuestions: answeredQuestions || {}, // Store details if available
-      timestamp: resultTimestamp,
+      passed,     // Store boolean passed status
+      answers: answers || {}, // Store answer details if available
+      startTime: startTime ? admin.firestore.Timestamp.fromDate(new Date(startTime)) : null, // Store as Timestamp
+      endTime: endTime ? admin.firestore.Timestamp.fromDate(new Date(endTime)) : null,       // Store as Timestamp
+      timeSpent: timeSpent ?? null, // Store time spent in seconds
+      timestamp: resultTimestamp, // Main completion timestamp
     };
 
-    // --- Save Exam Result and Update User Progress (Transaction Recommended) ---
-    await db.runTransaction(async transaction => {
-      console.log('saveExamResult: Starting transaction...');
-      const userRef = db.collection('users').doc(userId);
-      console.log('saveExamResult: Getting user document:', userId);
-      const userDoc = await transaction.get(userRef);
-      console.log('saveExamResult: User document retrieved.');
-
-      // 1. Save the detailed exam result
-      console.log('saveExamResult: Saving exam result:', examResultData);
-      transaction.set(examResultRef, examResultData);
-      console.log('saveExamResult: Exam result saved.');
-
-      // 2. Update user's general progress
-      // Create a timestamp without serverTimestamp for array elements
-      const completionTimestamp = timestamp
-        ? admin.firestore.Timestamp.fromDate(new Date(timestamp))
-        : new Date(); // Use regular Date when adding to array
-      
-      const examCompletionRecord = {
-        examId,
-        percentage,
-        passed: passed, // Use 'passed' consistently
-        completedAt: completionTimestamp, // Use regular timestamp, NOT serverTimestamp
-      };
-
-      // Get existing completed exams or initialize empty array
-      let completedExams = [];
-      if (userDoc.exists && userDoc.data().learningProgress?.completedExams) {
-        completedExams = [...userDoc.data().learningProgress.completedExams];
-      }
-
-      // Check if the user has already completed the exam
-      const existingExamIndex = completedExams.findIndex(
-        (exam) => exam.examId === examId
-      );
-
-      // Update or add the exam record
-      if (existingExamIndex !== -1) {
-        // If the exam exists, replace it with the new record
-        completedExams[existingExamIndex] = examCompletionRecord;
-      } else {
-        // If the exam doesn't exist, push the new record
-        completedExams.push(examCompletionRecord);
-      }
-      
-      // Prepare the update with explicit updates instead of arrayUnion
-      const userUpdateData = {
-        'learningProgress.completedExams': completedExams,
-        'lastActivity': admin.firestore.FieldValue.serverTimestamp()
-      };
-      
-      console.log(
-        'saveExamResult: Preparing user update data:',
-        userUpdateData,
-      );
-
-      if (userDoc.exists) {
-        console.log('saveExamResult: Updating existing user:', userId);
-        transaction.update(userRef, userUpdateData);
-        console.log('saveExamResult: User updated.');
-      } else {
-        // Create user if they don't exist (edge case?)
-        console.warn(
-          `User ${userId} not found during exam save. Creating user record.`,
-        );
-        console.log('saveExamResult: Creating new user:', userId);
-        transaction.set(
-          userRef,
-          {
-            userId,
-            learningProgress: {
-              completedExams: [examCompletionRecord],
-              completedModules: [],
-              completedQuizzes: [],
-            },
-            lastActivity: admin.firestore.FieldValue.serverTimestamp(),
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          {merge: true},
-        );
-        console.log('saveExamResult: New user created.');
-      }
-      console.log('saveExamResult: Transaction completed.');
-    });
+    // --- Save ONLY the Exam Result ---
+    // User progress update (adding to completedExams array within the specific learning path)
+    // is now handled by the POST /api/v1/users/:userId/progress endpoint.
+    await examResultRef.set(examResultData);
 
     console.log(
-      `Exam result ${examResultRef.id} saved for user ${userId}, exam ${examId}. Passed: ${isPassed}`,
+      `Exam result ${examResultRef.id} saved for user ${userId}, exam ${examId}, path ${providerId}/${pathId}. Passed: ${passed}`,
     );
 
     // --- Respond to Client ---
     res.status(201).json({
-      message: 'Exam result saved successfully.',
+      status: 'success',
+      message: 'Exam result saved successfully. Remember to call user progress endpoint.',
       resultId: examResultRef.id,
       passed: passed,
-      timestamp: resultTimestamp, // Include the timestamp in the response
+      // Return the timestamp used (might be slightly different if server generated)
+      timestamp: examResultData.timestamp instanceof admin.firestore.Timestamp
+                 ? examResultData.timestamp.toDate().toISOString()
+                 : new Date().toISOString(), // Approximate if serverTimestamp was used
     });
   } catch (error) {
-    console.error(
-      `Error saving exam result for user ${req.body.userId}, exam ${req.body.examId}:`,
-      error, // Log the full error object
-    );
+    console.error(`Error saving exam result for user ${req.body.userId}, exam ${req.body.examId}:`, error);
+    // Keep existing detailed error handling
     if (error.code === 'NOT_FOUND' && error.message.includes('User')) {
-      // Handle transaction user not found specifically if needed, though covered by AppError below
-      next(
-        new AppError(
-          'User not found during transaction.',
-          404,
-          'USER_NOT_FOUND_TX',
-        ),
-      );
-    } else if (
-      error.message?.includes('firestore') ||
-      error.name?.includes('FirebaseError')
-    ) {
-      console.error(
-        `Firestore error saving exam result for user ${req.body.userId}, exam ${req.body.examId}:`,
-        error,
-      );
-      next(
-        new AppError(
-          `Database error saving exam result: ${error.message}`,
-          500,
-          'DB_SAVE_ERROR',
-        ),
-      );
+      next(new AppError('User not found during transaction.', 404, 'USER_NOT_FOUND_TX'));
+    } else if (error.message?.includes('firestore') || error.name?.includes('FirebaseError')) {
+      next(new AppError(`Database error saving exam result: ${error.message}`, 500, 'DB_SAVE_ERROR'));
     } else {
-      console.error(
-        `Unexpected error saving exam result for user ${req.body.userId}, exam ${req.body.examId}:`,
-        error,
-      );
       next(error);
     }
   }
 };
 
-// --- NEW: Get Exam Progress ---
 // GET /progress/:userId
+// Optionally filter by providerId and pathId
 exports.getExamProgress = async (req, res, next) => {
   try {
     const {userId} = req.params;
-    const {examId} = req.query; // Optional: Filter by specific exam
+    const {
+        examId,     // Optional: Filter by specific exam
+        providerId, // ADDED: Optional filter by provider
+        pathId      // ADDED: Optional filter by path
+    } = req.query;
 
     if (!userId || typeof userId !== 'string') {
-      return next(
-        new AppError(
-          'Valid User ID parameter is required',
-          400,
-          'INVALID_USER_ID_PARAM',
-        ),
-      );
+      return next(new AppError('Valid User ID parameter is required', 400, 'INVALID_USER_ID_PARAM'));
     }
 
     let query = db.collection('examResults').where('userId', '==', userId);
 
     if (examId && typeof examId === 'string') {
-      console.log(
-        `Filtering exam progress for user ${userId} by exam ${examId}`,
-      );
+      console.log(`Filtering exam progress for user ${userId} by exam ${examId}`);
       query = query.where('examId', '==', examId);
     }
+    // ADDED: Add provider/path filters if provided
+    if (providerId && typeof providerId === 'string') {
+        console.log(`Filtering exam progress for user ${userId} by provider ${providerId}`);
+        query = query.where('providerId', '==', providerId);
+    }
+    if (pathId && typeof pathId === 'string') {
+        console.log(`Filtering exam progress for user ${userId} by path ${pathId}`);
+        query = query.where('pathId', '==', pathId);
+    }
+    // --- End ADDED ---
 
     query = query.orderBy('timestamp', 'desc'); // Latest first
 
@@ -285,75 +158,72 @@ exports.getExamProgress = async (req, res, next) => {
       return {
         resultId: doc.id, // ID of the result document
         examId: data.examId,
+        providerId: data.providerId, // ADDED
+        pathId: data.pathId,         // ADDED
         score: data.score, // Number correct
         totalQuestions: data.totalQuestions,
         percentage: data.percentage,
-        passed: data.passed, // Use 'passed' field name
+        passed: data.passed,
         timestamp: data.timestamp?.toDate()?.toISOString() || null,
+        timeSpent: data.timeSpent ?? null, // Include time spent if available
       };
     });
 
-    res.json({examProgress}); // Return as object with key
+    res.json({
+        status: 'success',
+        data: { examProgress }
+    }); // Return as object with key
   } catch (error) {
-    console.error(
-      `Error fetching exam progress for user ${req.params.userId}:`,
-      error,
-    );
-    next(
-      new AppError('Failed to retrieve exam progress.', 500, 'DB_FETCH_ERROR'),
-    );
+    console.error(`Error fetching exam progress for user ${req.params.userId}:`, error);
+    next(new AppError('Failed to retrieve exam progress.', 500, 'DB_FETCH_ERROR'));
   }
 };
 
-// --- NEW: List Exams ---
 // GET /list
+// Requires providerId and pathId query parameters
 exports.listExams = async (req, res, next) => {
   try {
     const {
+      providerId, // REQUIRED filter
+      pathId,     // REQUIRED filter
       limit = 10,
       lastId,
-      orderBy = 'updatedAt',
-      orderDir = 'desc',
+      orderBy = 'title', // Default sort by title
+      orderDir = 'asc',
     } = req.query;
-    const parsedLimit = parseInt(limit, 10);
 
-    if (isNaN(parsedLimit) || parsedLimit <= 0 || parsedLimit > 50) {
-      // Sensible max limit
-      return next(
-        new AppError(
-          'Invalid limit value (must be 1-50)',
-          400,
-          'INVALID_LIMIT',
-        ),
-      );
+    // --- Validation ---
+    if (!providerId || typeof providerId !== 'string') {
+        return next(new AppError('Query parameter "providerId" is required.', 400, 'MISSING_PROVIDER_ID'));
     }
-    const validOrderBy = ['title', 'createdAt', 'updatedAt']; // Allowed sort fields
+    if (!pathId || typeof pathId !== 'string') {
+        return next(new AppError('Query parameter "pathId" is required.', 400, 'MISSING_PATH_ID'));
+    }
+    const parsedLimit = parseInt(limit, 10);
+    if (isNaN(parsedLimit) || parsedLimit <= 0 || parsedLimit > 50) {
+      return next(new AppError('Invalid limit value (must be 1-50)', 400, 'INVALID_LIMIT'));
+    }
+    const validOrderBy = ['title', 'createdAt', 'updatedAt', 'duration']; // Allowed sort fields
     const validOrderDir = ['asc', 'desc'];
     if (!validOrderBy.includes(orderBy) || !validOrderDir.includes(orderDir)) {
-      return next(
-        new AppError(
-          'Invalid orderBy or orderDir parameter',
-          400,
-          'INVALID_SORT',
-        ),
-      );
+      return next(new AppError('Invalid orderBy or orderDir parameter', 400, 'INVALID_SORT'));
     }
+    // --- End Validation ---
 
-    let query = db
-      .collection('exams')
-      .orderBy(orderBy, orderDir)
-      .limit(parsedLimit);
+    console.log(`Listing exams for path: ${providerId}/${pathId}`);
+
+    let query = db.collection('exams')
+                  .where('providerId', '==', providerId)
+                  .where('pathId', '==', pathId)
+                  .orderBy(orderBy, orderDir)
+                  .limit(parsedLimit);
 
     if (lastId) {
       const lastDocSnapshot = await db.collection('exams').doc(lastId).get();
       if (lastDocSnapshot.exists) {
-        query = query.startAfter(lastDocSnapshot); // Use snapshot for pagination cursor
+        query = query.startAfter(lastDocSnapshot);
       } else {
-        // Don't throw error, just ignore invalid lastId and start from beginning
-        console.warn(
-          `Pagination lastId '${lastId}' not found. Starting from beginning.`,
-        );
-        // return next(new AppError('Invalid lastId provided for pagination', 400, 'INVALID_LAST_ID'));
+        console.warn(`Pagination lastId '${lastId}' not found for exams. Starting from beginning.`);
       }
     }
 
@@ -362,62 +232,77 @@ exports.listExams = async (req, res, next) => {
       const data = doc.data();
       return {
         id: doc.id,
+        providerId: data.providerId, // Include in response
+        pathId: data.pathId,         // Include in response
         title: data.title,
         description: data.description,
         duration: data.duration,
         prerequisites: data.prerequisites,
         associatedModules: data.associatedModules,
         passingRate: data.passingRate,
-        content: data.content, // Google Doc URL or other content identifier
-        createdAt: data.createdAt?.toDate() || null,
-        updatedAt: data.updatedAt?.toDate() || null,
-        // Add other relevant fields like thumbnail URL, tags, etc.
+        // Avoid sending full questions in list view
+        // questionCount: data.questions?.length || 0, // Example if questions stored directly
+        createdAt: data.createdAt?.toDate()?.toISOString() || null,
+        updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
       };
     });
 
-    // Determine the last ID for the next page request
-    const newLastId =
-      exams.length > 0 ? exams[exams.length - 1].id : null;
+    const newLastId = exams.length > 0 ? exams[exams.length - 1].id : null;
+    const hasMore = exams.length === parsedLimit;
 
     res.json({
-      exams,
-      hasMore: exams.length === parsedLimit, // If we fetched the max limit, there might be more
-      lastId: newLastId,
+      status: 'success',
+      data: {
+          exams,
+          hasMore,
+          lastId: newLastId
+      }
     });
   } catch (error) {
-    console.error('Error listing exams:', error);
+    console.error(`Error listing exams for path ${req.query.providerId}/${req.query.pathId}:`, error);
     next(error);
   }
 };
 
-// --- NEW: Get Exam by ID ---
-// GET /:examId
+// GET /:id (Changed route param name for consistency)
 exports.getExamById = async (req, res, next) => {
   try {
-    const examId = req.params.examId;
-    console.log('examId:', examId);
-    if (!examId || typeof examId !== 'string') {
-      return next(
-        new AppError('Invalid exam ID parameter', 400, 'INVALID_EXAM_ID'),
-      );
+    const { id } = req.params; // Use 'id' from the route
+    console.log(`Fetching exam by ID: ${id}`);
+
+    if (!id || typeof id !== 'string') {
+        return next(new AppError('Valid Exam ID parameter is required', 400, 'INVALID_EXAM_ID_PARAM'));
     }
 
-    const examDoc = await db.collection('exams').doc(examId).get();
+    const examDoc = await db.collection('exams').doc(id).get();
 
     if (!examDoc.exists) {
-      return next(
-        new AppError(`Exam with ID ${examId} not found`, 404, 'EXAM_NOT_FOUND'),
-      );
+      return next(new AppError(`Exam with ID ${id} not found`, 404, 'EXAM_NOT_FOUND'));
     }
 
     const examData = examDoc.data();
+    // Ensure providerId and pathId are included
     res.json({
-      examId: examDoc.id,
-      ...examData,
-      // Include other relevant fields from the exam document
+      status: 'success',
+      data: {
+        exam: {
+            id: examDoc.id,
+            providerId: examData.providerId, // Ensure this exists in your exam docs
+            pathId: examData.pathId,         // Ensure this exists in your exam docs
+            title: examData.title,
+            description: examData.description,
+            duration: examData.duration,
+            prerequisites: examData.prerequisites,
+            associatedModules: examData.associatedModules,
+            passingRate: examData.passingRate,
+            questions: examData.questions, // Assuming questions are stored directly
+            createdAt: examData.createdAt?.toDate()?.toISOString() || null,
+            updatedAt: examData.updatedAt?.toDate()?.toISOString() || null,
+        }
+      }
     });
   } catch (error) {
-    console.error(`Error getting exam by ID ${req.params.examId}:`, error);
+    console.error(`Error getting exam by ID ${req.params.id}:`, error);
     next(error);
   }
 };

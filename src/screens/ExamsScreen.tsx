@@ -1,54 +1,72 @@
 // src/screens/ExamsScreen.tsx
 import React from 'react';
-import { ScrollView, ActivityIndicator } from 'react-native';
-import { Title, Paragraph } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { ScrollView, View } from 'react-native';
+import { Title, Paragraph, Text } from 'react-native-paper'; // Added Text
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'; // Added useRoute, RouteProp
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useCustomTheme } from '../context/ThemeContext';
 import { darkColors, lightColors } from '../styles/colors';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import strings from '../localization/strings';
-import { useExams } from '../components/hooks/useExams';
-import {  ErrorView } from '../components/common';
+import { useExams } from '../components/hooks/useExams'; // Updated hook import
+import { ErrorView, LoadingView } from '../components/common'; // Use LoadingView
 import { examsStyles } from '../styles/examsStyles';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ExamCard } from '../components/exams';
+import { Exam } from '../types/exam'; // Import Exam type
 
 type ExamsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ExamDetail'>;
+type ExamsScreenRouteProp = RouteProp<RootStackParamList, 'ExamsScreen'>; // Define route prop type
 
 const ExamsScreen = () => {
   const navigation = useNavigation<ExamsScreenNavigationProp>();
+  const route = useRoute<ExamsScreenRouteProp>(); // Use useRoute hook
   const { isDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors;
-  const { exams, examAttempts, examScores, loading, error, userIdError, fetchExamAttempts } = useExams();
 
-  const handleStartExam = (examId: string, examTitle: string) => {
-    navigation.navigate('ExamDetail', { examId, title: examTitle });
+  // --- Get providerId and pathId from route params ---
+  const { providerId, pathId } = route.params;
+
+  // --- Use the updated hook ---
+  const { exams, examAttempts, examScores, loading, error, userIdError } = useExams(providerId, pathId);
+
+  // --- Update handleStartExam to include providerId and pathId ---
+  const handleStartExam = (exam: Exam) => { // Pass the full exam object
+    console.log(
+      `[ExamsScreen] Navigating to Exam Detail for exam ${exam.examId}, provider ${exam.providerId}, path ${exam.pathId}`
+    );
+    navigation.navigate('ExamDetail', {
+      examId: exam.examId, // Use exam.examId
+      title: exam.title,
+      providerId: exam.providerId, // Pass from exam data
+      pathId: exam.pathId,       // Pass from exam data
+    });
   };
 
   const handleRetry = async () => {
-    const userId = await AsyncStorage.getItem('userId');
-    if (userId) {
-      await fetchExamAttempts(userId);
-    } else {
-      navigation.navigate('Auth');
-    }
+    // Use the refetch function from the hook
+
   };
 
+  // --- Handle userIdError specifically ---
   if (userIdError) {
     return (
       <ErrorView
         message={userIdError}
-        onRetry={() => navigation.navigate('Auth')}
       />
     );
   }
 
+  // --- Loading State ---
+  if (loading) {
+    // Use LoadingView for consistency
+    return <LoadingView message={ 'Loading Exams...'} />;
+  }
+
+  // --- General Error State ---
   if (error) {
     return (
       <ErrorView
-      message={error}
-        onRetry={handleRetry}
+        message={error}
       />
     );
   }
@@ -64,18 +82,24 @@ const ExamsScreen = () => {
       <Paragraph style={[examsStyles.screenDescription, { color: colors.textSecondary }]}>
         {strings.certificationPracticeExamsDescription}
       </Paragraph>
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={colors.primary} />
-      ) : (
+
+      {exams.length > 0 ? (
         exams.map(exam => (
           <ExamCard
-            key={exam.examId}
+            key={exam.examId} // Use exam.id
             exam={exam}
-            attempts={examAttempts[exam.examId] || 0}
-            score={examScores[exam.examId]}
-            onStart={() => handleStartExam(exam.examId, exam.title)}
+            attempts={examAttempts[exam.examId] || 0} // Use exam.id
+            score={examScores[exam.examId]} // Use exam.id
+            onStart={() => handleStartExam(exam)} // Pass the full exam object
           />
         ))
+      ) : (
+        // --- Display message when no exams are found ---
+        <View style={examsStyles.noExamsContainer}>
+          <Text style={[examsStyles.noExamsText, { color: colors.textSecondary }]}>
+            No practice exams available for this learning path yet.
+          </Text>
+        </View>
       )}
     </ScrollView>
   );

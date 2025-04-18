@@ -35,12 +35,12 @@ async function fetchGCPEvents() {
     const $ = cheerio.load(response.data);
     const events = [];
 
-    // >>> IMPORTANT: Verify these selectors by inspecting https://cloudonair.withgoogle.com/events <<<
-    const eventCardSelector = "ul.events-list > li.event-item"; // Targets event list items
-    const titleSelector = "a.event-title"; // Title within link
-    const descriptionSelector = "p.event-description"; // Description paragraph
-    const dateSelector = "span.event-date"; // Date element
-    const linkSelector = "a.event-title"; // Link to event details
+    // Updated GCP selectors
+    const eventCardSelector = ".devsite-landing-row-item";
+    const titleSelector = "h3.devsite-landing-row-item-title";
+    const descriptionSelector = ".devsite-landing-row-item-description";
+    const dateSelector = ".devsite-landing-row-item-metadata";
+    const linkSelector = "a.devsite-landing-row-item-link";
 
     $(eventCardSelector).each((i, element) => {
       const title = $(element).find(titleSelector).text().trim();
@@ -96,12 +96,12 @@ async function fetchAWSEvents() {
     const $ = cheerio.load(response.data);
     const events = [];
 
-    // >>> IMPORTANT: Verify these selectors by inspecting https://aws.amazon.com/events/ <<<
-    const eventCardSelector = "div.m-event-card"; // Targets event card container
-    const titleSelector = "h3.m-event-title"; // Event title
-    const descriptionSelector = "p.m-event-description"; // Event description
-    const dateSelector = "span.m-event-date"; // Event date
-    const linkSelector = "a.m-event-link"; // Link to event details
+    // Updated AWS selectors
+    const eventCardSelector = ".aws-grid .aws-grid-column";
+    const titleSelector = "h3";
+    const descriptionSelector = "p";
+    const dateSelector = ".date-display";
+    const linkSelector = "a";
 
     $(eventCardSelector).each((i, element) => {
       const title = $(element).find(titleSelector).text().trim();

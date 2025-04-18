@@ -41,4 +41,7 @@ export interface CommunityEvent {
   speakers?: number;
   daysLeft?: number;
   isUpcoming: boolean;
+  link: string;
+  platform: string;
+  location: string;
 }

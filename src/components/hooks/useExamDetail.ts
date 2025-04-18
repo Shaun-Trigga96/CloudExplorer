@@ -103,7 +103,13 @@ export const useExam = (examId: string, navigation: any): UseExamReturn => {
           isCorrect: question.isCorrect,
           explanation: question.explanation.join('\n'), // Join the explanation array into a single string
         })),
-
+        examId: '',
+        providerId: '',
+        pathId: '',
+        userId: '',
+        percentage: 0,
+        passed: false,
+        answers: {}
       };
 
       const userId = await AsyncStorage.getItem('userId');

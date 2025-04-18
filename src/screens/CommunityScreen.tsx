@@ -19,6 +19,7 @@ import { handleApiError } from '../utils/errorHandler';
 import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { communityStyles } from '../styles/communityStyles';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -319,7 +320,7 @@ if ((refresh || selectedTab === 'members') && hasMoreMembers) {
 
   const renderFeed = () => (
     <>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topicsScroll}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={communityStyles.topicsScroll}>
         {topics.map(topic => (
           <TopicButton
             key={topic.id}
@@ -333,16 +334,16 @@ if ((refresh || selectedTab === 'members') && hasMoreMembers) {
         data={filteredPosts}
         renderItem={({ item }) => <PostItem post={item} onLike={handleLikePost} />}
         keyExtractor={item => item.id}
-        contentContainerStyle={styles.feedContainer}
+        contentContainerStyle={communityStyles.feedContainer}
         showsVerticalScrollIndicator={false}
         onRefresh={() => fetchCommunityData(true, userId)} // Pass userId
         refreshing={refreshing}
         onEndReached={handleLoadMorePosts}
         onEndReachedThreshold={0.5}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
+          <View style={communityStyles.emptyContainer}>
             <Icon name="inbox" size={48} color={colors.textSecondary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            <Text style={[communityStyles.emptyText, { color: colors.textSecondary }]}>
               {selectedTopic ? 'No posts found in this topic' : 'No posts yet. Start a discussion!'}
             </Text>
           </View>
@@ -351,7 +352,7 @@ if ((refresh || selectedTab === 'members') && hasMoreMembers) {
           isFetchingMore ? (
             <ActivityIndicator style={{ marginVertical: 20 }} size="small" color={colors.primary} />
           ) : !hasMorePosts && posts.length > 0 ? (
-            <Text style={[styles.endListText, { color: colors.textSecondary }]}>No more posts</Text>
+            <Text style={[communityStyles.endListText, { color: colors.textSecondary }]}>No more posts</Text>
           ) : null
         }
       />
@@ -364,79 +365,80 @@ if ((refresh || selectedTab === 'members') && hasMoreMembers) {
       data={members}
       renderItem={({ item }) => <MemberItem member={item} />}
       keyExtractor={item => item.id}
-      contentContainerStyle={styles.membersContainer}
+      contentContainerStyle={communityStyles.membersContainer}
       showsVerticalScrollIndicator={false}
       onRefresh={() => fetchCommunityData(true, userId)} // Pass userId
       refreshing={refreshing}
       onEndReached={handleLoadMoreMembers}
       onEndReachedThreshold={0.5}
       ListHeaderComponent={
-        <View style={styles.membersHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Cloud Experts Community</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+        <View style={communityStyles.membersHeader}>
+          <Text style={[communityStyles.sectionTitle, { color: colors.text }]}>Cloud Experts Community</Text>
+          <Text style={[communityStyles.sectionSubtitle, { color: colors.textSecondary }]}>
             Connect with {members.length}+ cloud professionals
           </Text>
         </View>
       }
       ListEmptyComponent={
-        <View style={styles.emptyContainer}>
+        <View style={communityStyles.emptyContainer}>
           <Icon name="users" size={48} color={colors.textSecondary} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No members found.</Text>
+          <Text style={[communityStyles.emptyText, { color: colors.textSecondary }]}>No members found.</Text>
         </View>
       }
       ListFooterComponent={
         isFetchingMore ? (
           <ActivityIndicator style={{ marginVertical: 20 }} size="small" color={colors.primary} />
         ) : !hasMoreMembers && members.length > 0 ? (
-          <Text style={[styles.endListText, { color: colors.textSecondary }]}>No more members</Text>
+          <Text style={[communityStyles.endListText, { color: colors.textSecondary }]}>No more members</Text>
         ) : null
       }
     />
   );
 
-  const renderEvents = () => (
+const renderEvents = () => (
     <FlatList
       data={events}
       renderItem={({ item }) => <EventCard event={item} userId={userId} />} // Pass userId
       keyExtractor={item => item.id.toString()}
-      contentContainerStyle={styles.eventsContent}
+      contentContainerStyle={communityStyles.eventsContent}
       showsVerticalScrollIndicator={false}
       onRefresh={() => fetchCommunityData(true, userId)} // Pass userId
       refreshing={refreshing}
       onEndReached={handleLoadMoreEvents}
       onEndReachedThreshold={0.5}
       ListEmptyComponent={
-        <View style={styles.emptyContainer}>
+        <View style={communityStyles.emptyContainer}>
           <Icon name="calendar" size={48} color={colors.textSecondary} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No events found.</Text>
+          <Text style={[communityStyles.emptyText, { color: colors.textSecondary }]}>No events found.</Text>
         </View>
       }
       ListFooterComponent={
         isFetchingMore ? (
           <ActivityIndicator style={{ marginVertical: 20 }} size="small" color={colors.primary} />
         ) : !hasMoreEvents && events.length > 0 ? (
-          <Text style={[styles.endListText, { color: colors.textSecondary }]}>No more events</Text>
+          <Text style={[communityStyles.endListText, { color: colors.textSecondary }]}>No more events</Text>
         ) : null
       }
     />
   );
 
+
   if (loading && posts.length === 0 && members.length === 0 && events.length === 0) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+      <View style={[communityStyles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Community</Text>
-        <TouchableOpacity style={styles.notificationButton}>
+    <SafeAreaView style={[communityStyles.container, { backgroundColor: colors.background }]}>
+      <View style={communityStyles.header}>
+        <Text style={[communityStyles.title, { color: colors.text }]}>Community</Text>
+        <TouchableOpacity style={communityStyles.notificationButton}>
           <Icon name="bell" size={24} color={colors.text} />
-          <View style={[styles.notificationBadge, { backgroundColor: colors.primary }]}>
-            <Text style={styles.notificationCount}>3</Text>
+          <View style={[communityStyles.notificationBadge, { backgroundColor: colors.primary }]}>
+            <Text style={communityStyles.notificationCount}>3</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -451,89 +453,6 @@ if ((refresh || selectedTab === 'members') && hasMoreMembers) {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 12 : 0,
-    paddingBottom: 12,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  notificationButton: {
-    position: 'relative',
-    padding: 4,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notificationCount: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  topicsScroll: {
-    maxHeight: 40,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-  },
-  feedContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 80,
-  },
-  membersContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 80,
-  },
-  membersHeader: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 15,
-  },
-  eventsContent: {
-    padding: 16,
-    paddingBottom: 80,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  endListText: {
-    textAlign: 'center',
-    paddingVertical: 20,
-    fontSize: 14,
-  },
-});
+
 
 export default CommunityScreen;

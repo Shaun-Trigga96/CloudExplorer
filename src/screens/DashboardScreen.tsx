@@ -320,7 +320,7 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
                   percentage={latestResult?.percentage} // Show latest percentage
                   color={moduleDetails.color} // Use module color
                   imageIcon={moduleDetails.imageIcon} // Use module icon
-                  onPress={() => navigation.navigate('QuizzesDetail', { moduleId: quiz.moduleId, quizId: quiz.id } as { moduleId: string; quizId: string })} // Navigate to quiz detail
+                  onPress={() => navigation.navigate('QuizzesDetail', { moduleId: quiz.moduleId, providerId: '', pathId: '', quizId: quiz.id } as { moduleId: string; providerId: string; pathId: string; quizId: string })} // Navigate to quiz detail
                 />
               );
             })
@@ -351,7 +351,7 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
                   percentage={latestResult?.percentage} // Show latest percentage
                   color={color}
                   imageIcon={imageIcon}
-                  onPress={() => navigation.navigate('ExamDetail', { examId: exam.id, title: exam.title })} // Navigate to exam detail
+                  onPress={() => navigation.navigate('ExamDetail', { examId: exam.id, title: exam.title, providerId: '', pathId: '' })} // Navigate to exam detail
                 />
               );
             })

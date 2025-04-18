@@ -1,70 +1,52 @@
 // src/components/quizzes/QuizCard.tsx
 import React from 'react';
-import { View, StyleSheet, Image } from 'react-native';
-import { Card, Title, Paragraph, Button } from 'react-native-paper';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { Card, Title, Paragraph } from 'react-native-paper';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useCustomTheme } from '../../context/ThemeContext';
-import strings from '../../localization/strings';
-import { Quiz } from '../../types/quiz';
-import { getQuizIcon } from '../../utils/iconHelper';
+import { Quiz } from '../../types/quiz'; // Ensure this type includes providerId, pathId
+import { darkColors, lightColors } from '../../styles/colors';
+
+// Assuming you might want icons based on provider later
+const providerIcons: Record<string, string> = {
+  gcp: 'google-cloud',
+  aws: 'aws',
+  azure: 'microsoft-azure',
+  default: 'brain',
+};
 
 interface QuizCardProps {
   quiz: Quiz;
   isCompleted: boolean;
-  onPress: () => void;
+  onPress: (quiz: Quiz) => void; // Pass the full quiz object
 }
 
 const QuizCard: React.FC<QuizCardProps> = ({ quiz, isCompleted, onPress }) => {
-  const { isDarkMode, theme } = useCustomTheme();
-  const { colors } = theme;
-  
-  const imageSource = getQuizIcon(quiz.moduleId);
-  const buttonLabel = isCompleted ? 'Review Quiz' : 'Start Quiz';
-  const buttonBackgroundColor = isCompleted
-    ? colors.buttonCompletedBackground
-    : colors.buttonPrimaryBackground;
+  const { isDarkMode } = useCustomTheme();
+  const colors = isDarkMode ? darkColors : lightColors;
+
+  const iconName = providerIcons[quiz.providerId] || providerIcons.default;
 
   return (
-    <Card
-      style={[
-        styles.card,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          borderWidth: isDarkMode ? 1 : 0,
-        }
-      ]}
-    >
-      <Card.Content>
-        <View style={styles.headerRow}>
-          <View style={styles.iconContainer}>
-            <Image
-              source={imageSource}
-              style={styles.iconImage}
-              resizeMode="contain"
-            />
-          </View>
-          <Title style={[styles.title, { color: colors.text }]}>{quiz.title}</Title>
+    <Card style={[styles.card, { backgroundColor: colors.surface }]} onPress={() => onPress(quiz)}>
+      <Card.Content style={styles.content}>
+        <View style={styles.iconContainer}>
+          <Icon name={iconName} size={30} color={colors.primary} />
         </View>
-        <Paragraph style={{ color: colors.textSecondary }}>{quiz.description}</Paragraph>
-        <Paragraph style={[styles.questionCount, { color: colors.textSecondary }]}>
-          {`${quiz.questionCount} ${strings.questionsSuffix || 'Questions'}`}
-        </Paragraph>
+        <View style={styles.textContainer}>
+          <Title style={[styles.title, { color: colors.text }]}>{quiz.title}</Title>
+          {quiz.description && (
+            <Paragraph style={[styles.description, { color: colors.textSecondary }]}>
+              {quiz.description}
+            </Paragraph>
+          )}
+        </View>
         {isCompleted && (
-          <Paragraph style={[styles.completedText, { color: colors.success }]}>
-            Completed
-          </Paragraph>
+          <View style={styles.completedBadge}>
+            <Icon name="check-circle" size={20} color={colors.success} />
+          </View>
         )}
       </Card.Content>
-      <Card.Actions>
-        <Button
-          mode="contained"
-          onPress={onPress}
-          style={{ backgroundColor: buttonBackgroundColor }}
-          labelStyle={{ color: colors.buttonText }}
-        >
-          {buttonLabel}
-        </Button>
-      </Card.Actions>
     </Card>
   );
 };
@@ -72,40 +54,33 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, isCompleted, onPress }) => {
 const styles = StyleSheet.create({
   card: {
     marginBottom: 16,
-    borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
-    elevation: 8,
+    borderRadius: 12,
+    elevation: 3,
   },
-  headerRow: {
+  content: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    padding: 16,
   },
   iconContainer: {
-    marginRight: 12,
-    width: 34,
-    height: 34,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: 16,
+    padding: 8,
+    borderRadius: 25,
+    // backgroundColor: '#e0f2fe', // Example background
   },
-  iconImage: {
-    width: 30,
-    height: 30,
-  },
-  title: {
-    marginLeft: 8,
+  textContainer: {
     flex: 1,
   },
-  questionCount: {
-    marginTop: 8,
-  },
-  completedText: {
-    marginTop: 4,
+  title: {
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  description: {
+    fontSize: 14,
+  },
+  completedBadge: {
+    marginLeft: 10,
   },
 });
 

@@ -4,9 +4,9 @@ import { Alert } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
-import { QuizDetail, QuestionType, QuizResult } from '../types/quiz'; // Adjust path
-import { Module } from '../types/moduleDetail'; // Adjust path
-import { handleError } from '../utils/handleError'; // Adjust path
+import { QuizDetail, QuestionType, QuizResult } from '../../types/quiz'; // Adjust path
+import { Module } from '../../types/moduleDetail'; // Adjust path
+import { handleError } from '../../utils/handleError'; // Adjust path
 
 const BASE_URL = REACT_APP_BASE_URL;
 

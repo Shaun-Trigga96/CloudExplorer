@@ -47,13 +47,13 @@ interface Question { // Assuming structure from AI parser
   }
 
   export interface LearningPath {
-    id: string;           // Unique identifier
-    name: string;         // Display name of the path
-    providerId: string;   // Reference to the provider
-    pathId: string;       // Identifier within the provider's system
-    logoUrl?: string;     // Optional logo URL (add this to fix your type error)
+    id: string;           
+    name: string;        
+    providerId: string;   
+    pathId: string;       
+    logoUrl?: string;     
     progress: {
-      completionPercentage: number;  // Overall completion percentage (0-100)
+      completionPercentage: number;  
     };
   }
 
@@ -66,16 +66,17 @@ interface Question { // Assuming structure from AI parser
   }
 
   export interface Module {
-    moduleId: string; // Unique ID for the module
+    moduleId: string; 
     title: string;
     description: string;
-    content: string; // HTML or Markdown content for the module
-    duration: number; // Estimated time to complete the module (in minutes)
-    prerequisites?: string[]; // Array of module IDs required to unlock this module (optional)
-    quizzes?: string[]; // Array of quiz IDs associated with this module (optional)
+    content: string; 
+    duration: number; 
+    providerId: string;
+    prerequisites?: string[]; 
+    quizzes?: string[]; 
     createdAt: Timestamp;
     updatedAt: Timestamp;
-    sections?: Section[]; // Array of sections with title, content, and order
+    sections?: Section[]; 
 }
 
 

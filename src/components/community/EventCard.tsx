@@ -7,275 +7,453 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+  Linking, // Import Linking
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { Chip } from 'react-native-paper'; // Import Chip
 import axios from 'axios';
-import {CommunityEvent} from '../../types/community'; // Use updated type if needed
+import {REACT_APP_BASE_URL} from '@env';
+import {CommunityEvent} from '../../types/community'; // Ensure this type includes platform and link
 import {useCustomTheme} from '../../context/ThemeContext';
-import {formatDate} from '../../utils/formatDate'; // Assumes you have date formatting
+import {formatDate} from '../../utils/formatDate';
+import {formatRelativeTime} from '../../utils/formatTime';
 
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
+
+const BASE_URL = REACT_APP_BASE_URL;
 
 interface EventCardProps {
-  event: CommunityEvent & {isRegistered?: boolean; isSaved?: boolean}; // Expect status from API
-  userId: string | null; // Pass current user ID
-  // Add onPress prop later for navigating to event details
+  event: CommunityEvent & {isRegistered?: boolean; isSaved?: boolean};
+  userId: string | null;
 }
 
 const EventCard: FC<EventCardProps> = ({event, userId}) => {
   const {theme} = useCustomTheme();
   const {colors} = theme;
 
-  // Internal state to manage button loading and optimistic updates
   const [isAttending, setIsAttending] = useState(event.isRegistered || false);
   const [isSavedState, setIsSavedState] = useState(event.isSaved || false);
   const [loadingAttend, setLoadingAttend] = useState(false);
   const [loadingSave, setLoadingSave] = useState(false);
 
-  // --- Actions ---
+  // --- Actions (Attend/Save - Keep the logic) ---
   const handleAttendToggle = useCallback(async () => {
-    if (!userId || loadingAttend) return;
-    if (!event.id) {
-      console.error('Event ID missing');
-      return;
-    }
-
+    if (!userId || loadingAttend || !event.id) return;
     setLoadingAttend(true);
     const originalAttendState = isAttending;
-    setIsAttending(!originalAttendState); // Optimistic update
-
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsAttending(!originalAttendState);
     try {
       const action = originalAttendState ? 'unregister' : 'register';
-      const url = `<span class="math-inline">\{BASE\_URL\}/api/v1/community/events/</span>{event.id}/${action}`;
-      await axios.post(url, {userId}); // Backend verifies userId via token ideally
-      // Success - state already updated optimistically
+      const url = `${BASE_URL}/api/v1/community/events/${event.id}/${action}`;
+      await axios.post(url, {userId});
     } catch (error) {
-      console.error(
-        `Error ${originalAttendState ? 'un' : ''}registering event:`,
-        error,
-      );
-      setIsAttending(originalAttendState); // Revert on error
-      Alert.alert(
-        'Error',
-        `Could not ${originalAttendState ? 'un' : ''}register for the event.`,
-      );
+      const action = originalAttendState ? 'unregister' : 'register'; // Declare the action variable here
+      console.error(`Error ${action}ing event:`, error);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setIsAttending(originalAttendState);
+      Alert.alert('Error', `Could not ${action} for the event.`);
     } finally {
       setLoadingAttend(false);
     }
   }, [userId, event.id, isAttending, loadingAttend]);
 
   const handleSaveToggle = useCallback(async () => {
-    if (!userId || loadingSave) return;
-    if (!event.id) {
-      console.error('Event ID missing');
-      return;
-    }
-
+    if (!userId || loadingSave || !event.id) return;
     setLoadingSave(true);
     const originalSaveState = isSavedState;
-    setIsSavedState(!originalSaveState); // Optimistic update
-
+    setIsSavedState(!originalSaveState);
     try {
       const action = originalSaveState ? 'unsave' : 'save';
-      const url = `<span class="math-inline">\{BASE\_URL\}/api/v1/community/events/</span>{event.id}/${action}`;
+      const url = `${BASE_URL}/api/v1/community/events/${event.id}/${action}`;
       await axios.post(url, {userId});
-      // Success
     } catch (error) {
-      console.error(
-        `Error ${originalSaveState ? 'un' : ''}saving event:`,
-        error,
-      );
-      setIsSavedState(originalSaveState); // Revert on error
-      Alert.alert(
-        'Error',
-        `Could not ${originalSaveState ? 'un' : ''}save the event.`,
-      );
+      console.error(`Error ${"action"}ing event:`, error);
+      setIsSavedState(originalSaveState);
+      Alert.alert('Error', `Could not ${"action"} the event.`);
     } finally {
       setLoadingSave(false);
     }
   }, [userId, event.id, isSavedState, loadingSave]);
 
-  // --- Rendering ---
-  const isPastEvent = new Date(event.date) < new Date(); // Simple check
+  // --- Open Link Action ---
+  const handleOpenLink = useCallback(async () => {
+    if (!event.link) return;
+    const supported = await Linking.canOpenURL(event.link);
+    if (supported) {
+      await Linking.openURL(event.link);
+    } else {
+      Alert.alert('Error', `Cannot open this URL: ${event.link}`);
+    }
+  }, [event.link]);
 
-  // Render different card styles based on upcoming/past or details available
-  if (!isPastEvent && event.description) {
-    // Detailed Upcoming Event Card
+  // --- Date Formatting ---
+  const eventDate = new Date(event.date);
+  const isPastEvent = eventDate < new Date();
+  const day = eventDate.getDate();
+  const month = eventDate.toLocaleString('default', {month: 'short'}).toUpperCase();
+
+  // --- Render Logic ---
+  if (isPastEvent) {
+    // --- Past Event Card ---
     return (
       <View
         style={[
-          styles.upcomingContainer,
-          {backgroundColor: colors.primary, borderColor: colors.border},
+          styles.cardBase,
+          styles.pastCard,
+          {backgroundColor: colors.surface, borderColor: colors.border},
         ]}>
-        {/* Optional: Add Save button/icon */}
-        <TouchableOpacity
-          onPress={handleSaveToggle}
-          style={styles.saveButton}
-          disabled={loadingSave}>
-          {loadingSave ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Icon
-              name={isSavedState ? 'bookmark' : 'bookmark'}
-              size={20}
-              color={isSavedState ? colors.primary : colors.textSecondary}
-            />
-          )}
-        </TouchableOpacity>
-
-        <Text style={[styles.title, {color: colors.text}]}>{event.title}</Text>
-        <View style={styles.dateTimeRow}>
-          <Icon name="calendar" size={14} color={colors.textSecondary} />
-          <Text style={[styles.detailText, {color: colors.textSecondary}]}>
-            {formatDate(event.date)}
-          </Text>
-        </View>
-        {event.time && (
-          <View style={styles.dateTimeRow}>
-            <Icon name="clock" size={14} color={colors.textSecondary} />
-            <Text style={[styles.detailText, {color: colors.textSecondary}]}>
-              {formatDate(event.time)}
+        <View style={styles.pastContent}>
+          <View style={styles.pastDateBlock}>
+            <Text style={styles.pastDateText}>{formatDate(event.date)}</Text>
+          </View>
+          <View style={styles.pastInfo}>
+            <Text style={[styles.pastTitle, {color: colors.textSecondary}]}>
+              {event.title}
+            </Text>
+            {/* Optionally show platform for past events */}
+            <Text style={[styles.pastPlatform, {color: colors.textSecondary}]}>
+              Platform: {event.platform || 'N/A'}
             </Text>
           </View>
-        )}
-        <Text style={[styles.description, {color: colors.textSecondary}]}>
-          {event.description}
-        </Text>
-
-        <View style={styles.footer}>
-          <Text style={[styles.attendeesText, {color: colors.textSecondary}]}>
-            {event.attending || 0} attending
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              isAttending
-                ? {
-                    backgroundColor: colors.background,
-                    borderColor: colors.primary,
-                    borderWidth: 1,
-                  }
-                : {backgroundColor: colors.primary},
-            ]}
-            onPress={handleAttendToggle}
-            disabled={loadingAttend}>
-            {loadingAttend ? (
-              <ActivityIndicator
-                size="small"
-                color={isAttending ? colors.primary : colors.background}
-              />
-            ) : (
-              <>
-                <Icon
-                  name={isAttending ? 'check-circle' : 'plus-circle'}
-                  size={16}
-                  color={isAttending ? colors.primary : colors.background}
-                />
-                <Text
-                  style={[
-                    styles.actionButtonText,
-                    {color: isAttending ? colors.primary : colors.background},
-                  ]}>
-                  {isAttending ? 'Attending' : 'Attend'}
-                </Text>
-              </>
-            )}
+        </View>
+        {/* Simple link for past events */}
+        {event.link && (
+          <TouchableOpacity onPress={handleOpenLink} style={styles.pastLinkButton}>
+             <Icon name="external-link" size={18} color={colors.primary} />
           </TouchableOpacity>
+        )}
+        <View style={styles.pastBadge}>
+          <Text style={styles.pastBadgeText}>Past</Text>
         </View>
       </View>
     );
   } else {
-    // Simplified Card (Past or less detail)
+    // --- Upcoming Event Card ---
     return (
-      <TouchableOpacity
-        style={[styles.pastContainer, {borderBottomColor: colors.border}]}>
-        <TouchableOpacity
-          onPress={handleSaveToggle}
-          style={styles.saveIconPast}
-          disabled={loadingSave}>
-          {loadingSave ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Icon
-              name={isSavedState ? 'bookmark' : 'bookmark'}
-              size={18}
-              color={isSavedState ? colors.primary : colors.textSecondary}
-            />
-          )}
-        </TouchableOpacity>
-        <View style={styles.pastDetails}>
-          <Text
-            style={[styles.pastTitle, {color: colors.text}]}
-            numberOfLines={1}>
-            {event.title}
-          </Text>
-          <Text style={[styles.pastDate, {color: colors.textSecondary}]}>
-            {formatDate(event.date)}
-          </Text>
+      <View
+        style={[
+          styles.cardBase,
+          styles.upcomingCard,
+          {backgroundColor: colors.surface, borderColor: colors.border},
+        ]}>
+        <View style={styles.cardContentRow}>
+          {/* Date Block */}
+          <View style={[styles.dateBlock, {backgroundColor: colors.primary}]}>
+            <Text style={styles.dateDay}>{day}</Text>
+            <Text style={styles.dateMonth}>{month}</Text>
+          </View>
+
+          {/* Main Content */}
+          <View style={styles.mainContent}>
+            <Text style={[styles.title, {color: colors.text}]}>
+              {event.title}
+            </Text>
+            {/* Platform Chip */}
+            <Chip
+              style={[styles.platformChip, {backgroundColor: colors.chipBackground}]}
+              textStyle={[styles.platformChipText, {color: colors.primary}]}
+              mode="flat">
+              {event.platform || 'General'}
+            </Chip>
+            {/* Details */}
+            <View style={styles.detailRow}>
+              <Icon name="clock" size={14} color={colors.textSecondary} />
+              <Text style={[styles.detailText, {color: colors.textSecondary}]}>
+                {event.time ? formatRelativeTime(event.time) : 'Time TBD'}
+              </Text>
+            </View>
+            {event.location && (
+              <View style={styles.detailRow}>
+                <Icon name="map-pin" size={14} color={colors.textSecondary} />
+                <Text
+                  style={[styles.detailText, {color: colors.textSecondary}]}
+                  numberOfLines={1}>
+                  {event.location}
+                </Text>
+              </View>
+            )}
+            {event.description && (
+              <Text
+                style={[styles.description, {color: colors.textSecondary}]}
+                numberOfLines={2}>
+                {event.description}
+              </Text>
+            )}
+          </View>
         </View>
-        <Icon name="chevron-right" size={20} color={colors.textSecondary} />
-      </TouchableOpacity>
+
+        {/* Footer Actions */}
+        <View style={[styles.footer, {borderTopColor: colors.border}]}>
+          {/* Left side: Attendees & View Link */}
+          <View style={styles.footerLeft}>
+            <View style={styles.attendeesContainer}>
+              <Icon name="users" size={14} color={colors.textSecondary} />
+              <Text style={[styles.attendeesText, {color: colors.textSecondary}]}>
+                {event.attending || 0} attending
+              </Text>
+            </View>
+            {/* View Event Link Button */}
+            {event.link && (
+              <TouchableOpacity
+                style={styles.viewEventButton}
+                onPress={handleOpenLink}>
+                <Icon name="external-link" size={14} color={colors.primary} />
+                <Text style={[styles.viewEventButtonText, {color: colors.primary}]}>
+                  View Event
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Right side: Save & Attend Buttons */}
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={handleSaveToggle}
+              disabled={loadingSave}>
+              {loadingSave ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Icon
+                  name="bookmark"
+                  size={20}
+                  color={isSavedState ? colors.primary : colors.textSecondary}
+                />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.attendButton,
+                isAttending
+                  ? {backgroundColor: colors.primary, borderColor: colors.success, borderWidth: 1}
+                  : {backgroundColor: colors.primary},
+              ]}
+              onPress={handleAttendToggle}
+              disabled={loadingAttend}>
+              {loadingAttend ? (
+                <ActivityIndicator
+                  size="small"
+                  color={isAttending ? colors.success : colors.background}
+                />
+              ) : (
+                <>
+                  <Icon
+                    name={isAttending ? 'check' : 'plus'}
+                    size={16}
+                    color={isAttending ? colors.success : colors.background}
+                  />
+                  <Text
+                    style={[
+                      styles.attendButtonText,
+                      {color: isAttending ? colors.success : colors.background},
+                    ]}>
+                    {isAttending ? 'Attending' : 'Attend'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
     );
   }
 };
 
-// --- Styles --- (Combine and adapt styles from previous versions)
+// --- Styles --- (Includes additions for platform chip and link button)
 const styles = StyleSheet.create({
-  upcomingContainer: {
-    padding: 16,
-    borderRadius: 10,
+  cardBase: {
+    borderRadius: 12,
     marginBottom: 16,
-    position: 'relative',
+    borderWidth: 1,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 4,
     elevation: 3,
   },
-  saveButton: {position: 'absolute', top: 10, right: 10, padding: 6, zIndex: 1},
-  saveIconPast: {
-    position: 'absolute',
-    top: 16,
-    right: 30,
-    padding: 4,
-    zIndex: 1,
+  upcomingCard: {},
+  pastCard: {
+    opacity: 0.75,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  title: {fontSize: 17, fontWeight: 'bold', marginBottom: 10, marginRight: 30},
-  dateTimeRow: {flexDirection: 'row', alignItems: 'center', marginBottom: 5},
-  detailText: {marginLeft: 6, fontSize: 13},
-  description: {fontSize: 14, lineHeight: 20, marginTop: 8, marginBottom: 12},
+  pastContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10, // Space before link/badge
+  },
+  pastDateBlock: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#e0e0e0',
+    marginRight: 12,
+  },
+  pastDateText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#666',
+  },
+  pastInfo: {
+    flex: 1,
+  },
+  pastTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  pastPlatform: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  pastLinkButton: {
+    padding: 8, // Make touch target larger
+    marginHorizontal: 8,
+  },
+  pastBadge: {
+    backgroundColor: '#a0a0a0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginLeft: 'auto', // Push to the far right if no link
+  },
+  pastBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  cardContentRow: {
+    flexDirection: 'row',
+    padding: 16,
+  },
+  dateBlock: {
+    width: 55,
+    height: 55,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    padding: 4,
+  },
+  dateDay: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    lineHeight: 24,
+  },
+  dateMonth: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    lineHeight: 12,
+  },
+  mainContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  platformChip: {
+    alignSelf: 'flex-start', // Don't stretch chip
+    height: 24,
+    marginBottom: 8,
+    justifyContent: 'center', // Center text vertically
+  },
+  platformChipText: {
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 14, // Adjust for vertical centering
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  detailText: {
+    marginLeft: 8,
+    fontSize: 13,
+    flexShrink: 1,
+  },
+  description: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 6,
+  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingTop: 12,
-    marginTop: 12,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#ccc',
-  }, // Use theme border
-  attendeesText: {fontSize: 13, color: '#555'}, // use theme textSecondary
-  actionButton: {
+  },
+  footerLeft: {
+    flexDirection: 'column', // Stack attendees and link
+    alignItems: 'flex-start',
+    flexShrink: 1, // Allow shrinking
+    marginRight: 10, // Space before action buttons
+  },
+  attendeesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4, // Space between attendees and link
+  },
+  attendeesText: {
+    fontSize: 13,
+    marginLeft: 6,
+  },
+  viewEventButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4, // Add padding for touch area
+  },
+  viewEventButtonText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  attendButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
     borderRadius: 20,
-    minWidth: 100,
-    height: 36,
+    minWidth: 90,
+    height: 32,
   },
-  actionButtonText: {marginLeft: 6, fontWeight: 'bold', fontSize: 13},
-  pastContainer: {
-    position: 'relative',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingRight: 10,
+  attendButtonText: {
+    marginLeft: 6,
+    fontWeight: '600',
+    fontSize: 13,
   },
-  pastDetails: {flex: 1, marginRight: 35}, // Space for save icon and chevron
-  pastTitle: {fontSize: 15, fontWeight: '500', marginBottom: 3},
-  pastDate: {fontSize: 13},
 });
 
 export default EventCard;

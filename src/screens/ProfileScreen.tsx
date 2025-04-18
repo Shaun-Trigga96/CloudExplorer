@@ -2,7 +2,6 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/Feather';
 import { useCustomTheme } from '../context/ThemeContext';
@@ -14,10 +13,7 @@ import { profileStyles } from '../styles/profileStyles';
 import { ProfileCard, ProfileHeader } from '../components/profile';
 import { UserProfile } from '../types/profile';
 
-type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProfileScreen'>;
-
 const ProfileScreen: React.FC = () => {
-  const navigation = useNavigation<ProfileScreenNavigationProp>();
   const { isDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors;
   const { userProfile, editedProfile, loading, uploading, isEditing, handleImagePicker, handleSaveProfile, cancelEdit } = useProfile();

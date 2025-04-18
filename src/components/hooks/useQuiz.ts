@@ -1,174 +1,113 @@
-// src/hooks/useQuiz.ts
-import { useState, useEffect } from 'react';
-import axios, { AxiosError } from 'axios';
+// src/components/hooks/useQuiz.ts
+import { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
 import { REACT_APP_BASE_URL } from '@env';
-import { QuestionType, ApiQuiz } from '../../types/quiz';
+import { Quiz } from '../../types/quiz'; // Adjust path as needed
+import { UserProgressResponse } from '../../types/modules'; // Assuming this contains progress info
+import { handleError } from '../../utils/handleError'; // Adjust path
 
 const BASE_URL = REACT_APP_BASE_URL;
 
-interface UseQuizReturn {
-  quiz: QuestionType[] | null;
-  loading: boolean;
-  error: string | null;
-  moduleTitle: string | null;
-  userId: string | null;
-  userAnswers: Record<number, string>;
-  showResults: boolean;
-  submittingResults: boolean;
-  setUserAnswers: React.Dispatch<React.SetStateAction<Record<number, string>>>;
-  setShowResults: React.Dispatch<React.SetStateAction<boolean>>;
-  handleAnswer: (questionId: number, answerLetter: string) => void;
-  calculateScore: () => number;
-  isAnswerCorrect: (questionId: number) => boolean;
-  submitQuizResults: () => Promise<void>;
-  handleRetry: () => void;
+// Define the expected API response structure for listing quizzes
+interface ListQuizzesResponse {
+  status: 'success' | 'error';
+  data: {
+    quizzes: Quiz[];
+    // Add pagination fields if your API supports them (lastId, hasMore)
+  };
+  message?: string;
 }
 
-export const useQuiz = (
-  moduleId: string,
-  navigation: any,
-): UseQuizReturn => {
-  const [quiz, setQuiz] = useState<QuestionType[] | null>(null);
+export const useQuizList = (providerId: string, pathId: string) => {
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [moduleTitle, setModuleTitle] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
-  const [showResults, setShowResults] = useState<boolean>(false);
-  const [submittingResults, setSubmittingResults] = useState<boolean>(false);
+  const [quizProgress, setQuizProgress] = useState<Record<string, boolean>>({}); // Tracks completion by quizId or moduleId
 
-  useEffect(() => {
-    const getUserId = async () => {
-      try {
-        const storedUserId = await AsyncStorage.getItem('userId');
-        if (storedUserId) {
-          setUserId(storedUserId);
-        } else {
-          navigation.navigate('Auth');
-        }
-      } catch (e) {
-        console.error('Error getting user ID:', e);
-      }
-    };
+  const fetchQuizzesAndProgress = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    console.log(`[useQuizList] Fetching quizzes for provider: ${providerId}, path: ${pathId}`);
 
-    const fetchQuiz = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const moduleResponse = await axios.get(`${BASE_URL}/api/v1/modules/${moduleId}`);
-        setModuleTitle(moduleResponse.data.title);
-        const quizzesResponse = await axios.get(`${BASE_URL}/api/v1/quizzes/list-quizzes`);
-        const quizzes: ApiQuiz[] = quizzesResponse.data.quizzes;
-        const currentQuiz = quizzes.find(q => q.moduleId === moduleId);
-        if (!currentQuiz) {
-          throw new Error(`No quiz found for module ID: ${moduleId}`);
-        }
-        const quizResponse = await axios.get(`${BASE_URL}/api/v1/quizzes/${currentQuiz.id}`);
-        setQuiz(quizResponse.data.questions);
-      } catch (error: any) {
-        console.error('Error fetching quiz:', error);
-        if (axios.isAxiosError(error)) {
-          const axiosError = error as AxiosError;
-          setError(
-            axiosError.response
-              ? `Server Error: ${axiosError.response.status} - ${axiosError.response.data || axiosError.response.statusText}`
-              : 'Network error: Unable to connect to server.'
-          );
-        } else {
-          setError(`An unexpected error occurred: ${error.message}`);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getUserId();
-    fetchQuiz();
-  }, [moduleId, navigation]);
-
-  const handleAnswer = (questionId: number, answerLetter: string) => {
-    setUserAnswers(prev => ({ ...prev, [questionId]: answerLetter }));
-  };
-
-  const calculateScore = () => {
-    let score = 0;
-    if (quiz) {
-      quiz.forEach(question => {
-        const userAnswer = userAnswers[question.id];
-        if (
-          userAnswer &&
-          userAnswer.toLowerCase() === question.correctAnswer.toLowerCase()
-        ) {
-          score++;
-        }
-      });
-    }
-    return score;
-  };
-
-  const isAnswerCorrect = (questionId: number): boolean => {
-    if (!quiz) return false;
-    const question = quiz.find(q => q.id === questionId);
-    if (!question) return false;
-    const userAnswer = userAnswers[questionId];
-    return (
-      userAnswer &&
-      userAnswer.toLowerCase() === question.correctAnswer.toLowerCase()
-    ) as boolean;
-  };
-
-  const submitQuizResults = async () => {
-    if (!userId || !quiz) {
-      console.error('userId or quiz is null');
+    const userId = await AsyncStorage.getItem('userId');
+    if (!userId) {
+      setError('User ID not found. Please log in again.');
+      setLoading(false);
       return;
     }
-    setSubmittingResults(true);
+
     try {
-      const score = calculateScore();
-      await axios.post(`${BASE_URL}/api/v1/quizzes/save-result`, {
-        userId,
-        moduleId,
-        quizId: quiz[0]?.id || '',
-        score,
-        totalQuestions: quiz.length,
-        answers: userAnswers,
-        timestamp: new Date().toISOString(),
+      // --- Fetch Quizzes for the specific Learning Path ---
+      const quizzesUrl = `${BASE_URL}/api/v1/quizzes/list`; // Assuming this endpoint exists
+      console.log(`[useQuizList] Fetching quizzes from: ${quizzesUrl} with params:`, { providerId, pathId });
+      const quizzesResponse = await axios.get<ListQuizzesResponse>(quizzesUrl, {
+        params: { providerId, pathId }, // <--- THIS IS CRITICAL
+        timeout: 10000,
       });
-      setShowResults(true);
-    } catch (err) {
-      console.error('Error submitting quiz results:', err);
-      Alert.alert(
-        'Error',
-        'Failed to save quiz results.',
-        [{ text: 'OK', onPress: () => setShowResults(true) }],
-      );
+
+      if (quizzesResponse.data.status !== 'success') {
+        throw new Error(quizzesResponse.data.message || 'Failed to fetch quizzes');
+      }
+      const fetchedQuizzes = quizzesResponse.data.data.quizzes || [];
+      console.log(`[useQuizList] Fetched ${fetchedQuizzes.length} quizzes.`);
+      setQuizzes(fetchedQuizzes);
+
+      // --- Fetch User Progress ---
+      console.log(`[useQuizList] Fetching progress for user: ${userId}`);
+      const progressUrl = `${BASE_URL}/api/v1/users/${userId}/progress`;
+      const progressResponse = await axios.get<UserProgressResponse>(progressUrl, {
+        timeout: 10000,
+      });
+
+       if (!progressResponse.data.userExists) {
+         setError('User progress data not found.');
+         setLoading(false);
+         return; // Or handle as needed (e.g., navigate to auth)
+       }
+
+      // --- Determine Quiz Completion Status ---
+      const completedQuizIds = new Set<string>();
+      // Iterate through the user's learning paths to find completed quizzes
+      progressResponse.data.learningPaths?.forEach(path => {
+        // Check if this path matches the current context (optional, but good practice)
+        if (path.providerId === providerId && path.pathId === pathId) {
+          path.learningProgress?.completedQuizzes?.forEach(quizId => {
+            completedQuizIds.add(quizId);
+          });
+        }
+        // If you want to show completion status regardless of the *current* path context,
+        // you can remove the if condition above.
+      });
+
+      const progressMap: Record<string, boolean> = {};
+      fetchedQuizzes.forEach(quiz => {
+        // Use quiz.id (or quiz.quizId) which should be the unique identifier
+        progressMap[quiz.id] = completedQuizIds.has(quiz.id);
+      });
+
+      console.log('[useQuizList] Calculated quiz progress:', progressMap);
+      setQuizProgress(progressMap);
+
+    } catch (err: any) {
+      console.error('[useQuizList] Error fetching data:', err.response?.data || err.message);
+      handleError(err, (msg) => setError(msg || 'Failed to load quizzes or progress.'));
+      setQuizzes([]); // Clear quizzes on error
+      setQuizProgress({});
     } finally {
-      setSubmittingResults(false);
+      setLoading(false);
     }
-  };
+  }, [providerId, pathId]); // Depend on providerId and pathId
 
-  const handleRetry = () => {
-    setUserAnswers({});
-    setShowResults(false);
-  };
+  useEffect(() => {
+    if (providerId && pathId) {
+      fetchQuizzesAndProgress();
+    } else {
+      // Handle case where providerId or pathId is missing
+      setError("Learning path context is missing.");
+      setLoading(false);
+    }
+  }, [fetchQuizzesAndProgress, providerId, pathId]); // Fetch when context changes
 
-  return {
-    quiz,
-    loading,
-    error,
-    moduleTitle,
-    userId,
-    userAnswers,
-    showResults,
-    submittingResults,
-    setUserAnswers,
-    setShowResults,
-    handleAnswer,
-    calculateScore,
-    isAnswerCorrect,
-    submitQuizResults,
-    handleRetry,
-  };
+  return { quizzes, quizProgress, loading, error, refetch: fetchQuizzesAndProgress };
 };

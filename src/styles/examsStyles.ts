@@ -14,4 +14,16 @@ export const examsStyles = StyleSheet.create({
   screenDescription: {
     marginBottom: 24,
   },
+
+noExamsContainer: {
+       flex: 1,
+     justifyContent: 'center',
+     alignItems: 'center',
+     padding: 20,
+     marginTop: 50,
+   },
+  noExamsText: {
+     fontSize: 16,
+     textAlign: 'center',
+   },
 });

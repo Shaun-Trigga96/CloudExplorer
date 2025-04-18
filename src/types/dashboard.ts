@@ -46,7 +46,7 @@ export interface OverallProgress {
   export interface QuizResult {
     id: string;
     moduleId: string;
-    quizId: string; // <--- ADD THIS LINE
+    quizId: string; 
     score: number;
     totalQuestions: number;
     percentage: number;

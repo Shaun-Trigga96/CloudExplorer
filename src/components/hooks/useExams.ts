@@ -18,7 +18,7 @@ interface UseExamsReturn {
   getIconForExam: (examId: string) => any;
 }
 
-export const useExams = (): UseExamsReturn => {
+export const useExams = (providerId: string, pathId: string): UseExamsReturn => {
   const [exams, setExams] = useState<Exam[]>([]);
   const [examAttempts, setExamAttempts] = useState<Record<string, number>>({});
   const [examScores, setExamScores] = useState<Record<string, number>>({});
@@ -97,6 +97,8 @@ export const useExams = (): UseExamsReturn => {
           examId: exam.id,
           title: exam.title,
           description: exam.description,
+          providerId: exam.providerId, // Assuming backend sends this
+          pathId: exam.pathId, 
           duration: exam.duration,
           prerequisites: exam.prerequisites,
           associatedModules: exam.associatedModules,

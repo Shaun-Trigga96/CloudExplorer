@@ -18,11 +18,34 @@ interface Section {
   contentPath?: string; // Used temporarily for reading file
 }
 
+export interface LearningPath {
+    id: string;           // Unique identifier 
+    name: string;         // Display name of the path
+    providerId: string;   // Reference to the provider
+    pathId: string;       // Identifier within the provider's system
+    logoUrl?: string;     // Optional logo URL
+    progress: {
+      completionPercentage: number;  // Overall completion percentage (0-100)
+      completedModules: string[];    // IDs of completed modules
+      completedQuizzes: string[];    // IDs of completed quizzes
+      completedExams: string[];      // IDs of completed exams
+      score: number;                 // Overall score
+    };
+    startedAt: string | null;       // When the user started this path
+    lastAccessedAt: string | null;  // When the user last accessed this path
+    completed: boolean;             // Whether the path is completed
+    completedAt: string | null;     // When the path was completed
+  }
+
 interface Module {
+  order: number;
   moduleId: string;
   title: string;
   description: string;
-  providerId: string ;
+  learningPath: {
+    providerId: string; // e.g., 'gcp', 'aws', 'azure'
+    pathId: string;     // e.g., 'cdl', 'ace'
+  };
   duration: number | null;
   prerequisites: string[];
   contentType?: 'markdown' | 'google_doc'; // Add this field
@@ -45,6 +68,8 @@ interface Question {
 interface Quiz {
   quizId: string; // Persistent ID
   moduleId: string;
+  providerId: string;
+  pathId: string;
   title: string;
   questions: Question[];
   passingScore: number;
@@ -56,6 +81,8 @@ interface Quiz {
 interface Exam {
   examId: string; // Persistent ID
   title: string;
+  providerId: string;
+  pathId: string;
   description: string;
   duration: number | null;
   prerequisites: string[];
@@ -476,22 +503,29 @@ const googleAiClientSeeding = new GoogleGenerativeAI(
 console.log('Google AI client initialized for seeding.');
 
 // Updated function to define modules with descriptions and ordered sections
+// Updated function to define modules with descriptions and ordered sections
 function defineModules(): ScriptModuleDef[] {
   console.log('\n[CONTENT] Defining Modules...');
   // Ensure this path correctly points to your .md files relative to the script location
   const contentBasePath = path.resolve(__dirname, 'content');
   console.log(`> Reading .md files from base path: ${contentBasePath}`);
 
+  // Define the common learning path once
+  const cdlLearningPath = { providerId: 'gcp', pathId: 'cloud-digital-leader' };
+
   return [
     {
+      order: 1,
       moduleId: 'digital-transformation',
       title: 'Digital Transformation with Google Cloud',
-      providerId: 'gcp',
+      // UPDATED: Use learningPath object
+      learningPath: cdlLearningPath,
       description:
-        'Understand core cloud computing concepts (IaaS, PaaS, SaaS), benefits, and key Google Cloud services and infrastructure.', // Added Description
-      duration: 30, // Example duration in minutes
-      prerequisites: [], // No prerequisites for the first module
+        'Understand core cloud computing concepts (IaaS, PaaS, SaaS), benefits, and key Google Cloud services and infrastructure.',
+      duration: 30,
+      prerequisites: [],
       sections: [
+        // ... sections remain the same
         {
           title: 'Introduction to Cloud Computing',
           contentPath:
@@ -503,19 +537,23 @@ function defineModules(): ScriptModuleDef[] {
           contentPath:
             '/Cloud Digital Leader Learning Path/01 Digital Transformation with Google Cloud/2. Cloud Computing Models.md',
           order: 2,
-        }, // Fixed Order
+        },
       ],
     },
     {
+      order: 2,
       moduleId: 'data-transformation',
       title: 'Exploring Data Transformation with Google Cloud',
-      providerId: 'gcp',
+      // UPDATED: Use learningPath object
+      learningPath: cdlLearningPath,
+      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
         'Understanding the value of data is essential for leveraging its full potential.',
       duration: 30,
       prerequisites: [],
       sections: [
-        {
+        // ... sections remain the same
+         {
           title: 'Value of Data',
           contentPath:
             '/Cloud Digital Leader Learning Path/02 Exploring Data Transformation with Google Cloud/1. Value of Data.md',
@@ -536,14 +574,18 @@ function defineModules(): ScriptModuleDef[] {
       ],
     },
     {
+      order: 3,
       moduleId: 'artificial-intelligence',
       title: 'Innovating with Google Cloud Artificial Intelligence',
-      providerId: 'gcp',
+      // UPDATED: Use learningPath object
+      learningPath: cdlLearningPath,
+      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
-        'Understanding AI and Machine Learning key concepts and how they benefit business.', // Added Description
-      duration: 30, // Example duration in minutes
-      prerequisites: [], // No prerequisites for the first module
+        'Understanding AI and Machine Learning key concepts and how they benefit business.',
+      duration: 30,
+      prerequisites: [],
       sections: [
+        // ... sections remain the same
         {
           title: 'AI and ML Fundamentals',
           contentPath:
@@ -555,18 +597,22 @@ function defineModules(): ScriptModuleDef[] {
           contentPath:
             '/Cloud Digital Leader Learning Path/03 Innovating with Google Cloud Artificial Intelligence/2. Google Cloud’s AI and ML Solutions.md',
           order: 2,
-        }, // Fixed Order
+        },
       ],
     },
     {
+      order: 4,
       moduleId: 'infrastructure-application',
       title: 'Infrastructure and Application Modernization with Google Cloud',
-      providerId: 'gcp',
+      // UPDATED: Use learningPath object
+      learningPath: cdlLearningPath,
+      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
-        'Understanding cloud infrastructure and cloud migration strategies .', // Added Description
-      duration: 30, // Example duration in minutes
-      prerequisites: [], // No prerequisites for the first module
+        'Understanding cloud infrastructure and cloud migration strategies .',
+      duration: 30,
+      prerequisites: [],
       sections: [
+        // ... sections remain the same
         {
           title: 'AI and ML Fundamentals',
           contentPath:
@@ -588,14 +634,18 @@ function defineModules(): ScriptModuleDef[] {
       ],
     },
     {
+      order: 5,
       moduleId: 'trust-security',
       title: 'Trust and Security in the Cloud with Google Cloud',
-      providerId: 'gcp',
+      // UPDATED: Use learningPath object
+      learningPath: cdlLearningPath,
+      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
-        'Understand why trust and security are central to Googles design and development philosophy.', // Added Description
-      duration: 30, // Example duration in minutes
-      prerequisites: [], // No prerequisites for the first module
+        'Understand why trust and security are central to Googles design and development philosophy.',
+      duration: 30,
+      prerequisites: [],
       sections: [
+        // ... sections remain the same
         {
           title: 'Trust and Security in the Cloud',
           contentPath:
@@ -617,14 +667,18 @@ function defineModules(): ScriptModuleDef[] {
       ],
     },
     {
+      order: 6,
       moduleId: 'scailing-operations',
       title: 'Scaling with Google Cloud Operations',
-      providerId: 'gcp',
+      // UPDATED: Use learningPath object
+      learningPath: cdlLearningPath,
+      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
-        'Cloud operations encompass the practices and strategies that ensure the smooth functioning, optimization, and scalability of cloud-based systems.', // Added Description
-      duration: 30, // Example duration in minutes
-      prerequisites: [], // No prerequisites for the first module
+        'Cloud operations encompass the practices and strategies that ensure the smooth functioning, optimization, and scalability of cloud-based systems.',
+      duration: 30,
+      prerequisites: [],
       sections: [
+        // ... sections remain the same
         {
           title: 'Scaling with Google Cloud Operations',
           contentPath:
@@ -654,15 +708,19 @@ function defineModules(): ScriptModuleDef[] {
   ];
 }
 
+
 function defineExams(): ScriptExamDef[] {
   console.log('\n[CONTENT] Defining Exams Metadata & Generation Params...');
   return [
     {
       examId: 'cloud-digital-leader-exam',
+      // ADDED: Learning Path association
+      providerId: 'gcp',
+      pathId: 'cloud-digital-leader',
       title: 'Google Cloud Digital Leader Practice Exam',
       description:
-        'Assesses foundational knowledge of cloud concepts and Google Cloud products, services, tools, features, benefits, and use cases.', // Updated Description
-      duration: 90, // minutes
+        'Assesses foundational knowledge of cloud concepts and Google Cloud products, services, tools, features, benefits, and use cases.',
+      duration: 90,
       prerequisites: [
         'digital-transformation',
         'data-transformation',
@@ -670,8 +728,7 @@ function defineExams(): ScriptExamDef[] {
         'infrastructure-application',
         'trust-security',
         'scailing-operations',
-      ], // Suggested prerequisite
-      // Modules relevant for fundamental understanding for AI context
+      ],
       associatedModules: [
         'digital-transformation',
         'data-transformation',
@@ -680,70 +737,90 @@ function defineExams(): ScriptExamDef[] {
         'trust-security',
         'scailing-operations',
       ],
-      numberOfQuestions: 30, // Adjusted number of questions for practice CDL
-      passingRate: 70, // Adjusted passing rate for CDL
+      numberOfQuestions: 30,
+      passingRate: 70,
     },
   ];
 }
 
+
 function defineQuizzes(): ScriptQuizDef[] {
   console.log('\n[CONTENT] Defining Quizzes (for AI Generation)...');
-  // This function defines which quizzes should be generated by AI, linked to modules.
-  // The actual questions are generated and stored later in the script.
+  // Define the common learning path once
+  const cdlLearningPath = { providerId: 'gcp', pathId: 'cloud-digital-leader' };
+
   return [
     {
-      quizId: 'digital-transformation-1', // Persistent ID for the quiz
-      moduleId: 'digital-transformation', // Link to the module
-      title: 'Digital Transformation Quiz', // Title for the quiz
-      numberOfQuestions: 10, // How many questions to generate
-      passingScore: 70, // Required score percentage to pass,
+      quizId: 'digital-transformation-1',
+      moduleId: 'digital-transformation',
+      // ADDED: Learning Path association
+      providerId: cdlLearningPath.providerId,
+      pathId: cdlLearningPath.pathId,
+      title: 'Digital Transformation Quiz',
+      numberOfQuestions: 10,
+      passingScore: 70,
       description:
-        'Test your knowledge of core cloud computing concepts and Google Cloud fundamentals.', // Added Description
+        'Test your knowledge of core cloud computing concepts and Google Cloud fundamentals.',
     },
     {
       quizId: 'data-transformation-quiz-1',
       moduleId: 'data-transformation',
+      // ADDED: Learning Path association
+      providerId: cdlLearningPath.providerId,
+      pathId: cdlLearningPath.pathId,
       title: 'Data Transformation Quiz',
       numberOfQuestions: 10,
       passingScore: 70,
       description:
-        'Test your understanding of data transformation and management concepts.', // Added Description
+        'Test your understanding of data transformation and management concepts.',
     },
     {
       quizId: 'artificial-intelligence-quiz-1',
       moduleId: 'artificial-intelligence',
+      // ADDED: Learning Path association
+      providerId: cdlLearningPath.providerId,
+      pathId: cdlLearningPath.pathId,
       title: 'Google Cloud Artificial Intelligence Quiz',
       numberOfQuestions: 10,
       passingScore: 70,
       description:
-        'Test your understanding of Google Cloud Artificial Intelligence.', // Added Description
+        'Test your understanding of Google Cloud Artificial Intelligence.',
     },
     {
       quizId: 'infrastructure-application-quiz-1',
       moduleId: 'infrastructure-application',
+      // ADDED: Learning Path association
+      providerId: cdlLearningPath.providerId,
+      pathId: cdlLearningPath.pathId,
       title: 'Infrastructure and Application Modernization Quiz',
       numberOfQuestions: 10,
       passingScore: 70,
       description:
-        'Test your knowledge of Infrastructure and Application Modernization concepts.', // Added Description
+        'Test your knowledge of Infrastructure and Application Modernization concepts.',
     },
     {
       quizId: 'trust-security-quiz-1',
       moduleId: 'trust-security',
+      // ADDED: Learning Path association
+      providerId: cdlLearningPath.providerId,
+      pathId: cdlLearningPath.pathId,
       title: 'Trust and Security Quiz',
       numberOfQuestions: 10,
       passingScore: 70,
       description:
-        'Test your understanding of Trust and Security in the Cloud.', // Added Description
+        'Test your understanding of Trust and Security in the Cloud.',
     },
     {
       quizId: 'scailing-operations-quiz-1',
       moduleId: 'scailing-operations',
+      // ADDED: Learning Path association
+      providerId: cdlLearningPath.providerId,
+      pathId: cdlLearningPath.pathId,
       title: 'Scaling with Google Cloud Operations Quiz',
       numberOfQuestions: 10,
       passingScore: 70,
       description:
-        'Test your knowledge of Scaling with Google Cloud Operations.', // Added Description
+        'Test your knowledge of Scaling with Google Cloud Operations.',
     },
   ];
 }
@@ -791,7 +868,7 @@ async function seedModules(
       title: modDef.title,
       description: modDef.description,
       duration: modDef.duration || null,
-      providerId: modDef.providerId,
+      learningPath: modDef.learningPath,
       prerequisites: modDef.prerequisites || [],
       contentType: 'markdown',
       updatedAt: serverTimestamp(),
@@ -834,12 +911,14 @@ async function seedExamMetadata(
     const examRef = examCollection.doc(examId);
     console.log(`Processing Exam Metadata: ${examId}`);
     const examDocData: Partial<Exam> = {
-      examId: examId,
+      providerId: examDef.providerId,
+      pathId: examDef.pathId,
       title: examDef.title,
       description: examDef.description,
       duration: examDef.duration || null,
       prerequisites: examDef.prerequisites || [],
       associatedModules: examDef.associatedModules || [],
+      passingRate: examDef.passingRate, // Ensure passingRate is included
       updatedAt: serverTimestamp(),
     };
     try {
@@ -973,6 +1052,8 @@ async function generateAndSaveQuizQuestions(
       const quizData: Partial<Quiz> = {
         quizId: quizId,
         moduleId: moduleId,
+        providerId: quizInfo.providerId,
+        pathId: quizInfo.pathId,
         title: quizTitle,
         description: quizInfo.description,
         passingScore: quizInfo.passingScore || 70,
@@ -1155,20 +1236,20 @@ async function runSeeding() {
     const modules = defineModules();
 
     // Define exams and quizzes (commented out - no longer needed for this run)
-    // const exams = defineExams();
-    // const quizzes = defineQuizzes();
+    const exams = defineExams();
+    const quizzes = defineQuizzes();
 
     // Seed modules and their sections (KEEP THIS)
     await seedModules(modules);
 
     // Seed exam metadata (commented out)
-    // await seedExamMetadata(exams);
+    await seedExamMetadata(exams);
 
     // Generate and save quiz questions (commented out)
-    // await generateAndSaveQuizQuestions(quizzes);
+    await generateAndSaveQuizQuestions(quizzes);
 
     // Generate and save exam questions (commented out)
-    // await generateAndSaveExamQuestions(exams);
+    await generateAndSaveExamQuestions(exams);
 
     // Updated log message
     console.log(

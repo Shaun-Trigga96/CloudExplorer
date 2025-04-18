@@ -16,14 +16,19 @@ export type RootStackParamList = {
   ModuleDetail: { moduleId: string };
   MainApp: { provider: string; path: string }; // Define the expected parameters
   ModulesScreen: { provider: string; path: string }; // Direct access, likely within TabNavigator
-  QuizzesScreen: undefined; // Direct access, likely within TabNavigator
-  QuizzesDetail: { moduleId: string };
-  ExamDetail: { examId: string; title: string };
+  QuizzesScreen: { providerId: string; pathId: string }; // Pass context
+  QuizzesDetail: {
+    moduleId: string;
+    providerId: string; // ADDED
+    pathId: string;     // ADDED
+    quizId?: string;    // Optional: Pass quizId if available/needed
+  };
+  ExamDetail: { examId: string; title: string; providerId: string; pathId: string }; // Pass context
   SettingsScreen: undefined; // Direct access, likely within TabNavigator
   CertificationsScreen: undefined; // Direct access, likely within TabNavigator
   ProfileScreen: undefined; // Direct access, likely within TabNavigator
   DashboardScreen: undefined; // Direct access, likely within TabNavigator
-  ExamsScreen: undefined; // Direct access, likely within TabNavigator
+  ExamsScreen: { providerId: string; pathId: string }; // Pass context
   CommunityScreen: undefined; // Direct access, likely within TabNavigator
   CreatePostScreen: undefined;
 };
