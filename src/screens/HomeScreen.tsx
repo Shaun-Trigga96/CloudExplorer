@@ -1,28 +1,32 @@
-import React, { useState, useEffect } from 'react';
+// c:\Users\thabi\Desktop\CloudExplorer\src\screens\HomeScreen.tsx
+import React, { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Button, ActivityIndicator } from 'react-native-paper';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Removed NativeStackScreenProps as it's not used
 import axios from 'axios';
 import { REACT_APP_BASE_URL } from '@env';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useCustomTheme } from '../context/ThemeContext';
+import { useActiveLearningPath } from '../context/ActiveLearningPathContext';
 import { darkColors, lightColors } from '../styles/colors';
 import { HeaderSection } from '../components/home';
 import { useUserSelections } from '../components/hooks/useUserSelections';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { handleError } from '../utils/handleError';
-import { 
-  Provider, 
-  PathResponse, 
-  ProvidersResponse, 
-  PathsResponse 
+import {
+  Provider,
+  PathResponse,
+  ProvidersResponse,
+  PathsResponse
 } from '../types/home';
 import { homeStyles } from '../styles/homeStyles';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Home' | 'MainApp'>;
+interface Props {
+  navigation: NativeStackNavigationProp<RootStackParamList>;
+}
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { isDarkMode } = useCustomTheme();
@@ -45,54 +49,62 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     refreshSelections,
   } = useUserSelections(navigation);
 
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(
-    activeLearningPath?.providerId || null
-  );
-  const [selectedPath, setSelectedPath] = useState<string | null>(
-    activeLearningPath?.pathId || null
-  );
-  const [showPathSelector, setShowPathSelector] = useState<boolean>(false);
+  // --- Active Learning Path Context ---
+  const { setActivePath } = useActiveLearningPath();
+
+  // --- Component State ---
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [showPathSelector, setShowPathSelector] = useState<boolean>(!hasActivePath);
   const [pathStartError, setPathStartError] = useState<string | null>(null);
 
   // --- Fetch Available Providers and Paths ---
-  useEffect(() => {
-    const fetchOptions = async () => {
-      setOptionsLoading(true);
-      setOptionsError(null);
-      try {
-        const [providersResponse, pathsResponse] = await Promise.all([
-          axios.get<ProvidersResponse>(`${BASE_URL}/api/v1/providers`),
-          axios.get<PathsResponse>(`${BASE_URL}/api/v1/paths/all`)
-        ]);
+  const fetchOptions = useCallback(async () => {
+    console.log('[HomeScreen] Fetching options...');
+    setOptionsLoading(true);
+    setOptionsError(null);
+    try {
+      const [providersResponse, pathsResponse] = await Promise.all([
+        axios.get<ProvidersResponse>(`${BASE_URL}/api/v1/providers`),
+        axios.get<PathsResponse>(`${BASE_URL}/api/v1/paths/all`)
+      ]);
 
-        console.log('[HomeScreen] Providers response:', providersResponse.data);
-        console.log('[HomeScreen] Paths response:', pathsResponse.data);
+      console.log('[HomeScreen] Providers response:', providersResponse.data);
+      console.log('[HomeScreen] Paths response:', pathsResponse.data);
 
-        // Check for API success status
-        if (providersResponse.data.status !== 'success' || pathsResponse.data.status !== 'success') {
-          throw new Error('Failed to fetch providers or paths');
-        }
-
-        setAvailableProviders(providersResponse.data.data.providers || []);
-        setAvailablePaths(pathsResponse.data.data.paths || {});
-      } catch (err: any) {
-        console.error('[HomeScreen] Error fetching options:', {
-          message: err.message,
-          response: err.response?.data,
-        });
-        const errorMessage = handleError(err, setOptionsError) || 'Could not load learning options.';
-        setOptionsError(errorMessage);
-      } finally {
-        setOptionsLoading(false);
+      if (providersResponse.data.status !== 'success' || pathsResponse.data.status !== 'success') {
+        throw new Error('Failed to fetch providers or paths');
       }
-    };
 
+      setAvailableProviders(providersResponse.data.data.providers || []);
+      setAvailablePaths(pathsResponse.data.data.paths || {});
+    } catch (err: any) {
+      console.error('[HomeScreen] Error fetching options:', {
+        message: err.message,
+        response: err.response?.data,
+      });
+      const errorMessage = handleError(err, setOptionsError) || 'Could not load learning options.';
+      setOptionsError(errorMessage);
+    } finally {
+      setOptionsLoading(false);
+      console.log('[HomeScreen] Finished fetching options.');
+    }
+  }, []); // Empty dependency array, fetchOptions doesn't depend on component state
+
+  useEffect(() => {
     fetchOptions();
-  }, []);
+  }, [fetchOptions]); // fetchOptions is stable due to useCallback
+
+  // --- Update showPathSelector based on hasActivePath after initial load ---
+  useEffect(() => {
+    if (!loadingSelections && !optionsLoading) {
+      setShowPathSelector(!hasActivePath);
+    }
+  }, [hasActivePath, loadingSelections, optionsLoading]);
 
   // --- Log State for Debugging ---
   useEffect(() => {
-    console.log('[HomeScreen] Learning paths state:', {
+    console.log('[HomeScreen] Learning paths state updated:', {
       activeLearningPath,
       allLearningPaths,
       hasActivePath,
@@ -103,105 +115,58 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const isLoading = loadingSelections || optionsLoading;
   const error = optionsError || selectionsError || pathStartError;
 
-  if (isLoading) {
-    return (
-      <SafeAreaView style={[homeStyles.container, { backgroundColor: colors.background }]}>
-        <View style={homeStyles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[homeStyles.loadingText, { color: colors.text }]}>
-            {loadingSelections ? 'Loading your progress...' : 'Loading learning options...'}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={[homeStyles.container, { backgroundColor: colors.background }]}>
-        <View style={homeStyles.errorContainer}>
-          <Text style={[homeStyles.errorText, { color: colors.error }]}>{error}</Text>
-          <Button
-            mode="contained"
-            onPress={() => {
-              console.log('[HomeScreen] Retrying on error');
-              setOptionsError(null);
-              setPathStartError(null);
-              refreshSelections();
-              if (optionsError) {
-                const fetchOptions = async () => {
-                  setOptionsLoading(true);
-                  try {
-                    const [providersResponse, pathsResponse] = await Promise.all([
-                      axios.get<ProvidersResponse>(`${BASE_URL}/api/v1/providers`),
-                      axios.get<PathsResponse>(`${BASE_URL}/api/v1/paths/all`)
-                    ]);
-                    setAvailableProviders(providersResponse.data.data.providers || []);
-                    setAvailablePaths(pathsResponse.data.data.paths || {});
-                    setOptionsError(null);
-                  } catch (err) {
-                    handleError(err, setOptionsError);
-                  } finally {
-                    setOptionsLoading(false);
-                  }
-                };
-                fetchOptions();
-              }
-            }}
-            style={[homeStyles.retryButton, { backgroundColor: colors.primary }]}
-            labelStyle={{ color: colors.buttonText }}
-          >
-            Retry
-          </Button>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // --- Event Handlers ---
-  const handleProviderSelect = (providerId: string) => {
+  // --- Event Handlers (Wrapped in useCallback) ---
+  const handleProviderSelect = useCallback((providerId: string) => {
     console.log('[HomeScreen] Selected provider:', providerId);
     setSelectedProvider(providerId);
-    setSelectedPath(null);
-    setPathStartError(null);
-  };
+    setSelectedPath(null); // Reset path when provider changes
+    setPathStartError(null); // Clear previous errors
+  }, [setSelectedProvider, setSelectedPath, setPathStartError]); // Dependencies: state setters
 
-  const handlePathSelect = (pathId: string) => {
+  const handlePathSelect = useCallback((pathId: string) => {
     console.log('[HomeScreen] Selected path:', pathId);
     setSelectedPath(pathId);
-    setPathStartError(null);
-  };
+    setPathStartError(null); // Clear previous errors
+  }, [setSelectedPath, setPathStartError]); // Dependencies: state setters
 
-  const handleStartLearning = async () => {
+  const navigateToMainApp = useCallback((providerId: string, pathId: string) => {
+    console.log(`[HomeScreen] Setting active path context: Provider=${providerId}, Path=${pathId}`);
+    setActivePath(providerId, pathId); // Set context *before* navigating
+
+    console.log(`[HomeScreen] Navigating to MainApp with params:`, { provider: providerId, path: pathId });
+
+    // --- CORRECTED NAVIGATION CALL ---
+    // Navigate to 'MainApp' and pass the required parameters
+    navigation.navigate('MainApp', { provider: providerId, path: pathId });
+    // --- END CORRECTION ---
+  }, [navigation, setActivePath]); // Incorrectly navigating to DashboardScreen instead of MainApp
+    // --- END PROBLEM ---
+
+  const handleStartLearning = useCallback(async () => {
     if (!selectedProvider || !selectedPath) {
       console.warn('[HomeScreen] Missing provider or path');
       setPathStartError('Please select both a provider and a learning path.');
       return;
     }
 
-    setPathStartError(null);
+    setPathStartError(null); // Clear previous errors
     try {
-      // Find the selected path info to get the name
       const selectedPathInfo = availablePaths[selectedProvider]?.find(
         path => path.id === selectedPath
       );
-      
-      if (!selectedPathInfo) {
-        throw new Error('Selected path information not found');
-      }
-      
-      console.log('[HomeScreen] Starting learning path:', {
+      if (!selectedPathInfo) throw new Error('Selected path information not found');
+
+      console.log('[HomeScreen] Starting new learning path via hook:', {
         providerId: selectedProvider,
         pathId: selectedPath,
         pathName: selectedPathInfo.name
       });
-      
+
       await startNewPath(selectedProvider, selectedPath);
-      console.log('[HomeScreen] Path started, navigating to MainApp');
-      navigation.navigate('MainApp', {
-        provider: selectedProvider,
-        path: selectedPath,
-      });
+
+      console.log('[HomeScreen] New path started, navigating to MainApp');
+      navigateToMainApp(selectedProvider, selectedPath);
+
     } catch (err: any) {
       console.error('[HomeScreen] Error starting path:', {
         message: err.message,
@@ -210,18 +175,38 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       const errorMessage = handleError(err, setPathStartError) || 'Failed to start learning path.';
       setPathStartError(errorMessage);
     }
-  };
+  }, [selectedProvider, selectedPath, availablePaths, startNewPath, navigateToMainApp, setPathStartError]); // Dependencies
 
-  const handleShowPathSelector = () => {
+  const handleContinuePath = useCallback((providerId: string, pathId: string) => {
+    console.log('[HomeScreen] Continuing existing path:', { providerId, pathId });
+    navigateToMainApp(providerId, pathId);
+  }, [navigateToMainApp]); // Dependency: navigateToMainApp
+
+  const handleShowPathSelector = useCallback(() => {
     console.log('[HomeScreen] Showing path selector');
     setShowPathSelector(true);
-    setSelectedProvider(null);
+    setSelectedProvider(null); // Reset selections when showing selector
     setSelectedPath(null);
     setPathStartError(null);
-  };
+  }, [setShowPathSelector, setSelectedProvider, setSelectedPath, setPathStartError]); // Dependencies: state setters
 
-  // --- Render Selection Card (works with both Provider and PathResponse types) ---
-  const renderSelectionCard = (
+  const handleRetry = useCallback(() => {
+    console.log('[HomeScreen] Retrying on error');
+    setOptionsError(null);
+    setPathStartError(null);
+    // Decide what to refresh based on the error type
+    if (selectionsError) {
+      console.log('[HomeScreen] Retrying: Refreshing selections');
+      refreshSelections();
+    }
+    if (optionsError) {
+      console.log('[HomeScreen] Retrying: Fetching options');
+      fetchOptions(); // Call the stable fetchOptions function
+    }
+  }, [selectionsError, optionsError, refreshSelections, fetchOptions, setOptionsError, setPathStartError]); // Dependencies
+
+  // --- Render Selection Card (Wrapped in useCallback) ---
+  const renderSelectionCard = useCallback((
     item: Provider | PathResponse,
     isSelected: boolean,
     onPress: () => void
@@ -245,15 +230,48 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       activeOpacity={0.7}
     >
       {item.logoUrl && (
-        <Image 
-          source={{ uri: item.logoUrl }} 
-          style={homeStyles.logo} 
-          resizeMode="contain" 
+        <Image
+          source={{ uri: item.logoUrl }}
+          style={homeStyles.logo}
+          resizeMode="contain"
         />
       )}
       <Text style={[homeStyles.cardText, { color: colors.text }]}>{item.name}</Text>
     </TouchableOpacity>
-  );
+  ), [colors, isDarkMode]); // Dependencies: colors, isDarkMode
+
+  // --- Loading View ---
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[homeStyles.container, { backgroundColor: colors.background }]}>
+        <View style={homeStyles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[homeStyles.loadingText, { color: colors.text }]}>
+            {loadingSelections ? 'Loading your progress...' : 'Loading learning options...'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // --- Error View ---
+  if (error) {
+    return (
+      <SafeAreaView style={[homeStyles.container, { backgroundColor: colors.background }]}>
+        <View style={homeStyles.errorContainer}>
+          <Text style={[homeStyles.errorText, { color: colors.error }]}>{error}</Text>
+          <Button
+            mode="contained"
+            onPress={handleRetry} // Use the useCallback wrapped handler
+            style={[homeStyles.retryButton, { backgroundColor: colors.primary }]}
+            labelStyle={{ color: colors.buttonText }}
+          >
+            Retry
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // --- Existing Paths View ---
   if (hasActivePath && !showPathSelector) {
@@ -274,22 +292,19 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               const pathInfo = availablePaths[path.providerId]?.find((p) => p.id === path.pathId);
 
               if (!provider) {
-                console.warn(
-                  `[HomeScreen] Missing provider info: providerId=${path.providerId}`
-                );
-                return null;
+                console.warn(`[HomeScreen] Missing provider info: providerId=${path.providerId}`);
+                return null; // Don't render if provider info is missing
               }
 
               const isActive =
                 activeLearningPath?.providerId === path.providerId &&
                 activeLearningPath?.pathId === path.pathId;
-              
-              // Use path.name as fallback if pathInfo is not available
-              const pathName = pathInfo?.name || path.name || `Path ${path.pathId}`;
+
+              const pathName = pathInfo?.name || path.name || `Path ${path.pathId}`; // Fallback name
 
               return (
                 <TouchableOpacity
-                  key={`${path.providerId}-${path.pathId}-${index}`}
+                  key={`${path.providerId}-${path.pathId}-${index}`} // More robust key
                   style={[
                     homeStyles.pathCard,
                     {
@@ -298,16 +313,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                       borderWidth: isActive ? 2 : isDarkMode ? 1 : 0,
                     },
                   ]}
-                  onPress={() => {
-                    console.log('[HomeScreen] Navigating to path:', {
-                      providerId: path.providerId,
-                      pathId: path.pathId,
-                    });
-                    navigation.navigate('MainApp', {
-                      provider: path.providerId,
-                      path: path.pathId,
-                    });
-                  }}
+                  onPress={() => handleContinuePath(path.providerId, path.pathId)} // Use handler
                 >
                   <View style={homeStyles.pathCardContent}>
                     {provider.logoUrl && (
@@ -352,7 +358,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <Animated.View entering={FadeIn.duration(500).delay(400)}>
             <Button
               mode="contained"
-              onPress={handleShowPathSelector}
+              onPress={handleShowPathSelector} // Use handler
               style={[homeStyles.button, { backgroundColor: colors.primary }]}
               contentStyle={homeStyles.buttonContent}
               labelStyle={[homeStyles.buttonText, { color: colors.buttonText }]}
@@ -381,6 +387,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               : "Let's set up your learning journey."}
           </Text>
         </Animated.View>
+
+        {/* Provider Selection */}
         <Animated.View entering={FadeIn.duration(500).delay(200)} style={homeStyles.section}>
           <Text style={[homeStyles.sectionTitle, { color: colors.text }]}>1. Choose Cloud Provider</Text>
           {availableProviders.length > 0 ? (
@@ -388,13 +396,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               renderSelectionCard(
                 provider,
                 selectedProvider === provider.id,
-                () => handleProviderSelect(provider.id)
+                () => handleProviderSelect(provider.id) // Use handler
               )
             )
           ) : (
             <Text style={{ color: colors.textSecondary }}>No providers available.</Text>
           )}
         </Animated.View>
+
+        {/* Path Selection (Conditional) */}
         {selectedProvider && availablePaths[selectedProvider] && (
           <Animated.View entering={FadeIn.duration(500).delay(400)} style={homeStyles.section}>
             <Text style={[homeStyles.sectionTitle, { color: colors.text }]}>2. Choose Learning Path</Text>
@@ -403,7 +413,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 renderSelectionCard(
                   path,
                   selectedPath === path.id,
-                  () => handlePathSelect(path.id)
+                  () => handlePathSelect(path.id) // Use handler
                 )
               )
             ) : (
@@ -411,11 +421,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             )}
           </Animated.View>
         )}
+
+        {/* Start Button (Conditional) */}
         {selectedPath && (
           <Animated.View entering={FadeIn.duration(500).delay(600)} exiting={FadeOut.duration(200)}>
             <Button
               mode="contained"
-              onPress={handleStartLearning}
+              onPress={handleStartLearning} // Use handler
               style={[homeStyles.button, { backgroundColor: colors.primary }]}
               contentStyle={homeStyles.buttonContent}
               labelStyle={[homeStyles.buttonText, { color: colors.buttonText }]}
@@ -425,13 +437,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             </Button>
           </Animated.View>
         )}
-        {hasActivePath && (
+
+        {/* Cancel Button (Conditional) */}
+        {hasActivePath && showPathSelector && ( // Only show cancel if showing selector AND there's an active path to go back to
           <Animated.View entering={FadeIn.duration(500).delay(700)}>
             <Button
               mode="text"
               onPress={() => {
                 console.log('[HomeScreen] Cancel path selector');
-                setShowPathSelector(false);
+                setShowPathSelector(false); // Go back to showing existing paths
               }}
               style={homeStyles.cancelButton}
               labelStyle={{ color: colors.textSecondary }}

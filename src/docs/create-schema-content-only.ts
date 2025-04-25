@@ -56,7 +56,6 @@ interface Module {
 }
 
 interface Question {
-  // Assuming structure from AI parser
   id: number;
   explanation: string[];
   answers: Array<{letter: string; answer: string; uniqueKey?: string}>;
@@ -136,7 +135,7 @@ async function executeWithRetry(
 ): Promise<any> {
   // Increased default timeout
   console.log(
-    `        >> Calling function with retry (max ${maxRetries}, timeout ${timeout}ms)...`,
+    `>> Calling function with retry (max ${maxRetries}, timeout ${timeout}ms)...`,
   );
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -518,14 +517,12 @@ function defineModules(): ScriptModuleDef[] {
       order: 1,
       moduleId: 'digital-transformation',
       title: 'Digital Transformation with Google Cloud',
-      // UPDATED: Use learningPath object
       learningPath: cdlLearningPath,
       description:
         'Understand core cloud computing concepts (IaaS, PaaS, SaaS), benefits, and key Google Cloud services and infrastructure.',
       duration: 30,
       prerequisites: [],
       sections: [
-        // ... sections remain the same
         {
           title: 'Introduction to Cloud Computing',
           contentPath:
@@ -544,15 +541,12 @@ function defineModules(): ScriptModuleDef[] {
       order: 2,
       moduleId: 'data-transformation',
       title: 'Exploring Data Transformation with Google Cloud',
-      // UPDATED: Use learningPath object
       learningPath: cdlLearningPath,
-      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
         'Understanding the value of data is essential for leveraging its full potential.',
       duration: 30,
       prerequisites: [],
       sections: [
-        // ... sections remain the same
          {
           title: 'Value of Data',
           contentPath:
@@ -577,15 +571,12 @@ function defineModules(): ScriptModuleDef[] {
       order: 3,
       moduleId: 'artificial-intelligence',
       title: 'Innovating with Google Cloud Artificial Intelligence',
-      // UPDATED: Use learningPath object
       learningPath: cdlLearningPath,
-      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
         'Understanding AI and Machine Learning key concepts and how they benefit business.',
       duration: 30,
       prerequisites: [],
       sections: [
-        // ... sections remain the same
         {
           title: 'AI and ML Fundamentals',
           contentPath:
@@ -604,15 +595,12 @@ function defineModules(): ScriptModuleDef[] {
       order: 4,
       moduleId: 'infrastructure-application',
       title: 'Infrastructure and Application Modernization with Google Cloud',
-      // UPDATED: Use learningPath object
       learningPath: cdlLearningPath,
-      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
         'Understanding cloud infrastructure and cloud migration strategies .',
       duration: 30,
       prerequisites: [],
       sections: [
-        // ... sections remain the same
         {
           title: 'AI and ML Fundamentals',
           contentPath:
@@ -637,15 +625,12 @@ function defineModules(): ScriptModuleDef[] {
       order: 5,
       moduleId: 'trust-security',
       title: 'Trust and Security in the Cloud with Google Cloud',
-      // UPDATED: Use learningPath object
       learningPath: cdlLearningPath,
-      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
         'Understand why trust and security are central to Googles design and development philosophy.',
       duration: 30,
       prerequisites: [],
       sections: [
-        // ... sections remain the same
         {
           title: 'Trust and Security in the Cloud',
           contentPath:
@@ -668,17 +653,14 @@ function defineModules(): ScriptModuleDef[] {
     },
     {
       order: 6,
-      moduleId: 'scailing-operations',
+      moduleId: 'scaling-operations',
       title: 'Scaling with Google Cloud Operations',
-      // UPDATED: Use learningPath object
       learningPath: cdlLearningPath,
-      // REMOVED: providerId: 'gcp', // Removed, now in learningPath
       description:
         'Cloud operations encompass the practices and strategies that ensure the smooth functioning, optimization, and scalability of cloud-based systems.',
       duration: 30,
       prerequisites: [],
       sections: [
-        // ... sections remain the same
         {
           title: 'Scaling with Google Cloud Operations',
           contentPath:
@@ -727,7 +709,7 @@ function defineExams(): ScriptExamDef[] {
         'artificial-intelligence',
         'infrastructure-application',
         'trust-security',
-        'scailing-operations',
+        'scaling-operations',
       ],
       associatedModules: [
         'digital-transformation',
@@ -735,7 +717,7 @@ function defineExams(): ScriptExamDef[] {
         'artificial-intelligence',
         'infrastructure-application',
         'trust-security',
-        'scailing-operations',
+        'scaling-operations',
       ],
       numberOfQuestions: 30,
       passingRate: 70,
@@ -811,8 +793,8 @@ function defineQuizzes(): ScriptQuizDef[] {
         'Test your understanding of Trust and Security in the Cloud.',
     },
     {
-      quizId: 'scailing-operations-quiz-1',
-      moduleId: 'scailing-operations',
+      quizId: 'scaling-operations-quiz-1',
+      moduleId: 'scaling-operations',
       // ADDED: Learning Path association
       providerId: cdlLearningPath.providerId,
       pathId: cdlLearningPath.pathId,

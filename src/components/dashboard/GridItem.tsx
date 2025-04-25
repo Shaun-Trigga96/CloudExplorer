@@ -11,9 +11,11 @@ interface GridItemProps {
   title: string;
   description: string;
   color: string;
-  screen: string;
+  screen: keyof RootStackParamList | string; // Allow string for Tab names
   index: number;
-  navigation: NativeStackNavigationProp<RootStackParamList, 'DashboardScreen'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'MainApp'>;
+  providerId: string;
+  pathId: string;
 }
 
 const screenWidth = Dimensions.get('window').width;

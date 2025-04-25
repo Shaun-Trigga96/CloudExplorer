@@ -1,38 +1,28 @@
-// src/components/quizzes/QuizCard.tsx
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet, ImageSourcePropType, Image } from 'react-native';
 import { Card, Title, Paragraph } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useCustomTheme } from '../../context/ThemeContext';
-import { Quiz } from '../../types/quiz'; // Ensure this type includes providerId, pathId
+import { Quiz } from '../../types/quiz';
 import { darkColors, lightColors } from '../../styles/colors';
 
-// Assuming you might want icons based on provider later
-const providerIcons: Record<string, string> = {
-  gcp: 'google-cloud',
-  aws: 'aws',
-  azure: 'microsoft-azure',
-  default: 'brain',
-};
-
 interface QuizCardProps {
-  quiz: Quiz;
+  quiz: Quiz & { icon: ImageSourcePropType };
   isCompleted: boolean;
-  onPress: (quiz: Quiz) => void; // Pass the full quiz object
+  onPress: (quiz: Quiz) => void;
 }
 
 const QuizCard: React.FC<QuizCardProps> = ({ quiz, isCompleted, onPress }) => {
   const { isDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors;
 
-  const iconName = providerIcons[quiz.providerId] || providerIcons.default;
-
   return (
-    <Card style={[styles.card, { backgroundColor: colors.surface }]} onPress={() => onPress(quiz)}>
+    <Card 
+      style={[styles.card, { backgroundColor: colors.surface }]} 
+      onPress={() => onPress(quiz)}
+    >
       <Card.Content style={styles.content}>
-        <View style={styles.iconContainer}>
-          <Icon name={iconName} size={30} color={colors.primary} />
-        </View>
+        <Image source={quiz.icon} style={styles.icon} resizeMode="cover" />
         <View style={styles.textContainer}>
           <Title style={[styles.title, { color: colors.text }]}>{quiz.title}</Title>
           {quiz.description && (
@@ -40,12 +30,15 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, isCompleted, onPress }) => {
               {quiz.description}
             </Paragraph>
           )}
+          {isCompleted && (
+            <View style={styles.completedBadge}>
+              <Icon name="check-circle" size={16} color={colors.success} />
+              <Paragraph style={[styles.completedText, { color: colors.success }]}>
+                Completed
+              </Paragraph>
+            </View>
+          )}
         </View>
-        {isCompleted && (
-          <View style={styles.completedBadge}>
-            <Icon name="check-circle" size={20} color={colors.success} />
-          </View>
-        )}
       </Card.Content>
     </Card>
   );
@@ -53,34 +46,47 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, isCompleted, onPress }) => {
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: 16,
-    borderRadius: 12,
-    elevation: 3,
+    marginBottom: 12,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
   },
-  iconContainer: {
-    marginRight: 16,
-    padding: 8,
-    borderRadius: 25,
-    // backgroundColor: '#e0f2fe', // Example background
+  icon: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
   },
   textContainer: {
     flex: 1,
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   description: {
     fontSize: 14,
+    lineHeight: 18,
   },
   completedBadge: {
-    marginLeft: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  completedText: {
+    fontSize: 12,
+    marginLeft: 4,
+    fontWeight: '500',
   },
 });
 

@@ -19,6 +19,7 @@ import QuizzesDetailScreen from '../screens/QuizzesDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import CertificationsScreen from '../screens/CertificationsScreen';
 import CommunityScreen from '../screens/CommunityScreen'
+import ExamDetailScreen from '../screens/ExamDetailsScreen'
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator<RootStackParamList>();
@@ -54,6 +55,7 @@ function ExamsStackNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ExamsScreen" component={ExamsScreen} />
+      <Stack.Screen name="ExamDetail" component={ExamDetailScreen} />
     </Stack.Navigator>
   );
 }

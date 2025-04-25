@@ -74,8 +74,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   imageIcon: {
-    width: 20, // Adjust size as needed
-    height: 20, // Adjust size as needed
+    width: 50, // Adjust size as needed
+    height: 50, // Adjust size as needed
   },
   textContainer: {
     flex: 1,

@@ -1,215 +1,327 @@
-// src/components/hooks/useQuizDetail.ts
-import { useState, useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { REACT_APP_BASE_URL } from '@env';
-import { QuizDetail, QuestionType, QuizResult } from '../types/quiz'; // Adjust path
-import { Module } from '../types/moduleDetail'; // Adjust path
-import { handleError } from '../utils/handleError'; // Adjust path
+// c:\Users\thabi\Desktop\CloudExplorer\src\screens\QuizzesScreen.tsx
+import React, { useState, useEffect, useCallback } from 'react'; // Added useState, useEffect, useCallback
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
+import { Button, Text } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import axios from 'axios'; // Import axios
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import { REACT_APP_BASE_URL } from '@env'; // Import BASE_URL
+import { RootStackParamList } from '../navigation/RootNavigator';
+import strings from '../localization/strings';
+import QuizCard from '../components/quizzes/QuizCard';
+import { Quiz } from '../types/quiz'; // Keep Quiz type
+// Remove hook import: import { useQuizList } from '../components/hooks/useQuiz';
+import { useCustomTheme } from '../context/ThemeContext';
+import { useActiveLearningPath } from '../context/ActiveLearningPathContext';
+import {imageMap} from '../utils/imageMap';
+import { handleError } from '../utils/handleError'; // Import error handler
+// Import progress response type and helper types
+import {
+    UserProgressResponse as ApiUserProgressResponse,
+    UserLearningPath // Assuming UserLearningPath is defined in modules.ts
+} from '../types/modules'; // Adjust path if needed
 
-const BASE_URL = REACT_APP_BASE_URL;
+const BASE_URL = REACT_APP_BASE_URL; // Define BASE_URL
 
-// Define expected API response structures
-interface QuizDetailResponse {
-  status: 'success' | 'error';
-  data: {
-    quiz: QuizDetail;
-    moduleTitle?: string; // Optional: API might return module title
+type NavigationProp = StackNavigationProp<RootStackParamList, 'QuizzesScreen'>;
+
+// Define response type inline like DashboardScreen
+interface ListQuizzesResponse {
+  status: string; // Use string for simplicity or 'success' | 'fail' | 'error'
+  data?: {
+    quizzes: Quiz[];
+    hasMore?: boolean;
+    lastId?: string | null;
   };
-  message?: string;
-}
-
-interface ModuleResponse {
-    status: 'success' | 'error';
-    data: Module; // Assuming Module type has a title
-    message?: string;
-}
-
-interface SubmitProgressResponse {
-    status: 'success' | 'error';
-    message?: string;
-    // Include any other relevant data returned on submission
+  message?: string; // Add optional message
 }
 
 
-export const useQuizDetail = (
-  moduleId: string,
-  providerId: string, // ADDED
-  pathId: string,     // ADDED
-  quizId: string | undefined, // ADDED (optional, but useful)
-  navigation: any // Use specific navigation type if available
-) => {
-  const [quiz, setQuiz] = useState<QuestionType[] | null>(null);
-  const [quizMeta, setQuizMeta] = useState<Omit<QuizDetail, 'questions'> | null>(null); // Store quiz metadata separately
-  const [loading, setLoading] = useState<boolean>(true);
+const QuizzesScreen = () => {
+  const navigation = useNavigation<NavigationProp>();
+  const { colors } = useCustomTheme().theme;
+
+  // --- Use Context for providerId and pathId ---
+  const { activeProviderId, activePathId } = useActiveLearningPath();
+
+  // --- Add State Variables ---
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [quizProgress, setQuizProgress] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState<boolean>(true); // Start loading true
   const [error, setError] = useState<string | null>(null);
-  const [moduleTitle, setModuleTitle] = useState<string | null>(null);
-  const [userAnswers, setUserAnswers] = useState<Record<string | number, string>>({}); // { questionId: answerLetter }
-  const [showResults, setShowResults] = useState<boolean>(false);
-  const [submittingResults, setSubmittingResults] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const fetchQuizData = useCallback(async () => {
+  // --- Load userId ---
+  useEffect(() => {
+    const loadUserId = async () => {
+      try {
+        const storedUserId = await AsyncStorage.getItem('userId');
+        setUserId(storedUserId);
+        if (!storedUserId) {
+          console.warn('[QuizzesScreen] userId not found in storage.');
+          setError('User session not found. Please log in.');
+          setLoading(false); // Stop loading if no user
+        } else {
+            console.log('[QuizzesScreen] Loaded userId:', storedUserId);
+        }
+      } catch (e) {
+          console.error('[QuizzesScreen] Failed to load userId:', e);
+          setError('Failed to load user session.');
+          setLoading(false);
+      }
+    };
+    loadUserId();
+  }, []);
+
+  // --- Fetch Data Function (Directly in component) ---
+  const fetchData = useCallback(async (currentProviderId: string, currentPathId: string, currentUserId: string) => {
+    console.log(`[QuizzesScreen] Fetching data for path: ${currentProviderId}/${currentPathId}, user: ${currentUserId}`);
     setLoading(true);
     setError(null);
-    setShowResults(false); // Reset results view on fetch
-    setUserAnswers({});   // Reset answers
-    console.log(`[useQuizDetail] Fetching quiz for module: ${moduleId}, provider: ${providerId}, path: ${pathId}, quizId: ${quizId}`);
+    // Reset state before fetching
+    setQuizzes([]);
+    setQuizProgress({});
 
     try {
-      // --- Determine API endpoint ---
-      // Option 1: Fetch by Quiz ID if available (preferred if globally unique)
-      // Option 2: Fetch by Module ID (assuming one quiz per module within a path)
-      const fetchUrl = quizId
-        ? `${BASE_URL}/api/v1/quizzes/${quizId}` // Assumes endpoint exists
-        : `${BASE_URL}/api/v1/quizzes/module/${moduleId}`; // Existing endpoint
+      // --- Fetch Quizzes ---
+      const quizzesUrl = `${BASE_URL}/api/v1/quizzes/list-quizzes`;
+      console.log(`[QuizzesScreen] Fetching quizzes from: ${quizzesUrl} with params:`, { providerId: currentProviderId, pathId: currentPathId });
+      const quizzesResponse = await axios.get<ListQuizzesResponse>(quizzesUrl, {
+        params: { providerId: currentProviderId, pathId: currentPathId, limit: 50 }, // Fetch up to 50 quizzes
+        timeout: 10000,
+      });
+      console.log('[QuizzesScreen] Raw quizzesResponse.data:', JSON.stringify(quizzesResponse.data, null, 2));
 
-      console.log(`[useQuizDetail] Using fetch URL: ${fetchUrl}`);
-      const response = await axios.get<QuizDetailResponse>(fetchUrl, { timeout: 10000 });
-
-      if (response.data.status !== 'success' || !response.data.data.quiz) {
-        throw new Error(response.data.message || 'Failed to load quiz details');
+      if (quizzesResponse.data.status !== 'success') {
+        throw new Error(quizzesResponse.data.message || 'Failed to fetch quizzes');
       }
 
-      const { quiz: quizData } = response.data.data;
-      const { questions, ...meta } = quizData;
+      // --- Use EXACT extraction logic from DashboardScreen ---
+      const fetchedQuizzes = quizzesResponse.data.data?.quizzes || [];
+      console.log(`[QuizzesScreen] Extracted ${fetchedQuizzes.length} quizzes.`);
+      setQuizzes(fetchedQuizzes); // Set state
 
-      console.log(`[useQuizDetail] Fetched quiz "${meta.title}" with ${questions.length} questions.`);
-      setQuiz(questions);
-      setQuizMeta(meta);
+      // --- Fetch User Progress ---
+      console.log(`[QuizzesScreen] Fetching progress for user: ${currentUserId}`);
+      const progressUrl = `${BASE_URL}/api/v1/users/${currentUserId}/progress`;
+      const progressResponse = await axios.get<ApiUserProgressResponse>(progressUrl, {
+        timeout: 10000,
+      });
+      console.log('[QuizzesScreen] Raw progressResponse.data:', JSON.stringify(progressResponse.data, null, 2));
 
-      // Fetch module title separately if not included in quiz response
-      if (!response.data.data.moduleTitle && meta.moduleId) {
-        try {
-            const moduleUrl = `${BASE_URL}/api/v1/modules/${meta.moduleId}`;
-            const moduleRes = await axios.get<ModuleResponse>(moduleUrl, { timeout: 5000 });
-            if (moduleRes.data.status === 'success') {
-                setModuleTitle(moduleRes.data.data.title);
-            }
-        } catch (moduleError) {
-            console.warn("[useQuizDetail] Could not fetch module title:", moduleError);
-            setModuleTitle(`Module ${meta.moduleId}`); // Fallback title
-        }
+      const progressDataPayload = progressResponse.data;
+
+      if (!progressDataPayload?.userExists) {
+        console.warn('[QuizzesScreen] User progress data not found or user does not exist.');
+        setQuizProgress({}); // Reset progress
       } else {
-         setModuleTitle(response.data.data.moduleTitle || `Module ${meta.moduleId}`);
+        // --- Determine Quiz Completion Status ---
+        const completedQuizIds = new Set<string>();
+        // Iterate over learningPaths within the payload
+        progressDataPayload.learningPaths?.forEach((path: UserLearningPath) => {
+          if (path.providerId === currentProviderId && path.pathId === currentPathId) {
+            // Access nested progress object
+            path.progress?.completedQuizzes?.forEach((quizId: string) => {
+              if (quizId) completedQuizIds.add(quizId);
+            });
+          }
+        });
+
+        const progressMap: Record<string, boolean> = {};
+        // Use the fetchedQuizzes array directly
+        if (Array.isArray(fetchedQuizzes)) {
+          fetchedQuizzes.forEach((quiz: Quiz) => {
+            progressMap[quiz.id] = completedQuizIds.has(quiz.id);
+          });
+        } else {
+           // This should not happen if extraction is correct
+           console.error('[QuizzesScreen] fetchedQuizzes is not an array before progress mapping!', fetchedQuizzes);
+        }
+        console.log('[QuizzesScreen] Calculated quiz progress:', progressMap);
+        setQuizProgress(progressMap);
       }
 
     } catch (err: any) {
-      console.error('[useQuizDetail] Error fetching quiz data:', err.response?.data || err.message);
-      handleError(err, (msg) => setError(msg || 'Failed to load the quiz.'));
-      setQuiz(null);
-      setQuizMeta(null);
-      setModuleTitle(null);
+      console.error('[QuizzesScreen] Error fetching data:', err.response?.data || err.message);
+      handleError(err, (msg: string | null) => setError(msg || 'Failed to load quizzes or progress.'));
+      setQuizzes([]); // Clear data on error
+      setQuizProgress({});
     } finally {
       setLoading(false);
+      console.log('[QuizzesScreen] Fetching complete.');
     }
-  }, [moduleId, providerId, pathId, quizId]); // Add dependencies
+  }, []); // Empty dependency array for useCallback, relies on arguments passed in useEffect
 
+  // --- useEffect to Trigger Fetch ---
   useEffect(() => {
-    fetchQuizData();
-    // Optional: Post 'start' action here if needed
-    // postProgressUpdate('start');
-  }, [fetchQuizData]); // Fetch on mount and when fetchQuizData changes
-
-  const handleAnswer = (questionId: number | string, answerLetter: string) => {
-    setUserAnswers(prev => ({ ...prev, [questionId]: answerLetter }));
-  };
-
-  const calculateScore = useCallback(() => {
-    if (!quiz) return 0;
-    return quiz.reduce((score, question) => {
-      const correct = question.correctAnswer.toLowerCase();
-      const userAnswer = userAnswers[question.id]?.toLowerCase();
-      return score + (userAnswer === correct ? 1 : 0);
-    }, 0);
-  }, [quiz, userAnswers]);
-
-  const isAnswerCorrect = useCallback((questionId: number | string): boolean => {
-    const question = quiz?.find(q => q.id === questionId);
-    if (!question) return false;
-    return userAnswers[questionId]?.toLowerCase() === question.correctAnswer.toLowerCase();
-  }, [quiz, userAnswers]);
-
-  const submitQuizResults = useCallback(async () => {
-    if (!quiz || !quizMeta) {
-      Alert.alert('Error', 'Quiz data is missing.');
-      return;
-    }
-    if (submittingResults) return; // Prevent double submission
-
-    setSubmittingResults(true);
-    setError(null); // Clear previous errors
-
-    const userId = await AsyncStorage.getItem('userId');
-    if (!userId) {
-      setError('User ID not found. Please log in again.');
-      setSubmittingResults(false);
-      return;
-    }
-
-    const score = calculateScore();
-    const totalQuestions = quiz.length;
-    const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0;
-    const passed = percentage >= (quizMeta.passingScore || 70); // Use fetched passing score, default 70
-
-    console.log(`[useQuizDetail] Submitting results for quiz: ${quizMeta.id}, user: ${userId}`);
-    console.log(`[useQuizDetail] Score: ${score}/${totalQuestions} (${percentage}%), Passed: ${passed}`);
-    console.log(`[useQuizDetail] Path context: ${providerId}/${pathId}`);
-
-    try {
-      const progressUrl = `${BASE_URL}/api/v1/users/${userId}/progress`;
-      const payload: Partial<QuizResult> & { resourceType: string; action: string; resourceId: string } = {
-        resourceType: 'quiz',
-        resourceId: quizMeta.id, // Use the actual quiz ID
-        action: 'complete', // Action type
-        providerId: providerId, // Include providerId
-        pathId: pathId,         // Include pathId
-        moduleId: quizMeta.moduleId, // Include moduleId
-        score: score,
-        percentage: percentage,
-        passed: passed,
-        answers: userAnswers, // Send the user's answers
-        timestamp: new Date().toISOString(), // Use ISO string for consistency
-      };
-
-      console.log('[useQuizDetail] Progress payload:', payload);
-
-      const response = await axios.post<SubmitProgressResponse>(progressUrl, payload, { timeout: 10000 });
-
-      if (response.data.status !== 'success') {
-        throw new Error(response.data.message || 'Failed to submit quiz results.');
+    // Fetch only when all required IDs are available
+    if (activeProviderId && activePathId && userId) {
+      console.log('[QuizzesScreen] useEffect triggered: Fetching data.');
+      fetchData(activeProviderId, activePathId, userId);
+    } else {
+      console.log('[QuizzesScreen] useEffect triggered: Waiting for required IDs.', { activeProviderId, activePathId, userId });
+      // If context is missing, the initial path error check will handle it
+      // If only userId is missing, wait for it or show login error
+      if (!userId && !loading && !error) { // Only set error if not already loading userId and no other error exists
+         // setError("User session not found."); // Handled by userId effect setting error
+      } else if ((!activeProviderId || !activePathId) && !loading) {
+         // This case is handled by the initial path error check render
+         setLoading(false); // Ensure loading stops if context is missing
       }
-
-      console.log('[useQuizDetail] Submission successful.');
-      setShowResults(true); // Show results card on success
-
-    } catch (err: any) {
-      console.error('[useQuizDetail] Error submitting quiz results:', err.response?.data || err.message);
-      handleError(err, (msg) => setError(msg || 'Failed to submit results. Please try again.'));
-      // Don't show results card on error, keep user on questions
-    } finally {
-      setSubmittingResults(false);
     }
-  }, [quiz, quizMeta, userAnswers, calculateScore, providerId, pathId, submittingResults]); // Add dependencies
+  }, [activeProviderId, activePathId, userId, fetchData]); // Depend on context IDs, userId, and fetchData function reference
 
-  const handleRetry = () => {
-    // Reset state and fetch again
-    fetchQuizData();
+
+  // --- Refetch Function ---
+  const refetch = () => {
+    // Refetch only if IDs are available
+    if (activeProviderId && activePathId && userId) {
+      fetchData(activeProviderId, activePathId, userId);
+    } else {
+      setError("Cannot retry: Missing required information (path or user).");
+    }
   };
 
-  return {
-    quiz, // Array of questions
-    quizMeta, // Quiz metadata (title, passingScore etc.)
-    loading,
-    error,
-    moduleTitle,
-    userAnswers,
-    showResults,
-    submittingResults,
-    handleAnswer,
-    calculateScore,
-    isAnswerCorrect,
-    submitQuizResults,
-    handleRetry,
+  // --- Navigation Handlers (remain the same) ---
+  const handleStartQuiz = (quiz: Quiz) => {
+    if (!activeProviderId || !activePathId) {
+        console.error("[QuizzesScreen] Cannot navigate to quiz detail, active path not set.");
+        return;
+    }
+    console.log('[QuizzesScreen] Navigating to QuizzesDetail with:', {
+        moduleId: quiz.moduleId,
+        providerId: activeProviderId,
+        pathId: activePathId,
+        quizId: quiz.id,
+     });
+    navigation.navigate('QuizzesDetail', {
+      moduleId: quiz.moduleId,
+      providerId: activeProviderId,
+      pathId: activePathId,
+      quizId: quiz.id,
+    });
   };
+
+  const handleSelectPath = () => {
+    navigation.navigate('Home');
+  };
+
+  // --- RENDER LOGIC (Uses local state now) ---
+
+  // --- Path Error State ---
+  if (!activeProviderId || !activePathId) {
+    return (
+      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+          Please select a learning path first.
+        </Text>
+        <Button
+            mode="contained"
+            onPress={handleSelectPath}
+            style={{ backgroundColor: colors.primary }}
+            labelStyle={{ color: colors.buttonText }}
+        >
+          Select Learning Path
+        </Button>
+      </View>
+    );
+  }
+
+  // --- Loading State ---
+  if (loading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          {strings.loadingQuizzes || 'Loading Quizzes...'}
+        </Text>
+      </View>
+    );
+  }
+
+  // --- API Error State ---
+  if (error) {
+    return (
+      <View style={[styles.errorContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.error }]}>{String(error)}</Text>
+        <Button
+            mode="contained"
+            onPress={refetch} // Use the local refetch function
+            style={{ backgroundColor: colors.primary }}
+            labelStyle={{ color: colors.buttonText }}
+        >
+          Retry
+        </Button>
+      </View>
+    );
+  }
+
+  // --- Main Content ---
+  return (
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      {quizzes.length > 0 ? (
+        quizzes.map((quiz) => {
+          const imageSource = imageMap[quiz.moduleId] || imageMap['default']; // Use imageMap here
+          return (
+            <QuizCard
+              key={quiz.id}
+              quiz={{ ...quiz, icon: imageSource }} // Pass the correct source
+              isCompleted={quizProgress[quiz.id] || false} // Use local state
+              onPress={() => handleStartQuiz(quiz)}
+            />
+          );
+        })
+      ) : (
+        // --- No Quizzes Found State ---
+        <View style={styles.noQuizzesContainer}>
+          <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
+            No quizzes found for the selected learning path.
+          </Text>
+        </View>
+      )}
+    </ScrollView>
+  );
 };
+
+// --- Styles (remain the same) ---
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    textAlign: 'center',
+    marginBottom: 16,
+    fontSize: 16,
+  },
+  noQuizzesContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    marginTop: 50,
+  },
+});
+
+export default QuizzesScreen;

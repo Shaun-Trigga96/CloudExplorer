@@ -16,11 +16,11 @@ router.post('/save-result', /* protect, */ quizController.saveQuizResult);
 router.get('/history/:userId', /* protect, */ quizController.getQuizHistory);
 
 // --- NEW: Get All Quizzes ---
-// GET /api/v1/quizzes/
-router.get('/list', quizController.listQuizzes);
+// GET /api/v1/quizzes/list
+router.get('/list-quizzes', quizController.listQuizzes);
 // --- NEW: Get Quiz by ID ---
-// GET /api/v1/quizzes/:quizId
-router.get('/:quizId', quizController.getQuizById);
+// GET /api/v1/quizzes/:id
+router.get('/:id', quizController.getQuizById);
 
 
 

@@ -209,6 +209,7 @@ exports.getQuizById = async (req, res, next) => {
 // GET /list (or just / if base route is /api/v1/quizzes)
 // Requires providerId and pathId query parameters
 exports.listQuizzes = async (req, res, next) => {
+  console.log('[quizController.listQuizzes] Received req.query:', JSON.stringify(req.query));
   try {
     const {
         providerId, // REQUIRED filter
@@ -264,7 +265,6 @@ exports.listQuizzes = async (req, res, next) => {
             pathId: data.pathId,
             title: data.title,
             description: data.description,
-
             passingScore: data.passingScore,
             createdAt: data.createdAt?.toDate()?.toISOString() || null,
             updatedAt: data.updatedAt?.toDate()?.toISOString() || null,

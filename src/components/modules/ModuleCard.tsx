@@ -8,13 +8,15 @@ import { RootStackParamList } from '../../navigation/RootNavigator';
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 interface ModuleCardProps {
-  id: string;
+  moduleId: string;
   title: string;
   description: string;
   imageSource: ImageSourcePropType;
   progress: number;
   onStartLearning: (moduleId: string) => void;
   navigation: NavigationProp;
+  providerId: string;
+  pathId: string;
 }
 
 class ModuleCardErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -33,83 +35,148 @@ class ModuleCardErrorBoundary extends Component<{ children: React.ReactNode }, {
   }
 }
 
-const ModuleCard: FC<ModuleCardProps> = ({ id, title, description, imageSource, progress, onStartLearning, navigation }) => {
+const ModuleCard: FC<ModuleCardProps> = ({ 
+  moduleId, 
+  title, 
+  description, 
+  imageSource, 
+  progress, 
+  onStartLearning, 
+  navigation, 
+  providerId, 
+  pathId 
+}) => {
   const { theme } = useCustomTheme();
   const { colors, cardStyle } = theme;
 
-  console.log('Rendering ModuleCard:', { id, title, progress, imageSource });
-
-  const progressColor = progress === 1 ? colors.success : progress > 0 ? colors.warning : colors.progressBarBackground;
-  const buttonLabel = progress === 1 ? 'Review Module' : progress > 0 ? 'Continue Learning' : 'Start Learning';
-  const buttonBackgroundColor = progress === 1 ? colors.buttonCompletedBackground : colors.buttonPrimaryBackground;
+  const progressColor = progress === 1 
+    ? colors.success 
+    : progress > 0 
+      ? colors.warning 
+      : colors.progressBarBackground;
+      
+  const buttonLabel = progress === 1 
+    ? 'Review Module' 
+    : progress > 0 
+      ? 'Continue Learning' 
+      : 'Start Learning';
+      
+  const buttonBackgroundColor = progress === 1 
+    ? colors.buttonCompletedBackground 
+    : colors.buttonPrimaryBackground;
 
   const handlePress = () => {
-    console.log('ModuleCard handlePress:', id);
-    onStartLearning(id);
-    navigation.navigate('ModuleDetail', { moduleId: id });
+    console.log('ModuleCard handlePress:', moduleId, 'providerId:', providerId, 'pathId:', pathId);
+    navigation.navigate('ModuleDetail', {
+      moduleId: moduleId,
+    });
+    console.log(`[ModuleCard] Navigation call complete for ${moduleId}`);
   };
 
   return (
     <ModuleCardErrorBoundary>
-      <View style={{ marginVertical: 8 }}>
-        <Card style={[styles.card, cardStyle, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Card.Content>
-            <Image source={imageSource} style={styles.image} resizeMode="contain" />
-            <Title style={[styles.title, { color: colors.text }]}>{title}</Title>
-            <Paragraph style={[styles.description, { color: colors.textSecondary }]}>{description}</Paragraph>
-            <ProgressBar
-              progress={progress}
-              color={progressColor}
-              style={[styles.progressBar, { backgroundColor: colors.progressBarBackground }]}
+      <Card 
+        style={[styles.card, cardStyle, { backgroundColor: colors.surface }]} 
+        onPress={handlePress}
+      >
+        <Card.Content style={styles.contentContainer}>
+          <View style={styles.headerContainer}>
+            <Image 
+              source={imageSource} 
+              style={styles.image} 
+              resizeMode="contain" 
             />
-            <Paragraph style={[styles.percentage, { color: colors.textSecondary }]}>{`${(progress * 100).toFixed(0)}%`}</Paragraph>
-          </Card.Content>
-          <Card.Actions>
-            <Button
-              mode="contained"
-              onPress={handlePress}
-              style={[styles.button, { backgroundColor: buttonBackgroundColor }]}
-              labelStyle={{ color: colors.buttonText }}
-            >
-              {buttonLabel}
-            </Button>
-          </Card.Actions>
-        </Card>
-      </View>
+            <View style={styles.headerTextContainer}>
+              <Title style={[styles.title, { color: colors.text }]}>
+                {title}
+              </Title>
+              <View style={styles.progressContainer}>
+                <ProgressBar
+                  progress={progress}
+                  color={progressColor}
+                  style={[styles.progressBar, { backgroundColor: colors.progressBarBackground }]}
+                />
+                <Text style={[styles.percentage, { color: colors.textSecondary }]}>
+                  {`${(progress * 100).toFixed(0)}%`}
+                </Text>
+              </View>
+            </View>
+          </View>
+          
+          <Paragraph style={[styles.description, { color: colors.textSecondary }]}>
+            {description}
+          </Paragraph>
+          
+          <Button
+            mode="contained"
+            onPress={handlePress}
+            style={[styles.button, { backgroundColor: buttonBackgroundColor }]}
+            labelStyle={{ color: colors.buttonText }}
+          >
+            {buttonLabel}
+          </Button>
+        </Card.Content>
+      </Card>
     </ModuleCardErrorBoundary>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 18,
+    borderRadius: 12,
+    marginVertical: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
     overflow: 'hidden',
   },
+  contentContainer: {
+    padding: 12,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  headerTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
   image: {
-    width: 30,
-    height: 30,
-    marginBottom: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 8,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
+    lineHeight: 20,
   },
-  description: {
-    fontSize: 14,
-    marginBottom: 12,
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
+    flex: 1,
+    marginRight: 8,
   },
   percentage: {
     fontSize: 12,
-    alignSelf: 'flex-end',
-    marginTop: 6,
+    fontWeight: '500',
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 16,
   },
   button: {
     borderRadius: 8,
+    marginTop: 4,
   },
 });
 

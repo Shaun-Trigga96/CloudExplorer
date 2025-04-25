@@ -14,7 +14,7 @@ export type RootStackParamList = {
   Auth: undefined;
   Home: undefined;
   ModuleDetail: { moduleId: string };
-  MainApp: { provider: string; path: string }; // Define the expected parameters
+  MainApp: { provider: string; path: string }; // <-- EXPECTS PARAMS!
   ModulesScreen: { provider: string; path: string }; // Direct access, likely within TabNavigator
   QuizzesScreen: { providerId: string; pathId: string }; // Pass context
   QuizzesDetail: {
@@ -27,7 +27,7 @@ export type RootStackParamList = {
   SettingsScreen: undefined; // Direct access, likely within TabNavigator
   CertificationsScreen: undefined; // Direct access, likely within TabNavigator
   ProfileScreen: undefined; // Direct access, likely within TabNavigator
-  DashboardScreen: undefined; // Direct access, likely within TabNavigator
+  DashboardScreen: { provider: string; path: string }; // Direct access, likely within TabNavigator
   ExamsScreen: { providerId: string; pathId: string }; // Pass context
   CommunityScreen: undefined; // Direct access, likely within TabNavigator
   CreatePostScreen: undefined;

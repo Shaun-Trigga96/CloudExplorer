@@ -2,18 +2,24 @@
 import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/Feather';
 import { useCustomTheme } from '../context/ThemeContext';
 import { darkColors, lightColors } from '../styles/colors';
-import { RootStackParamList } from '../navigation/RootNavigator';
 import { useProfile } from '../components/hooks/useProfile';
 import { LoadingView } from '../components/common/LoadingView';
 import { profileStyles } from '../styles/profileStyles';
 import { ProfileCard, ProfileHeader } from '../components/profile';
 import { UserProfile } from '../types/profile';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
 
-const ProfileScreen: React.FC = () => {
+type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProfileScreen'>;
+
+interface ProfileScreenProps {
+  navigation: ProfileScreenNavigationProp;
+}
+
+const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) =>{
   const { isDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors;
   const { userProfile, editedProfile, loading, uploading, isEditing, handleImagePicker, handleSaveProfile, cancelEdit } = useProfile();

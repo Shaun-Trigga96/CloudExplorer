@@ -10,10 +10,10 @@
     "test": "jest",
     "start-push-images": "bash ./script-start-push-images.sh",
     "schema": "npm run clean && npm run build-schema && npm run run-schema",
-    "create-modules": "npm run clean && npm run build-schema && node --no-deprecation dist/scripts/create-schema-content-only.js",
+    "create-modules": "npm run clean && npm run build-schema && node --no-deprecation dist/scripts/seed/index.js",
     "clean": "if exist dist rmdir /s /q dist",
-    "build-schema": "tsc -p tsconfig.node.json && xcopy /E /I /Y scripts\\content dist\\scripts\\content",
-    "run-schema": "node --no-deprecation dist/scripts/create-schema-content-only.js"
+    "build-schema": "tsc -p tsconfig.node.json && (if not exist dist\\scripts\\backend\\src\\config mkdir dist\\scripts\\backend\\src\\config) && (for /d %f in (scripts\\content\\*) do xcopy /E /I /Y \"%f\" \"dist\\scripts\\content\\%~nxf\") && copy backend\\src\\config\\cloud-explorer-c3d98-firebase-adminsdk-4tota-5a332e02f6.json dist\\scripts\\backend\\src\\config\"",
+    "run-schema": "node --no-deprecation dist/scripts/content/seed/index.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
@@ -83,6 +83,7 @@
     "@types/react-native-dotenv": "^0.2.2",
     "@types/react-native-vector-icons": "^6.4.18",
     "@types/react-test-renderer": "^18.0.0",
+    "cross-env": "^7.0.3",
     "eslint": "^9.12.0",
     "glob": "^11.0.0",
     "jest": "^29.6.3",

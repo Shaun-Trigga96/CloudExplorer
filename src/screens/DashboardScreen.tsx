@@ -1,5 +1,5 @@
-// src/screens/DashboardScreen.tsx
-import React, { FC, useEffect, useState } from 'react';
+// c:\Users\thabi\Desktop\CloudExplorer\src\screens\DashboardScreen.tsx
+import React, { FC, useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -9,34 +9,27 @@ import { REACT_APP_BASE_URL } from '@env';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useCustomTheme } from '../context/ThemeContext';
+import { useActiveLearningPath } from '../context/ActiveLearningPathContext'; // Import context hook
 import GridItem from '../components/dashboard/GridItem';
 import ProgressItem from '../components/dashboard/ProgressItem';
 import ErrorBanner from '../components/dashboard/ErrorBanner';
 import WarningBanner from '../components/dashboard/WarningBanner';
 import {
-  Module,
-  Quiz,
   QuizResult,
-  Exam,
   ExamResult,
   ErrorInfo,
-  OverallProgress, // New type
-  LearningPath, // New type
-} from '../types/dashboard'; // Make sure these types are updated or defined
+  OverallProgress,
+  LearningPath,
+  ApiModule,
+  ApiQuiz,
+  ApiExam,
+} from '../types/dashboard';
 import { extractFirestoreIndexUrl } from '../utils/firestore';
 import { dashboardStyles} from '../styles/dashboardStyles'
-const BASE_URL = REACT_APP_BASE_URL;
+import { imageMapRecord } from '../utils/imageMap';
 
-// --- Icon Maps (Keep as is) ---
-const iconMap: Record<string, any> = {
-  'digital-transformation': require('../assets/images/digital_transformation.jpeg'),
-  'artificial-intelligence': require('../assets/images/artificial_intelligence.jpeg'),
-  'infrastructure-application': require('../assets/images/infrastructure_application.jpeg'),
-  'scailing-operations': require('../assets/images/scailing_operations.jpeg'),
-  'trust-security': require('../assets/images/trust_security.jpeg'),
-  'data-transformation': require('../assets/images/data_transformation.jpeg'),
-  'default': require('../assets/images/cloud_generic.png'),
-};
+
+const BASE_URL = REACT_APP_BASE_URL;
 
 const examIcons: Record<string, any> = {
   'cloud-digital-leader-exam': require('../assets/images/cloud-digital-leader.png'),
@@ -50,122 +43,183 @@ const examColors: Record<string, string> = {
 // --- End Icon Maps ---
 
 interface DashboardScreenProps {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'DashboardScreen'>;
+  // Navigation prop might still be needed if navigating *from* Dashboard
+  navigation: NativeStackNavigationProp<RootStackParamList, 'MainApp'>; // Changed to MainApp as it's within TabNavigator
 }
+
+// --- Removed Route Prop Type ---
+// type DashboardScreenRouteProp = RouteProp<RootStackParamList, 'DashboardScreen'>;
 
 // --- Default State Values ---
 const defaultOverallProgress: OverallProgress = {
   totalModulesCompleted: 0,
   totalQuizzesCompleted: 0,
+  totalExamsCompleted: 0,
   totalScore: 0,
 };
 
 const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
   const { colors, cardStyle } = useCustomTheme().theme;
   const [loading, setLoading] = useState<boolean>(true);
-  // --- Updated State ---
   const [overallProgress, setOverallProgress] = useState<OverallProgress>(defaultOverallProgress);
   const [learningPaths, setLearningPaths] = useState<LearningPath[]>([]);
-  // --- Existing State ---
-  const [modules, setModules] = useState<Module[]>([]);
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [quizResults, setQuizResults] = useState<QuizResult[]>([]); // Keep for potential future use (e.g., showing attempts)
-  const [examResults, setExamResults] = useState<ExamResult[]>([]); // Keep for potential future use
+  const [modules, setModules] = useState<ApiModule[]>([]);
+  const [exams, setExams] = useState<ApiExam[]>([]);
+  const [quizzes, setQuizzes] = useState<ApiQuiz[]>([]);
+  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
+  const [examResults, setExamResults] = useState<ExamResult[]>([]);
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
-  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({}); // Removed as QuizModule is removed
 
-   const toggleModuleExpanded = (moduleId: string) => {
-     setExpandedModules(prev => ({ ...prev, [moduleId]: !prev[moduleId] }));
-   };
+  // --- Get active path from context ---
+  const { activeProviderId, activePathId } = useActiveLearningPath();
+
+  // --- Removed route and route.params access ---
+  // const route = useRoute<DashboardScreenRouteProp>();
+  // const providerId = route.params?.providerId;
+  // const pathId = route.params?.pathId;
 
   // --- Fetch User Data (Updated) ---
-  const fetchUserData = async () => {
+  const fetchUserData = useCallback(async (currentProviderId: string, currentPathId: string) => {
     setLoading(true);
-    setErrorInfo(null); // Reset error on fetch
-    setOverallProgress(defaultOverallProgress); // Reset progress
-    setLearningPaths([]); // Reset paths
+    setErrorInfo(null);
+    setOverallProgress(defaultOverallProgress);
+    setLearningPaths([]);
+    setModules([]);
+    setQuizzes([]);
+    setExams([]);
 
     try {
       const storedUserId = await AsyncStorage.getItem('userId');
       if (!storedUserId) {
-        // Handle case where user is not logged in (e.g., navigate to Auth)
-        navigation.replace('Auth'); // Example: redirect to login
+        // Consider navigating to Auth via RootNavigator if needed
+        // navigation.navigate('Auth'); // This might not work correctly from inside TabNavigator
+        console.error("[DashboardScreen] User ID not found, cannot fetch data.");
+        setErrorInfo({ message: 'User session not found. Please log in again.', isIndexError: false });
+        setLoading(false);
         return;
       }
 
-      // Fetch data from the updated endpoint
-      const response = await axios.get(
+      console.log(`[DashboardScreen] Fetching data for user: ${storedUserId}, path: ${currentProviderId}/${currentPathId}`);
+
+      // --- Call 1: Get User Progress Summary ---
+      const progressResponse = await axios.get(
         `${BASE_URL}/api/v1/users/${storedUserId}/progress`
-        // No specific params needed now as the endpoint returns everything by default
       );
+      console.log("[DashboardScreen] Progress Data Received:", progressResponse.data);
+      if (progressResponse.data.status !== 'success') throw new Error('Failed to fetch user progress');
+      setOverallProgress(progressResponse.data.data.overallProgress || defaultOverallProgress);
+      setLearningPaths(progressResponse.data.data.learningPaths || []);
+      setQuizResults(progressResponse.data.data.quizResults || []);
+      setExamResults(progressResponse.data.data.examResults || []);
 
-      console.log("Dashboard Data Received:", response.data); // Log the received data
+      // --- Call 2: Get Available Modules for the Active Path ---
+      try {
+        interface ListModulesResponse { status: string; data: { modules: ApiModule[]; hasMore: boolean; lastId: string | null; } }
+        const modulesResponse = await axios.get<ListModulesResponse>(`${BASE_URL}/api/v1/modules/list`, {
+          params: { providerId: currentProviderId, pathId: currentPathId, limit: 20 }
+        });
+        console.log("[DashboardScreen] Modules Data Received:", modulesResponse.data);
+        if (modulesResponse.data.status !== 'success') throw new Error('Failed to fetch modules');
+        setModules(modulesResponse.data.data.modules || []);
+      } catch (moduleError) {
+         console.error("Error fetching modules for dashboard:", moduleError);
+         setErrorInfo(prev => ({
+             message: `${prev?.message || ''} Failed to load modules.`.trim(),
+             isIndexError: false,
+             indexUrl: prev?.indexUrl
+         }));
+      }
 
-      // Set state based on the new structure, providing defaults
-      setOverallProgress(response.data.overallProgress || defaultOverallProgress);
-      setLearningPaths(response.data.learningPaths || []);
-      setModules(response.data.availableModules || []);
-      setExams(response.data.availableExams || []); // Use availableExams
-      setQuizzes(response.data.availableQuizzes || []);
-      setQuizResults(response.data.quizResults || []);
-      setExamResults(response.data.examResults || []);
+      // --- Call 3: Get Available Quizzes for the Active Path ---
+      try {
+        interface ListQuizzesResponse { status: string; data: { quizzes: ApiQuiz[]; hasMore: boolean; lastId: string | null; } }
+        const quizzesResponse = await axios.get<ListQuizzesResponse>(`${BASE_URL}/api/v1/quizzes/list-quizzes`, {
+          params: { providerId: currentProviderId, pathId: currentPathId, limit: 20 }
+        });
+        console.log("[DashboardScreen] Quizzes Data Received:", quizzesResponse.data);
+         if (quizzesResponse.data.status !== 'success') throw new Error('Failed to fetch quizzes');
+        setQuizzes(quizzesResponse.data.data.quizzes || []);
+      } catch (quizError) {
+         console.error("Error fetching quizzes for dashboard:", quizError);
+         setErrorInfo(prev => ({
+             message: `${prev?.message || ''} Failed to load quizzes.`.trim(),
+             isIndexError: false,
+             indexUrl: prev?.indexUrl
+         }));
+      }
+
+      // --- Call 4: Get Available Exams for the Active Path ---
+      try {
+        interface ListExamsResponse { status: string; data: { exams: ApiExam[]; hasMore: boolean; lastId: string | null; } }
+        const examsResponse = await axios.get<ListExamsResponse>(`${BASE_URL}/api/v1/exams/list-exams`, {
+          params: { providerId: currentProviderId, pathId: currentPathId, limit: 20 }
+        });
+        console.log("[DashboardScreen] Exams Data Received:", examsResponse.data);
+        if (examsResponse.data.status !== 'success') throw new Error('Failed to fetch exams');
+        setExams(examsResponse.data.data.exams || []);
+      } catch (examError) {
+         console.error("Error fetching exams for dashboard:", examError);
+         setErrorInfo(prev => ({
+             message: `${prev?.message || ''} Failed to load exams.`.trim(),
+             isIndexError: false,
+             indexUrl: prev?.indexUrl
+         }));
+      }
 
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err.response?.data || err.message);
-      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'An unknown error occurred';
-
-      // Keep Firestore index error handling
-      if (typeof errorMessage === 'string' && errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('index')) {
-        setErrorInfo({
-          message: 'The database query requires an index which needs to be created.',
-          isIndexError: true,
-          indexUrl: extractFirestoreIndexUrl(errorMessage),
-        });
-        // Still try to set available content if provided in error response
-        if (err.response?.data?.availableModules) setModules(err.response.data.availableModules);
-        if (err.response?.data?.availableExams) setExams(err.response.data.availableExams);
-        if (err.response?.data?.availableQuizzes) setQuizzes(err.response.data.availableQuizzes);
-      } else {
-        setErrorInfo({
-          message: `Failed to load dashboard data: ${errorMessage}. Please try again.`,
-          isIndexError: false,
-        });
-      }
+      const indexUrl = extractFirestoreIndexUrl(err.message);
+      setErrorInfo({
+        message: indexUrl ? 'Database setup required.' : `Failed to load dashboard data: ${err.message}. Please try again.`,
+        isIndexError: !!indexUrl,
+        indexUrl: indexUrl || undefined,
+      });
     } finally {
       setLoading(false);
     }
-  };
+  // Removed navigation dependency as it's not used directly for fetching
+  }, []); // Removed navigation dependency
 
   useEffect(() => {
-    // Fetch data when the screen focuses (e.g., after completing a module/quiz)
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchUserData();
-    });
+    // Log how DashboardScreen gets the IDs from context
+    console.log('[DashboardScreen] Trying to determine active path from context.');
+    console.log('[DashboardScreen] Context Values:', { activeProviderId, activePathId });
 
-    return unsubscribe; // Cleanup listener on unmount
-  }, [navigation]);
+    if (activeProviderId && activePathId) {
+      // --- Call fetchUserData with context values ---
+      fetchUserData(activeProviderId, activePathId);
+    } else {
+      setErrorInfo({ message: 'Could not determine the active learning path from context.', isIndexError: false });
+      setLoading(false);
+    }
+    // --- Update dependency array to use context values ---
+  }, [activeProviderId, activePathId, fetchUserData]);
 
 
-  // --- Helper to get details (unchanged, but used for quizzes now too) ---
+  // --- Helper to get details (No changes needed here, but ensure it uses fetched data correctly) ---
   const getResourceDetails = (resourceId: string, resourceType: 'module' | 'quiz' | 'exam') => {
     let item;
     let title = resourceId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    let imageIcon = iconMap['default']; // Default icon
-    let color = '#3b82f6'; // Default color
+    let imageIcon = imageMapRecord['default'];
+    let color = '#3b82f6';
+    // Provider/Path IDs for navigation will now come from context, not item data
+    // let providerIdForNav: string | undefined;
+    // let pathIdForNav: string | undefined;
 
     if (resourceType === 'module') {
       item = modules.find(m => m.id === resourceId);
       if (item) {
         title = item.title;
-        imageIcon = iconMap[resourceId] || iconMap['default'];
-        // Add specific module colors if needed
+        imageIcon = imageMapRecord[resourceId] || imageMapRecord['default'];
+        // providerIdForNav = item.providerId || undefined; // No longer needed from item
+        // pathIdForNav = item.pathId || undefined;       // No longer needed from item
       }
     } else if (resourceType === 'quiz') {
       item = quizzes.find(q => q.id === resourceId);
        if (item) {
          title = item.title;
-         // Use module's icon/color for associated quiz
+         // providerIdForNav = item.providerId || undefined; // No longer needed from item
+         // pathIdForNav = item.pathId || undefined;       // No longer needed from item
          const moduleDetails = getResourceDetails(item.moduleId, 'module');
          imageIcon = moduleDetails.imageIcon;
          color = moduleDetails.color;
@@ -174,32 +228,35 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
       item = exams.find(e => e.id === resourceId);
       if (item) {
         title = item.title;
-        imageIcon = examIcons[resourceId] || iconMap['default'];
-        color = examColors[resourceId] || '#3b82f6';
+        // providerIdForNav = item.providerId || undefined; // No longer needed from item
+        // pathIdForNav = item.pathId || undefined;       // No longer needed from item
+        imageIcon = examIcons[item.examId] || imageMapRecord['default'];
+        color = examColors[item.examId] || '#3b82f6';
       }
     }
 
+    // Return details without provider/path IDs for navigation
     return { imageIcon, color, title };
   };
 
-  // --- Aggregate Completed Items ---
+  // --- Aggregate Completed Items (No changes needed) ---
   const allCompletedModuleIds = new Set<string>(
-    learningPaths.flatMap(path => path.learningProgress?.completedModules || [])
+    learningPaths.flatMap(path => path.progress?.completedModules || [])
   );
   const allCompletedQuizIds = new Set<string>(
-    learningPaths.flatMap(path => path.learningProgress?.completedQuizzes || [])
+    learningPaths.flatMap(path => path.progress?.completedQuizzes || [])
   );
   const allCompletedExamIds = new Set<string>(
-    learningPaths.flatMap(path => path.learningProgress?.completedExams || [])
+    learningPaths.flatMap(path => path.progress?.completedExams || [])
   );
 
-  // --- Calculate Overall Progress Percentage ---
-  const totalAvailableModules = modules.length; // Use total available modules as the denominator
+  // --- Calculate Overall Progress Percentage (No changes needed) ---
+  const totalAvailableModules = modules.length;
   const progressPercentage = totalAvailableModules > 0
     ? Math.round((overallProgress.totalModulesCompleted / totalAvailableModules) * 100)
     : 0;
 
-  // --- Loading State ---
+  // --- Loading State (No changes needed) ---
   if (loading) {
     return (
       <View style={[dashboardStyles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -209,34 +266,46 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
     );
   }
 
-  // --- Error State (Handles index error separately) ---
+  // --- Error State ---
   if (errorInfo && (!errorInfo.isIndexError || (modules.length === 0 && exams.length === 0 && quizzes.length === 0))) {
     return (
       <SafeAreaView style={[dashboardStyles.container, { backgroundColor: colors.background }]}>
         <ScrollView style={dashboardStyles.scrollContainer}>
-          <ErrorBanner error={errorInfo} onRetry={fetchUserData} />
-          {/* Optionally show GridItems even on error */}
+          <ErrorBanner error={errorInfo} onRetry={() => {
+              // --- Refetch using context values ---
+              if (activeProviderId && activePathId) {
+                  fetchUserData(activeProviderId, activePathId);
+              } else {
+                  setErrorInfo({ message: 'Cannot retry: Learning path information is missing from context.', isIndexError: false });
+              }
+          }} />
         </ScrollView>
       </SafeAreaView>
     );
   }
 
-  // --- Grid Items (Keep as is) ---
+  // --- Grid Items (Removed providerId/pathId props) ---
   const gridItems = [
-    { icon: 'book-open', title: 'Learning Modules', description: 'Interactive GCP concepts', color: '#3b82f6', screen: 'Modules' },
-    { icon: 'award', title: 'Practice Exams', description: 'Prepare for certifications', color: '#a855f7', screen: 'Exams' },
-    { icon: 'help-circle', title: 'Module Quizzes', description: 'Test your knowledge', color: '#f97316', screen: 'Quizzes' },
-    { icon: 'users', title: 'Community', description: 'Connect with learners', color: '#0ea5e9', screen: 'Community' },
-    { icon: 'bar-chart-2', title: 'Your Progress', description: 'Track your journey', color: '#22c55e', screen: 'Dashboard' }, // Link to self or specific progress screen
-    { icon: 'settings', title: 'Settings', description: 'Customize your app', color: '#ef4444', screen: 'Settings' },
+    { icon: 'book-open', title: 'Learning Modules', description: 'Interactive concepts', color: '#3b82f6', screen: 'ModulesScreen' },
+    { icon: 'award', title: 'Practice Exams', description: 'Prepare for certifications', color: '#a855f7', screen: 'ExamsScreen' },
+    { icon: 'help-circle', title: 'Module Quizzes', description: 'Test your knowledge', color: '#f97316', screen: 'QuizzesScreen' },
+    { icon: 'users', title: 'Community', description: 'Connect with learners', color: '#0ea5e9', screen: 'CommunityScreen' },
+    { icon: 'bar-chart-2', title: 'Your Progress', description: 'Track your journey', color: '#22c55e', screen: 'DashboardScreen' }, // Stays on Dashboard
+    { icon: 'settings', title: 'Settings', description: 'Customize your app', color: '#ef4444', screen: 'SettingsScreen' },
   ];
   // --- End Grid Items ---
 
   return (
     <SafeAreaView style={[dashboardStyles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={dashboardStyles.scrollContainer} contentContainerStyle={{ paddingBottom: 20 }}>
-        {/* --- Banners --- */}
-        {errorInfo?.isIndexError && <WarningBanner onRetry={fetchUserData} />}
+        {/* --- Banners (Updated retry logic) --- */}
+        {errorInfo?.isIndexError && <WarningBanner onRetry={() => {
+             if (activeProviderId && activePathId) {
+                 fetchUserData(activeProviderId, activePathId);
+             } else {
+                 setErrorInfo({ message: 'Cannot retry: Learning path information is missing from context.', isIndexError: false });
+             }
+        }} />}
 
         {/* --- Grid --- */}
         <View style={dashboardStyles.gridWrapper}>
@@ -244,10 +313,12 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
           <View style={dashboardStyles.gridContainer}>
             {gridItems.map((item, index) => (
               <GridItem
+                providerId={''} 
+                pathId={''} 
                 key={item.title}
                 {...item}
                 index={index}
-                navigation={navigation}
+                navigation={navigation}                // Removed providerId and pathId props
               />
             ))}
           </View>
@@ -257,7 +328,7 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
         <Animated.View entering={FadeIn.duration(1200)} style={[dashboardStyles.card, cardStyle, { backgroundColor: colors.surface }]}>
           <Text style={[dashboardStyles.cardTitle, { color: colors.text }]}>Learning Progress</Text>
 
-          {/* Overall Progress Bar */}
+          {/* Overall Progress Bar (No changes needed) */}
           <View style={dashboardStyles.progressSection}>
             <View style={dashboardStyles.progressLabelContainer}>
               <Text style={[dashboardStyles.progressLabel, { color: colors.text }]}>Overall Module Completion</Text>
@@ -275,9 +346,9 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
           <Text style={[dashboardStyles.sectionTitle, { color: colors.text }]}>Modules</Text>
           {modules.length > 0 ? (
             modules.map(module => {
+              // Get details without provider/path for nav
               const { imageIcon, color, title } = getResourceDetails(module.id, 'module');
               const isCompleted = allCompletedModuleIds.has(module.id);
-              // Simple status: Completed or Not Started. "In Progress" is harder to track reliably here.
               const status = isCompleted ? 'Completed' : 'Not Started';
               return (
                 <ProgressItem
@@ -286,77 +357,79 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
                   status={status}
                   color={color}
                   imageIcon={imageIcon}
-                  onPress={() => navigation.navigate('ModuleDetail', { moduleId: module.id })} // Navigate to module detail
+                  // --- Pass context provider/path IDs to ModuleDetail ---
+                  onPress={() => navigation.navigate('ModuleDetail', {
+                      moduleId: module.id,
+                  })}
                 />
               );
             })
           ) : (
-            <Text style={[dashboardStyles.noDataText, { color: colors.textSecondary }]}>No modules available.</Text>
+            <Text style={[dashboardStyles.noDataText, { color: colors.textSecondary }]}>No modules available for this path.</Text>
           )}
 
-          {/* Quizzes List (Flat) */}
+          {/* Quizzes List */}
           <Text style={[dashboardStyles.sectionTitle, { color: colors.text }]}>Quizzes</Text>
           {quizzes.length > 0 ? (
             quizzes.map(quiz => {
-              // Find the module this quiz belongs to for details
               const moduleDetails = getResourceDetails(quiz.moduleId, 'module');
+              // Get details without provider/path for nav
+              // const { providerIdForNav, pathIdForNav } = getResourceDetails(quiz.id, 'quiz'); // No longer needed
               const isCompleted = allCompletedQuizIds.has(quiz.id);
               const status = isCompleted ? 'Completed' : 'Not Started';
-              // Get latest result percentage if available
-              const latestResult = quizResults
-                .filter(qr => qr.quizId === quiz.id)
-                .sort((a, b) => {
-                  const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-                  const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-                  return bTime - aTime;
-                })[0];
+              const latestResult = quizResults.find(qr => qr.quizId === quiz.id);
 
               return (
                 <ProgressItem
                   key={quiz.id}
                   title={quiz.title}
-                  subtitle={`Part of: ${moduleDetails.title}`} // Add subtitle for context
+                  subtitle={`Part of: ${moduleDetails.title}`}
                   status={status}
-                  percentage={latestResult?.percentage} // Show latest percentage
-                  color={moduleDetails.color} // Use module color
-                  imageIcon={moduleDetails.imageIcon} // Use module icon
-                  onPress={() => navigation.navigate('QuizzesDetail', { moduleId: quiz.moduleId, providerId: '', pathId: '', quizId: quiz.id } as { moduleId: string; providerId: string; pathId: string; quizId: string })} // Navigate to quiz detail
+                  color={moduleDetails.color}
+                  imageIcon={moduleDetails.imageIcon}
+                  // --- Pass context provider/path IDs to QuizzesDetail ---
+                  onPress={() => navigation.navigate('QuizzesDetail', {
+                      moduleId: quiz.moduleId,
+                      providerId: activeProviderId || '', // Use context value
+                      pathId: activePathId || '',       // Use context value
+                      quizId: quiz.id
+                  })}
                 />
               );
             })
           ) : (
-            <Text style={[dashboardStyles.noDataText, { color: colors.textSecondary }]}>No quizzes available.</Text>
+            <Text style={[dashboardStyles.noDataText, { color: colors.textSecondary }]}>No quizzes available for this path.</Text>
           )}
 
           {/* Exams List */}
           <Text style={[dashboardStyles.sectionTitle, { color: colors.text }]}>Exams</Text>
           {exams.length > 0 ? (
             exams.map(exam => {
+              // Get details without provider/path for nav
               const { imageIcon, color, title } = getResourceDetails(exam.id, 'exam');
               const isCompleted = allCompletedExamIds.has(exam.id);
-              const status = isCompleted ? 'Completed' : 'Not Started'; // Or 'Attempted' based on examResults?
-              // Get latest result percentage if available
-              const latestResult = examResults
-                .filter(er => er.examId === exam.id)
-                .sort((a, b) => {
-                  const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-                  const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-                  return bTime - aTime;
-                })[0];
+              const status = isCompleted ? 'Completed' : 'Not Started';
+              const latestResult = examResults.find(er => er.examId === exam.id);
+
               return (
                 <ProgressItem
                   key={exam.id}
                   title={title}
                   status={status}
-                  percentage={latestResult?.percentage} // Show latest percentage
                   color={color}
                   imageIcon={imageIcon}
-                  onPress={() => navigation.navigate('ExamDetail', { examId: exam.id, title: exam.title, providerId: '', pathId: '' })} // Navigate to exam detail
+                  // --- Pass context provider/path IDs to ExamDetail ---
+                  onPress={() => navigation.navigate('ExamDetail', {
+                      examId: exam.examId,
+                      title: exam.title,
+                      providerId: activeProviderId || '', // Use context value
+                      pathId: activePathId || '',       // Use context value
+                  })}
                 />
               );
             })
           ) : (
-            <Text style={[dashboardStyles.noDataText, { color: colors.textSecondary }]}>No exams available.</Text>
+            <Text style={[dashboardStyles.noDataText, { color: colors.textSecondary }]}>No exams available for this path.</Text>
           )}
         </Animated.View>
       </ScrollView>

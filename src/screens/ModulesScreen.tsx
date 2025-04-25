@@ -1,35 +1,26 @@
-import React, { FC, useEffect, useState, useRef } from 'react';
-import { ScrollView, StyleSheet, ActivityIndicator, Alert, ImageSourcePropType, Text } from 'react-native';
+// c:\Users\thabi\Desktop\CloudExplorer\src\screens\ModulesScreen.tsx
+import React, { useEffect, useState, useRef, useCallback } from 'react'; // Added useCallback
+import { ScrollView, StyleSheet, ActivityIndicator, Alert, Text, View } from 'react-native'; // Added View
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { REACT_APP_BASE_URL } from '@env';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { StackNavigationProp, StackScreenProps } from '@react-navigation/stack';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useCustomTheme } from '../context/ThemeContext';
+import { useActiveLearningPath } from '../context/ActiveLearningPathContext'; // Import context hook
 import ModuleCard from '../components/modules/ModuleCard';
 import { ErrorView } from '../components/common/ErrorView';
 import { ApiModule, UserProgressResponse, ListModulesResponse } from '../types/modules';
 import { handleError } from '../utils/handleError';
+import { imageMap } from '../utils/imageMap';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
-const iconMap: { [key: string]: ImageSourcePropType } = {
-  'digital-transformation': require('../assets/images/digital_transformation.jpeg'),
-  'artificial-intelligence': require('../assets/images/artificial_intelligence.jpeg'),
-  'infrastructure-application': require('../assets/images/infrastructure_application.jpeg'),
-  'scailing-operations': require('../assets/images/scailing_operations.jpeg'),
-  'trust-security': require('../assets/images/trust_security.jpeg'),
-  'data-transformation': require('../assets/images/data_transformation.jpeg'),
-  'default': require('../assets/images/cloud_generic.png'),
-};
-
 type NavigationProp = StackNavigationProp<RootStackParamList, 'ModulesScreen'>;
-type Props = StackScreenProps<RootStackParamList, 'ModulesScreen'>;
 
-const ModulesScreen: FC<Props> = () => {
+const ModulesScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const route = useRoute<Props['route']>();
   const { colors } = useCustomTheme().theme;
   const [moduleProgress, setModuleProgress] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
@@ -39,22 +30,21 @@ const ModulesScreen: FC<Props> = () => {
   const [hasMore, setHasMore] = useState<boolean>(false);
   const isMounted = useRef(true);
 
-  // Get provider from route params, default to 'gcp'
-  const providerId = route.params;
+  // --- Use Context for providerId and pathId ---
+  const { activeProviderId, activePathId } = useActiveLearningPath();
 
-  useEffect(() => {
-    console.log('ModulesScreen mounted with params:', route.params);
-    console.log('BASE_URL:', BASE_URL);
-    isMounted.current = true;
-    fetchUserProgress();
 
-    return () => {
-      console.log('ModulesScreen unmounting');
-      isMounted.current = false;
-    };
-  }, [providerId]);
+  // --- Fetch User Progress (using context values) ---
+  const fetchUserProgress = useCallback(async (currentProviderId: string | null, currentPathId: string | null) => {
+    console.log('FRONTEND: Attempting fetch with context:', { currentProviderId, currentPathId });
 
-  const fetchUserProgress = async () => {
+    if (!currentProviderId || !currentPathId) {
+      console.error("FRONTEND: Missing provider or pathId from context!");
+      setError("Learning path information is missing.");
+      setLoading(false);
+      return;
+    }
+
     if (!isMounted.current) {
       console.log('fetchUserProgress aborted: component unmounted');
       return;
@@ -68,125 +58,128 @@ const ModulesScreen: FC<Props> = () => {
     console.log('Fetched userId from AsyncStorage:', userId);
     if (!userId) {
       console.log('No userId found, navigating to Auth');
-      Alert.alert('Error', 'User ID not found. Please log in again.');
       if (isMounted.current) {
         setLoading(false);
+        // Consider navigation.navigate('Auth') or similar if appropriate
       }
       return;
     }
 
     try {
-      // Fetch modules
       const moduleUrl = `${BASE_URL}/api/v1/modules/list`;
-      console.log('Attempting to fetch modules with params:', { limit: 20, lastId, providerId });
-      console.log('Module fetch URL:', moduleUrl);
+      console.log('FRONTEND: Making axios.get request to:', moduleUrl);
+      console.log('FRONTEND: Axios params being sent:', { limit: 20, lastId: null, providerId: currentProviderId, pathId: currentPathId });
+
       const modulesResponse = await axios.get<ListModulesResponse>(moduleUrl, {
-        params: { limit: 20, lastId, providerId },
-        timeout: 5000,
+        params: { limit: 20, lastId: null, providerId: currentProviderId, pathId: currentPathId }, // Use context values
+        timeout: 10000, // Increased timeout
       });
+
       console.log('Modules Response:', JSON.stringify(modulesResponse.data, null, 2));
 
-      if (!isMounted.current) {
-        console.log('fetchUserProgress aborted after module fetch: component unmounted');
-        return;
-      }
-
-      if (modulesResponse.data.status !== 'success') {
-        throw new Error('Failed to fetch modules: Invalid response status');
-      }
+      if (!isMounted.current) return;
+      if (modulesResponse.data.status !== 'success') throw new Error('Failed to fetch modules');
 
       const { modules, hasMore: newHasMore, lastId: newLastId } = modulesResponse.data.data;
-      console.log(`Fetched ${modules.length} modules for providerId: ${providerId}`);
-      console.log('Modules IDs:', modules.map(m => m.id));
+      console.log(`Fetched ${modules.length} modules for provider: ${currentProviderId}`);
       setAvailableModules(modules);
       setHasMore(newHasMore);
       setLastId(newLastId);
-      console.log('Updated state: availableModules:', modules.length, 'hasMore:', newHasMore, 'lastId:', newLastId);
 
       if (modules.length === 0) {
-        console.log('No modules found, setting error state');
-        setError(`No modules found for ${providerId}. Try a different provider or check back later.`);
+        setError(`No modules found for this path. Try a different one or check back later.`);
       }
 
       // Fetch user progress
       console.log('Fetching user progress for userId:', userId);
       const progressResponse = await axios.get<UserProgressResponse>(`${BASE_URL}/api/v1/users/${userId}/progress`, {
-        timeout: 5000,
+        timeout: 10000, // Increased timeout
       });
       console.log('Progress Response:', JSON.stringify(progressResponse.data, null, 2));
 
-      if (!isMounted.current) {
-        console.log('fetchUserProgress aborted after progress fetch: component unmounted');
-        return;
-      }
-
+      if (!isMounted.current) return;
       if (!progressResponse.data.userExists) {
-        console.log('User not found, navigating to Auth');
-        Alert.alert('Error', 'User not found. Please log in again.');
+        console.log('User not found in progress response');
+        // Handle appropriately, maybe show error or navigate
         return;
       }
 
-      const { learningPaths, quizResults } = progressResponse.data;
+      const { learningPaths } = progressResponse.data; // Removed quizResults as it's not used here directly
+
+      // Find the specific learning path progress for the current pathId
+      const currentPathData = learningPaths.find((path: { pathId: string }) => path.pathId === currentPathId);
+      const currentPathProgress = currentPathData?.progress; // Use optional chaining
 
       const progress: Record<string, number> = {};
       modules.forEach((apiModule) => {
         const moduleId = apiModule.id;
-        let isStarted = false;
-        let isCompleted = false;
-        let hasCompletedQuiz = false;
+        let moduleStatus = 0; // Default to 0 (Not Started)
 
-        learningPaths.forEach((path) => {
-          const { learningProgress } = path;
-          if (learningProgress.completedModules.includes(moduleId)) {
-            isCompleted = true;
+        if (currentPathProgress) {
+          if (currentPathProgress.completedModules?.includes(moduleId)) {
+            moduleStatus = 1.0; // Completed
+          } else if (currentPathProgress.completedQuizzes?.some((quizId: string) => quizId.startsWith(moduleId))) {
+             // Assuming quizId format like 'moduleId-quizSuffix'
+             // This logic might need adjustment based on your actual quizId structure
+             // Or check if any completed quiz belongs to this module via another lookup
+             moduleStatus = 0.75; // Quiz Completed
+          } else if (moduleProgress[moduleId] === 0.25) {
+             // Preserve existing 'started' state if backend doesn't track it explicitly
+             // This might be removed if 'start' action reliably updates backend progress
+             moduleStatus = 0.25; // Started (based on previous optimistic update)
           }
-          if (learningProgress.completedQuizzes.some((quizId) => {
-            const quiz = quizResults.find((qr) => qr.quizId === quizId);
-            return quiz?.moduleId === moduleId;
-          })) {
-            hasCompletedQuiz = true;
-          }
-          if (learningProgress.completedModules.includes(moduleId) && !isCompleted) {
-            isStarted = true;
-          }
-        });
-
-        if (isCompleted) {
-          progress[moduleId] = 1.0;
-        } else if (hasCompletedQuiz) {
-          progress[moduleId] = 0.75;
-        } else if (isStarted) {
-          progress[moduleId] = 0.25;
-        } else {
-          progress[moduleId] = 0;
+          // Add more conditions if needed (e.g., based on completedExams)
         }
+        progress[moduleId] = moduleStatus;
       });
 
-      console.log('Calculated progress:', progress);
+      console.log('Calculated progress for current path:', progress);
       setModuleProgress(progress);
+
     } catch (err: any) {
-      console.error('Error in fetchUserProgress:', {
-        message: err.message,
-        code: err.code,
-        response: err.response ? {
-          status: err.response.status,
-          data: err.response.data,
-        } : null,
-        request: err.request ? err.request._header : null,
-      });
+      console.error('Error in fetchUserProgress:', { /* ... error logging ... */ });
       if (isMounted.current) {
-        handleError(err, (msg) => setError(msg || 'Failed to fetch modules or progress. Please check your network and try again.'));
+        handleError(err, (msg) => setError(msg || 'Failed to fetch modules or progress.'));
         setModuleProgress({});
       }
     } finally {
       if (isMounted.current) {
-        console.log('Setting loading to false, final state: loading:', false, 'error:', error, 'modules:', availableModules.length);
+        console.log('Setting loading to false, final state:', { loading: false, error, modules: availableModules.length });
         setLoading(false);
       }
     }
-  };
+  // Add useCallback dependency
+  }, [lastId, moduleProgress]); // Dependency on lastId for pagination, moduleProgress for preserving optimistic updates
 
-  const handleStartLearning = async (moduleId: string) => {
+  // --- useEffect to trigger fetch ---
+  useEffect(() => {
+    console.log('ModulesScreen mounted/context changed:', { activeProviderId, activePathId });
+    isMounted.current = true;
+    // Fetch data when context values are available
+    if (activeProviderId && activePathId) {
+      fetchUserProgress(activeProviderId, activePathId);
+    } else {
+      // Handle case where context is not yet ready or user needs to select path
+      setError("Please select a learning path first.");
+      setLoading(false);
+    }
+
+    return () => {
+      console.log('ModulesScreen unmounting');
+      isMounted.current = false;
+    };
+  // Dependency on context values
+  }, [activeProviderId, activePathId, fetchUserProgress]);
+
+
+  // --- handleStartLearning (using context values) ---
+  const handleStartLearning = useCallback(async (moduleId: string) => {
+    // Use context values directly
+    if (!activeProviderId || !activePathId) {
+        Alert.alert('Error', 'Learning path not selected.');
+        return;
+    }
+
     const userId = await AsyncStorage.getItem('userId');
     console.log('handleStartLearning called with moduleId:', moduleId, 'userId:', userId);
     if (!userId) {
@@ -195,70 +188,59 @@ const ModulesScreen: FC<Props> = () => {
       return;
     }
 
-    if ((moduleProgress[moduleId] ?? 0) === 0) {
-      try {
-        console.log('Posting progress update for moduleId:', moduleId);
-        await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, {
-          resourceType: 'module',
-          resourceId: moduleId,
-          action: 'start',
-          providerId,
-          pathId: route.params,
-        }, {
-          timeout: 5000,
-        });
-        console.log('Progress updated for moduleId:', moduleId);
-        setModuleProgress((prev) => ({ ...prev, [moduleId]: 0.25 }));
-      } catch (err: any) {
-        console.error('Error in handleStartLearning:', {
-          message: err.message,
-          code: err.code,
-          response: err.response ? {
-            status: err.response.status,
-            data: err.response.data,
-          } : null,
-        });
-        handleError(err, setError);
-      }
-    }
-  };
+    // Optimistic update
+    setModuleProgress((prev) => ({ ...prev, [moduleId]: 0.25 }));
 
-  const handleLoadMore = async () => {
+    try {
+      console.log('Posting progress update for moduleId:', moduleId);
+      await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, {
+        resourceType: 'module',
+        resourceId: moduleId,
+        action: 'start',
+        providerId: activeProviderId, // Use context value
+        pathId: activePathId,       // Use context value
+      }, {
+        timeout: 5000,
+      });
+      console.log('Progress updated for moduleId:', moduleId);
+      // No need to set progress again, optimistic update is done
+    } catch (err: any) {
+      console.error('Error in handleStartLearning:', { /* ... error logging ... */ });
+      // Revert optimistic update on error
+      setModuleProgress((prev) => ({ ...prev, [moduleId]: prev[moduleId] === 0.25 ? 0 : prev[moduleId] }));
+      handleError(err, setError);
+    }
+  // Add dependencies for useCallback
+  }, [activeProviderId, activePathId, setModuleProgress, setError]);
+
+
+  // --- handleLoadMore (using context values) ---
+  const handleLoadMore = useCallback(async () => {
+    // Use context values directly
+    if (!activeProviderId || !activePathId) return;
     if (!hasMore || loading) return;
 
     setLoading(true);
     console.log('handleLoadMore called, loading: true');
     try {
-      console.log('Loading more modules with params:', { limit: 20, lastId, providerId });
+      console.log('Loading more modules with params:', { limit: 20, lastId, providerId: activeProviderId, pathId: activePathId });
       const modulesResponse = await axios.get<ListModulesResponse>(`${BASE_URL}/api/v1/modules/list`, {
-        params: { limit: 20, lastId, providerId },
-        timeout: 5000,
+        params: { limit: 20, lastId, providerId: activeProviderId, pathId: activePathId }, // Use context values
+        timeout: 10000, // Increased timeout
       });
 
-      if (!isMounted.current) {
-        console.log('handleLoadMore aborted: component unmounted');
-        return;
-      }
-
-      if (modulesResponse.data.status !== 'success') {
-        throw new Error('Failed to fetch more modules');
-      }
+      if (!isMounted.current) return;
+      if (modulesResponse.data.status !== 'success') throw new Error('Failed to fetch more modules');
 
       const { modules, hasMore: newHasMore, lastId: newLastId } = modulesResponse.data.data;
-      console.log(`Fetched ${modules.length} additional modules for providerId: ${providerId}`);
+      console.log(`Fetched ${modules.length} additional modules`);
       setAvailableModules((prev) => [...prev, ...modules]);
       setHasMore(newHasMore);
       setLastId(newLastId);
-      console.log('Updated state after load more: availableModules:', availableModules.length + modules.length, 'hasMore:', newHasMore, 'lastId:', newLastId);
+      console.log('Updated state after load more:', { modules: availableModules.length + modules.length, hasMore: newHasMore, lastId: newLastId });
+
     } catch (err: any) {
-      console.error('Error loading more modules:', {
-        message: err.message,
-        code: err.code,
-        response: err.response ? {
-          status: err.response.status,
-          data: err.response.data,
-        } : null,
-      });
+      console.error('Error loading more modules:', { /* ... error logging ... */ });
       handleError(err, setError);
     } finally {
       if (isMounted.current) {
@@ -266,32 +248,36 @@ const ModulesScreen: FC<Props> = () => {
         setLoading(false);
       }
     }
-  };
+  // Add dependencies for useCallback
+  }, [loading, hasMore, lastId, activeProviderId, activePathId, setAvailableModules, setHasMore, setLastId, setError]);
 
+
+  // --- Render Logic ---
   console.log('Rendering ModulesScreen, state:', { loading, error, modules: availableModules.length });
 
   if (loading && availableModules.length === 0) {
     console.log('Rendering loading state');
     return (
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} style={styles.loading} />
-      </ScrollView>
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
     );
   }
 
   if (error) {
     console.log('Rendering error state:', error);
-    return <ErrorView message={error} onRetry={fetchUserProgress} />;
+    // Pass fetch function with current context values
+    return <ErrorView message={error} onRetry={() => fetchUserProgress(activeProviderId, activePathId)} />;
   }
 
-  if (availableModules.length === 0) {
+  if (availableModules.length === 0 && !loading) { // Check loading state here too
     console.log('Rendering empty state');
     return (
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={[styles.noModulesText, { color: colors.text }]}>
-          No modules available for {providerId.provider}. Try a different provider or check back later.
+          No modules available for this path yet.
         </Text>
-      </ScrollView>
+      </View>
     );
   }
 
@@ -299,21 +285,29 @@ const ModulesScreen: FC<Props> = () => {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      onScrollEndDrag={() => hasMore && handleLoadMore()}
+      onScrollEndDrag={({ nativeEvent }) => {
+          // Check if near bottom to trigger load more
+          if (nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y >= nativeEvent.contentSize.height - 20) {
+              handleLoadMore();
+          }
+      }}
+      scrollEventThrottle={400} // Adjust frequency as needed
     >
       {availableModules.map((module) => (
         <ModuleCard
           key={module.id}
-          id={module.id}
+          moduleId={module.id}
           title={module.title}
           description={module.description || 'No description available'}
-          imageSource={iconMap[module.id] || iconMap['default']}
+          imageSource={imageMap[module.id] || imageMap['default']}
           progress={moduleProgress[module.id] ?? 0}
-          onStartLearning={handleStartLearning}
+          providerId={activeProviderId || ''} // Pass context value
+          pathId={activePathId || ''}       // Pass context value
+          onStartLearning={() => handleStartLearning(module.id)} // Simplified call
           navigation={navigation}
         />
       ))}
-      {loading && (
+      {loading && availableModules.length > 0 && ( // Show loading indicator at bottom only when loading more
         <ActivityIndicator size="small" color={colors.primary} style={styles.loadingMore} />
       )}
     </ScrollView>
@@ -325,16 +319,14 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  loading: {
-    marginTop: 100,
-  },
+  // Removed loading style, using centered View instead
   loadingMore: {
     marginVertical: 20,
   },
   noModulesText: {
     fontSize: 16,
     textAlign: 'center',
-    marginTop: 50,
+    paddingHorizontal: 20, // Add padding for better text wrapping
   },
 });
 

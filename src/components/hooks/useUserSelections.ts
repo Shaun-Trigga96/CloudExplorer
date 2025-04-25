@@ -1,12 +1,12 @@
 // src/components/hooks/useUserSelections.ts
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios'; // Import AxiosError if needed, but handleError handles 'any'
+import axios from 'axios';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { REACT_APP_BASE_URL } from '@env';
-// Assuming this is the intended error handler based on its signature
 import { handleError } from '../../utils/handleError';
+import { useActiveLearningPath } from '../../context/ActiveLearningPathContext';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -19,27 +19,24 @@ export interface LearningPath {
   logoUrl?: string;
   progress: {
     completionPercentage: number;
-    // Include these if needed by UI, otherwise keep minimal
     completedModules: string[];
     completedQuizzes: string[];
     completedExams: string[];
     score: number;
   };
-  // Add timestamps/completion status as required by the interface
   startedAt: string | null;
   lastAccessedAt: string | null;
   completed: boolean;
   completedAt: string | null;
 }
 
-
 // Type matching the backend response from GET /api/v1/user/:userId/progress
 export interface ApiLearningPath {
   id: string;
   providerId: string;
   pathId: string;
-  name: string; // Backend now includes name
-  logoUrl?: string; // Backend now includes logoUrl
+  name: string;
+  logoUrl?: string;
   progress: {
     completionPercentage: number;
     completedModules: string[];
@@ -47,11 +44,10 @@ export interface ApiLearningPath {
     completedExams: string[];
     score: number;
   };
-  startedAt: string | null; // Timestamps are likely ISO strings
+  startedAt: string | null;
   lastAccessedAt: string | null;
   completed: boolean;
   completedAt: string | null;
-  // Include totals if backend sends them
   totalModules?: number;
   totalQuizzes?: number;
   totalExams?: number;
@@ -65,7 +61,7 @@ interface UserProgressResponse {
     overallProgress: {
       totalModulesCompleted: number;
       totalQuizzesCompleted: number;
-      totalExamsCompleted: number; // Added based on backend
+      totalExamsCompleted: number;
       totalScore: number;
     };
   };
@@ -77,7 +73,7 @@ interface StartPathResponse {
     message: string;
     data: {
         learningPathId: string;
-        activePath: { // Backend returns the active path info
+        activePath: {
             id: string;
             providerId: string;
             pathId: string;
@@ -98,30 +94,30 @@ interface ActivatePathResponse {
     };
 }
 
-
 export const useUserSelections = (
   navigation: NativeStackNavigationProp<RootStackParamList>
 ) => {
-  // State now uses the more detailed LearningPath type
+  // Get access to the ActiveLearningPathContext
+  const activeLearningPathContext = useActiveLearningPath();
+  
   const [activeLearningPath, setActiveLearningPath] = useState<LearningPath | null>(null);
   const [allLearningPaths, setAllLearningPaths] = useState<LearningPath[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null); // Store userId
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Fetch User ID effect
   useEffect(() => {
     const loadUserId = async () => {
       try {
         const storedUserId = await AsyncStorage.getItem('userId');
-        console.log('')
         if (storedUserId) {
           setUserId(storedUserId);
           console.log('[useUserSelections] User ID loaded:', storedUserId);
         } else {
           console.warn('[useUserSelections] User ID not found in storage.');
           setError('User ID not found. Please log in.');
-          navigation.navigate('Auth'); // Redirect if no user ID
+          navigation.navigate('Auth');
         }
       } catch (e) {
         console.error('[useUserSelections] Error loading userId:', e);
@@ -131,13 +127,10 @@ export const useUserSelections = (
     loadUserId();
   }, [navigation]);
 
-
   // --- Fetch User's Learning Paths ---
   const fetchSelections = useCallback(async () => {
-    // Don't fetch if userId isn't loaded yet
     if (!userId) {
       console.log('[useUserSelections] Waiting for userId to fetch selections...');
-      // Set loading true only if userId exists but data isn't fetched yet
       if (!loading && allLearningPaths.length === 0) setLoading(true);
       return;
     }
@@ -147,10 +140,10 @@ export const useUserSelections = (
     setError(null);
     try {
       const response = await axios.get<UserProgressResponse>(
-        `${BASE_URL}/api/v1/user/${userId}/progress` // Use the stored userId
+        `${BASE_URL}/api/v1/user/${userId}/progress`
       );
       console.log('[useUserSelections] Progress response status:', response.data.status);
-      console.log('[useUserSelections] Progress response data:', JSON.stringify(response.data.data, null, 2)); // Detailed log
+      console.log('[useUserSelections] Progress response data:', JSON.stringify(response.data.data, null, 2));
 
       if (response.data.status !== 'success') {
         throw new Error(response.data.data?.toString() || 'Failed to fetch user progress');
@@ -158,29 +151,24 @@ export const useUserSelections = (
 
       if (!response.data.data.userExists) {
         console.warn('[useUserSelections] User does not exist according to backend, navigating to Auth');
-        // Maybe clear userId from storage?
-        // await AsyncStorage.removeItem('userId');
         navigation.navigate('Auth');
         return;
       }
 
       // Transform API paths to the format expected by components
       const fetchedPaths: LearningPath[] = response.data.data.learningPaths.map((path) => ({
-        id: path.id, // Use the learning path instance ID from backend
-        name: path.name || `Path ${path.pathId}`, // Use name from backend
+        id: path.id,
+        name: path.name || `Path ${path.pathId}`,
         providerId: path.providerId,
         pathId: path.pathId,
-        logoUrl: path.logoUrl, // Use logoUrl from backend
+        logoUrl: path.logoUrl,
         progress: {
-          // Use percentage directly from backend if available, otherwise default
           completionPercentage: path.progress?.completionPercentage ?? 0,
-          // Map other progress details if needed by UI
           completedModules: path.progress?.completedModules || [],
           completedQuizzes: path.progress?.completedQuizzes || [],
           completedExams: path.progress?.completedExams || [],
           score: path.progress?.score || 0,
         },
-        // *** FIX: Add the missing properties from the ApiLearningPath ***
         startedAt: path.startedAt,
         lastAccessedAt: path.lastAccessedAt,
         completed: path.completed,
@@ -193,14 +181,24 @@ export const useUserSelections = (
       const mostRecentPath = fetchedPaths.length > 0 ? fetchedPaths[0] : null;
       setActiveLearningPath(mostRecentPath);
 
+      // Update ActiveLearningPathContext with the active path details
+      if (mostRecentPath) {
+        activeLearningPathContext.setActivePath(
+          mostRecentPath.providerId,
+          mostRecentPath.pathId
+        );
+        console.log('[useUserSelections] Updated ActiveLearningPathContext:', {
+          providerId: mostRecentPath.providerId,
+          pathId: mostRecentPath.pathId
+        });
+      }
+
       console.log(
         `[useUserSelections] Fetched ${fetchedPaths.length} learning paths. Active path ID: ${mostRecentPath?.id}`
       );
     } catch (err: any) {
       console.error('[useUserSelections] Error fetching selections:', err);
-      // *** FIX: Call handleError correctly (it sets error state internally) ***
       handleError(err, setError);
-      // Avoid navigating away if it's just a fetch error, unless it's specifically a 401/403
       if (err.response?.status === 401 || err.response?.status === 403) {
          console.warn('[useUserSelections] Unauthorized access, navigating to Auth');
          navigation.navigate('Auth');
@@ -208,57 +206,53 @@ export const useUserSelections = (
     } finally {
       setLoading(false);
     }
-  }, [userId, navigation]); // Depend on userId
+  }, [userId, navigation, activeLearningPathContext]);
 
   // Effect to trigger fetchSelections when userId is available
   useEffect(() => {
     if (userId) {
       fetchSelections();
     }
-  }, [userId, fetchSelections]); // Run when userId changes or fetchSelections definition changes
-
+  }, [userId, fetchSelections]);
 
   // --- Start a New Learning Path ---
   const startNewPath = useCallback(
-    async (providerId: string, pathId: string): Promise<void> => { // Return Promise<void>
+    async (providerId: string, pathId: string): Promise<void> => {
       if (!userId) {
         console.error('[useUserSelections] Cannot start path: userId is null');
         throw new Error('User session is not available. Please log in.');
       }
-      setError(null); // Clear previous errors
+      setError(null);
       console.log(`[useUserSelections] Attempting to start path: userId=${userId}, providerId=${providerId}, pathId=${pathId}`);
 
       try {
-        // Call the CORRECT backend endpoint
         const response = await axios.post<StartPathResponse>(
-          `${BASE_URL}/api/v1/user/${userId}/paths`, // Correct endpoint
-          { providerId, pathId } // Correct body
+          `${BASE_URL}/api/v1/user/${userId}/paths`,
+          { providerId, pathId }
         );
 
         console.log('[useUserSelections] Start path response status:', response.data.status);
         console.log('[useUserSelections] Start path response data:', response.data.data);
 
         if (response.data.status !== 'success') {
-          // Throw error with message from backend if available
           throw new Error(response.data.message || 'Server responded with an error');
         }
 
-        // Backend handles creating or activating. Refresh selections to get the latest state.
-        await fetchSelections();
+        // Update the ActiveLearningPathContext before fetching
+        activeLearningPathContext.setActivePath(providerId, pathId);
+        console.log('[useUserSelections] Updated context after starting new path:', { providerId, pathId });
 
-        // No need for optimistic update here, fetchSelections will update the state correctly.
-        // The HomeScreen will navigate based on the refreshed state from fetchSelections.
+        // Refresh selections to get updated data
+        await fetchSelections();
 
       } catch (err: any) {
         console.error('[useUserSelections] Error starting new path:', err);
-        // *** FIX: Call handleError correctly ***
-        handleError(err, setError); // Show alert, set state
-        // Re-throw a generic message or derive one if needed for the calling component
+        handleError(err, setError);
         const messageForThrow = (err instanceof Error ? err.message : null) || 'Failed to start learning path';
         throw new Error(messageForThrow);
       }
     },
-    [userId, fetchSelections] // Depend on userId and fetchSelections
+    [userId, fetchSelections, activeLearningPathContext]
   );
 
   // --- Set an Existing Path as Active ---
@@ -272,9 +266,15 @@ export const useUserSelections = (
       console.log(`[useUserSelections] Setting active path: userId=${userId}, learningPathId=${learningPathId}`);
 
       try {
+        // Find the path details before making the API call
+        const pathToActivate = allLearningPaths.find(path => path.id === learningPathId);
+        if (!pathToActivate) {
+          console.error(`[useUserSelections] Path with ID ${learningPathId} not found in allLearningPaths`);
+          throw new Error('Learning path not found');
+        }
+
         const response = await axios.post<ActivatePathResponse>(
-          `${BASE_URL}/api/v1/user/${userId}/paths/${learningPathId}/activate` // Correct endpoint
-          // No body needed for this request based on the backend controller
+          `${BASE_URL}/api/v1/user/${userId}/paths/${learningPathId}/activate`
         );
 
         console.log('[useUserSelections] Set active path response status:', response.data.status);
@@ -283,41 +283,49 @@ export const useUserSelections = (
           throw new Error(response.data.message || 'Server responded with an error');
         }
 
-        // Refresh selections to reflect the change in lastAccessedAt and potentially active status
+        // Update ActiveLearningPathContext with path details
+        activeLearningPathContext.setActivePath(
+          pathToActivate.providerId,
+          pathToActivate.pathId
+        );
+        console.log('[useUserSelections] Updated context after activating path:', {
+          providerId: pathToActivate.providerId,
+          pathId: pathToActivate.pathId
+        });
+
+        // Update local state for immediate UI reflection
+        setActiveLearningPath(pathToActivate);
+
+        // Refresh selections to get updated lastAccessedAt and other changes
         await fetchSelections();
 
       } catch (err: any) {
         console.error('[useUserSelections] Error setting active path:', err);
-        // *** FIX: Call handleError correctly ***
-        handleError(err, setError); // Show alert, set state
-        // Re-throw a generic message or derive one if needed for the calling component
+        handleError(err, setError);
         const messageForThrow = (err instanceof Error ? err.message : null) || 'Failed to activate learning path';
         throw new Error(messageForThrow);
       }
     },
-    [userId, fetchSelections]
+    [userId, fetchSelections, allLearningPaths, activeLearningPathContext]
   );
-
 
   // --- Refresh Selections Manually ---
   const refreshSelections = useCallback(() => {
     console.log('[useUserSelections] Manual refresh triggered');
-    if (userId) { // Only refresh if userId is available
+    if (userId) {
         fetchSelections();
     } else {
         console.warn('[useUserSelections] Cannot refresh: userId is null');
     }
-  }, [userId, fetchSelections]); // Depend on userId
-
+  }, [userId, fetchSelections]);
 
   return {
     activeLearningPath,
     allLearningPaths,
     loading,
     error,
-    startNewPath, // Use the corrected function
-    setActivePath, // Expose the new function
-    // Determine hasActivePath based on whether activeLearningPath is set after fetch
+    startNewPath,
+    setActivePath,
     hasActivePath: !!activeLearningPath,
     refreshSelections,
   };

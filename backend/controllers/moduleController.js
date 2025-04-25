@@ -1,23 +1,19 @@
+// c:\Users\thabi\Desktop\CloudExplorer\backend\controllers\moduleController.js
 const admin = require('firebase-admin');
 const AppError = require('../utils/appError');
 
 const db = admin.firestore();
 
-/**
- * Lists modules with pagination and sorting.
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- */
 exports.listModules = async (req, res, next) => {
-  console.log('Fetching modules...');
+  console.log('Fetching modules with query params:', req.query); // Log incoming query params
   try {
     const {
-      limit = 10,
+      limit = 20,
       lastId,
-      orderBy = 'updatedAt',
-      orderDir = 'desc',
-      providerId, // Optional filter for provider (e.g., 'gcp')
+      orderBy = 'order',
+      orderDir = 'asc',
+      providerId,
+      pathId,
     } = req.query;
 
     // --- Input Validation ---
@@ -25,50 +21,70 @@ exports.listModules = async (req, res, next) => {
     if (isNaN(parsedLimit) || parsedLimit <= 0 || parsedLimit > 50) {
       return next(new AppError('Limit must be between 1 and 50', 400, 'INVALID_LIMIT'));
     }
-
-    const validOrderBy = ['title', 'createdAt', 'updatedAt', 'duration'];
+    const validOrderBy = ['title', 'createdAt', 'updatedAt', 'duration', 'order'];
     const validOrderDir = ['asc', 'desc'];
     if (!validOrderBy.includes(orderBy) || !validOrderDir.includes(orderDir)) {
       return next(new AppError('Invalid orderBy or orderDir parameter', 400, 'INVALID_SORT'));
     }
-
     if (lastId && typeof lastId !== 'string') {
       return next(new AppError('lastId must be a valid string', 400, 'INVALID_LAST_ID'));
     }
-
     if (providerId && typeof providerId !== 'string') {
-      return next(new AppError('providerId must be a valid string', 400, 'INVALID_PROVIDER_ID'));
+      return next(new AppError('providerId must be a valid string if provided', 400, 'INVALID_PROVIDER_ID'));
+    }
+    if (pathId && typeof pathId !== 'string') {
+        return next(new AppError('pathId must be a valid string if provided', 400, 'INVALID_PATH_ID'));
     }
 
     // --- Build Query ---
-    let query = db.collection('modules').orderBy(orderBy, orderDir).limit(parsedLimit);
+    let query = db.collection('modules');
 
+    // --- Filters ---
     if (providerId) {
-      query = query.where('providerId', '==', providerId);
+      console.log(`Filtering modules by learningPath.providerId: ${providerId}`);
+      query = query.where('learningPath.providerId', '==', providerId);
+    }
+    if (pathId) {
+        console.log(`Filtering modules by learningPath.pathId: ${pathId}`);
+        query = query.where('learningPath.pathId', '==', pathId);
     }
 
+    // Apply sorting and limit AFTER filtering
+    query = query.orderBy(orderBy, orderDir).limit(parsedLimit);
+
+    // Apply pagination AFTER filtering and sorting
     if (lastId) {
       const lastDocSnapshot = await db.collection('modules').doc(lastId).get();
       if (!lastDocSnapshot.exists) {
         console.warn(`Pagination lastId '${lastId}' not found. Starting from beginning.`);
       } else {
+        console.log(`Paginating modules after document ID: ${lastId}`);
         query = query.startAfter(lastDocSnapshot);
       }
     }
 
     // --- Execute Query ---
+    console.log('Executing Firestore query...'); // Log before executing
     const modulesSnapshot = await query.get();
+    console.log(`Firestore query returned ${modulesSnapshot.docs.length} documents.`); // Log how many docs Firestore returned
+
     const modules = modulesSnapshot.docs.map((doc) => {
       const data = doc.data();
+      // *** ADDED DETAILED LOG ***
+      console.log(`Mapping doc ID: ${doc.id}, Raw data:`, JSON.stringify(data));
+      // *** END ADDED LOG ***
+
+      const learningPathInfo = data.learningPath || {};
+
       return {
         id: doc.id,
         title: data.title || 'Untitled Module',
         description: data.description || null,
-        content: data.content || null,
         duration: data.duration || null,
-        quizzes: data.quizzes || [],
         prerequisites: data.prerequisites || [],
-        providerId: data.providerId,
+        providerId: learningPathInfo.providerId || null,
+        pathId: learningPathInfo.pathId || null,
+        order: data.order ?? null,
         createdAt: data.createdAt?.toDate()?.toISOString() || null,
         updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
       };
@@ -79,7 +95,7 @@ exports.listModules = async (req, res, next) => {
     const hasMore = modules.length === parsedLimit;
 
     // --- Log Success ---
-    console.log(`Fetched ${modules.length} modules for providerId=${providerId || 'all'}, lastId=${lastId || 'none'}`);
+    console.log(`Mapped ${modules.length} modules (orderBy=${orderBy}, orderDir=${orderDir}) for providerId=${providerId || 'all'}, pathId=${pathId || 'all'}, lastId=${lastId || 'none'}`);
 
     // --- Send Response ---
     res.status(200).json({
@@ -94,55 +110,44 @@ exports.listModules = async (req, res, next) => {
     console.error('Error listing modules:', {
       message: error.message,
       code: error.code,
-      stack: error.stack,
+      query: req.query
     });
+    if (error.code === 'FAILED_PRECONDITION' && error.message.includes('index')) {
+         console.error("Firestore index missing for the query:", error.message);
+         // IMPORTANT: Check your function logs for a URL to create the index!
+         return next(new AppError(`Database query requires a composite index. Please create it in Firestore (check function logs for a link!). The query likely involves filtering on 'learningPath.providerId'/'learningPath.pathId' and ordering by '${orderBy}'. Error: ${error.message}`, 500, 'DB_INDEX_REQUIRED'));
+    }
     return next(new AppError(`Failed to list modules: ${error.message}`, 500, 'DB_FETCH_ERROR'));
   }
 };
 
-/**
-* Retrieves a module by its ID.
-* @param {Object} req - Express request object
-* @param {Object} res - Express response object
-* @param {Function} next - Express next middleware function
-*/
-
+// --- getModuleById remains unchanged ---
 exports.getModuleById = async (req, res, next) => {
  try {
    const { moduleId } = req.params;
-
-   // --- Input Validation ---
    if (!moduleId || typeof moduleId !== 'string') {
      return next(new AppError('Valid moduleId parameter is required', 400, 'INVALID_MODULE_ID_PARAM'));
    }
-
-   // --- Fetch Module ---
    const moduleDoc = await db.collection('modules').doc(moduleId).get();
-
    if (!moduleDoc.exists) {
      return next(new AppError(`Module with ID ${moduleId} not found`, 404, 'MODULE_NOT_FOUND'));
    }
-
    const data = moduleDoc.data();
-
-   // --- Construct Response ---
+   const learningPathInfo = data.learningPath || {};
    const module = {
      id: moduleDoc.id,
      title: data.title || 'Untitled Module',
      description: data.description || null,
-     content: data.content || null,
      duration: data.duration || null,
      quizzes: data.quizzes || [],
      prerequisites: data.prerequisites || [],
-     providerId: data.providerId || null,
+     providerId: learningPathInfo.providerId || null,
+     pathId: learningPathInfo.pathId || null,
+     order: data.order ?? null,
      createdAt: data.createdAt?.toDate()?.toISOString() || null,
      updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
    };
-
-   // --- Log Success ---
    console.log(`Fetched module ${moduleId}`);
-
-   // --- Send Response ---
    res.status(200).json({
      status: 'success',
      data: module,
@@ -151,40 +156,27 @@ exports.getModuleById = async (req, res, next) => {
    console.error(`Error fetching module ${req.params.moduleId}:`, {
      message: error.message,
      code: error.code,
-     stack: error.stack,
    });
    return next(new AppError(`Failed to fetch module: ${error.message}`, 500, 'DB_FETCH_ERROR'));
  }
 };
 
-/**
- * Retrieves sections for a specific module, sorted by order.
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- */
+// --- getModuleSections remains unchanged ---
 exports.getModuleSections = async (req, res, next) => {
   try {
     const { moduleId } = req.params;
-
-    // --- Input Validation ---
     if (!moduleId || typeof moduleId !== 'string') {
       return next(new AppError('Valid moduleId parameter is required', 400, 'INVALID_MODULE_ID_PARAM'));
     }
-
-    // --- Check Module Existence ---
     const moduleRef = db.collection('modules').doc(moduleId);
     const moduleDoc = await moduleRef.get();
     if (!moduleDoc.exists) {
       return next(new AppError(`Module with ID ${moduleId} not found`, 404, 'MODULE_NOT_FOUND'));
     }
-
-    // --- Fetch Sections ---
     const sectionsSnapshot = await moduleRef
       .collection('sections')
       .orderBy('order', 'asc')
       .get();
-
     const sections = sectionsSnapshot.docs.map((doc) => {
       const data = doc.data();
       return {
@@ -192,17 +184,11 @@ exports.getModuleSections = async (req, res, next) => {
         moduleId: data.moduleId || moduleId,
         title: data.title || 'Untitled Section',
         content: data.content || null,
-        order: data.order || 0,
+        order: data.order ?? 0,
         durationEstimate: data.durationEstimate || null,
-        createdAt: data.createdAt?.toDate()?.toISOString() || null,
-        updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
       };
     });
-
-    // --- Log Success ---
-    console.log(`Fetched ${sections.length} sections for module ${moduleId}`);
-
-    // --- Send Response ---
+    console.log(`Fetched ${sections.length} sections for module ${moduleId}, ordered by 'order'`);
     res.status(200).json({
       status: 'success',
       data: sections,
@@ -211,7 +197,6 @@ exports.getModuleSections = async (req, res, next) => {
     console.error(`Error fetching sections for module ${req.params.moduleId}:`, {
       message: error.message,
       code: error.code,
-      stack: error.stack,
     });
     return next(new AppError(`Failed to fetch sections: ${error.message}`, 500, 'DB_FETCH_ERROR'));
   }

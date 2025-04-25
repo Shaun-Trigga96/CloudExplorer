@@ -84,7 +84,6 @@ const AppError = require('./utils/appError');
 // --- Route Imports ---
 const userRoutes = require('./routes/userRoutes');
 const moduleRoutes = require('./routes/moduleRoutes');
-const docRoutes = require('./routes/docRoutes');
 const examRoutes = require('./routes/examRoutes');
 const quizRoutes = require('./routes/quizRoutes'); // Added
 const appRoutes = require('./routes/appRoutes'); // Added
@@ -113,14 +112,12 @@ app.use(express.urlencoded({extended: true, limit: '50kb'}));
 app.use('/api/v1', appRoutes); // General: /api/v1/health
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/modules', moduleRoutes);
-app.use('/api/v1/docs', docRoutes);
 app.use('/api/v1/quizzes', quizRoutes); // Added: /api/v1/quizzes/...
 app.use('/api/v1/exams', examRoutes); // Added/Updated: /api/v1/exams/...
 app.use('/api/v1/email', emailRoutes); // Mount email routes under /api/v1/email
 app.use('/api/v1/credly', credlyRoutes);
 app.use('/api/v1/community', communityRoutes); // <-- Add community routes
 app.use('/api/v1', providerPathRoutes);
-app.use('/api/v1', require('./routes/appRoutes')); // General routes like /health
 
 // --- Health Check Route ---
 app.get('/health', (req, res) => {
