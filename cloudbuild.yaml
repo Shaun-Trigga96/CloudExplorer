@@ -76,19 +76,21 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'cloud-explorer-backend' # Consider 'cloud-explorer-backend-dev' for non-prod
+      - 'cloud-explorer-backend'
       - '--image'
       - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
       - '--region'
-      - 'us-central1' # Or your preferred/newly configured build region
+      - 'us-central1'
       - '--platform'
       - 'managed'
-      - '--port'  
-      - '5000'    # <-- Specify the port your app listens on
-      # Removed explicit PORT env var as it's automatically set by Cloud Run
+      - '--port'
+      - '5000'
       - '--allow-unauthenticated'
       - '--timeout'
-      - '300s'  # <-- Increased startup timeout
+      - '600s'
+      - '--set-env-vars'
+      - 'NODE_ENV=production'
+      - '--health-check-path=/health'  # Add health check
 
   # 5. Build React Native app for Android
   - name: 'gcr.io/cloud-builders/docker'
@@ -122,16 +124,16 @@ steps:
       - 'android/app/build/outputs/apk/release/app-release.apk'
       - 'gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk'
 
-  # # 7. Update Firestore with new app version info # <--- STEP 7 COMMENTED OUT
-  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  #   id: 'update-app-version'
-  #   entrypoint: 'bash'
-  #   args:
-  #     - '-c'
-  #     - |
-  #       npm install -g firebase-tools && \
-  #       firebase firestore:set --project $PROJECT_ID /appVersions/latest --data '{"version": "$COMMIT_SHA", "buildDate": "'$(date -u +'%Y-%m-%dT%H:%M:%SZ')'", "downloadUrl": "gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk"}' --token $_FIREBASE_TOKEN
-  #       # WARNING: Might fail with auth errors. Use --token if needed.
+  # 7. Update Firestore with new app version info # <--- STEP 7 COMMENTED OUT
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'update-app-version'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        npm install -g firebase-tools && \
+        firebase firestore:set --project $PROJECT_ID /appVersions/latest --data '{"version": "$COMMIT_SHA", "buildDate": "'$(date -u +'%Y-%m-%dT%H:%M:%SZ')'", "downloadUrl": "gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk"}' --token $_FIREBASE_TOKEN
+        # WARNING: Might fail with auth errors. Use --token if needed.
 
 # Images to be pushed to Container Registry
 images:

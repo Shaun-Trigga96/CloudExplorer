@@ -19,12 +19,12 @@ COPY . .
 # --- Runtime ---
 # Make port 8080 available to the world outside this container
 # Cloud Run expects containers to listen on port 8080 by default (or the PORT env var)
-EXPOSE 8080
+EXPOSE 5000
 
 # Define the command to run your app using node
 # Assumes your entry point script is named 'server.js'
 CMD [ "node", "server.js" ]
 
 # Optional: Add a basic health check if your app has a health endpoint (e.g., /healthz)
-# HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-#   CMD curl -f http://localhost:8080/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:5000/health || exit 1

@@ -124,6 +124,15 @@ app.get('/health', (req, res) => {
   res.status(200).json({status: 'ok', timestamp: new Date()});
 });
 
+// --- Root Route ---
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Welcome to Cloud Explorer Backend',
+    version: '1.0.0',
+  });
+});
+
 // --- Handle Undefined Routes ---
 app.all('*', (req, res, next) => {
   next(
