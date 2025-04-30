@@ -83,9 +83,13 @@ steps:
       - 'us-central1' # Or your preferred/newly configured build region
       - '--platform'
       - 'managed'
-      - '--port'  # <-- ADD THIS FLAG
+      - '--port'  
       - '5000'    # <-- Specify the port your app listens on
+      - '--set-env-vars'
+      - 'PORT=5000'  # <-- Explicitly set the PORT environment variable
       - '--allow-unauthenticated'
+      - '--timeout'
+      - '300s'  # <-- Increased startup timeout
 
   # 5. Build React Native app for Android
   - name: 'gcr.io/cloud-builders/docker'
@@ -96,7 +100,7 @@ steps:
       - 'gcr.io/$PROJECT_ID/react-native-builder:latest'
       - '-f'
       - 'android/Dockerfile.builder' # Assumes this path is correct
-      - './android'                  # Assumes this context is corrects
+      - './android'                  # Assumes this context is correct
 
   - name: 'gcr.io/$PROJECT_ID/react-native-builder:latest' # Use the image just built
     id: 'build-android-app'
