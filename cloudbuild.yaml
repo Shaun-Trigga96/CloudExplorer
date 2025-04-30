@@ -85,8 +85,7 @@ steps:
       - 'managed'
       - '--port'  
       - '5000'    # <-- Specify the port your app listens on
-      - '--set-env-vars'
-      - 'PORT=5000'  # <-- Explicitly set the PORT environment variable
+      # Removed explicit PORT env var as it's automatically set by Cloud Run
       - '--allow-unauthenticated'
       - '--timeout'
       - '300s'  # <-- Increased startup timeout
