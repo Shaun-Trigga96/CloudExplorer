@@ -125,15 +125,15 @@ steps:
       - 'gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk'
 
   # 7. Update Firestore with new app version info # <--- STEP 7 COMMENTED OUT
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'update-app-version'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        npm install -g firebase-tools && \
-        firebase firestore:set --project $PROJECT_ID /appVersions/latest --data '{"version": "$COMMIT_SHA", "buildDate": "'$(date -u +'%Y-%m-%dT%H:%M:%SZ')'", "downloadUrl": "gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk"}' --token $_FIREBASE_TOKEN
-        # WARNING: Might fail with auth errors. Use --token if needed.
+  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   id: 'update-app-version'
+  #   entrypoint: 'bash'
+  #   args:
+  #     - '-c'
+  #     - |
+  #       npm install -g firebase-tools && \
+  #       firebase firestore:set --project $PROJECT_ID /appVersions/latest --data '{"version": "$COMMIT_SHA", "buildDate": "'$(date -u +'%Y-%m-%dT%H:%M:%SZ')'", "downloadUrl": "gs://$PROJECT_ID-builds/cloud-explorer-$COMMIT_SHA.apk"}' --token $_FIREBASE_TOKEN
+  #       # WARNING: Might fail with auth errors. Use --token if needed.
 
 # Images to be pushed to Container Registry
 images:

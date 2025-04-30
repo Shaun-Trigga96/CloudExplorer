@@ -1,5 +1,5 @@
 # backend/Dockerfile
-FROM node:18-slim
+FROM node:23-slim
 
 # Set the working directory
 WORKDIR /app
