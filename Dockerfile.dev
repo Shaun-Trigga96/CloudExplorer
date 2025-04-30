@@ -42,8 +42,11 @@ RUN chown -R appuser:appuser /app
 # Switch back to the non-root user for running the app
 USER appuser
 
+# Make sure the app listens on the PORT environment variable
+ENV PORT=5000
+
 # Expose the necessary ports
-EXPOSE 19000 19001 19002 8081 8097
+EXPOSE ${PORT}
 
 # Start the application
 CMD ["npm", "run", "start"]
