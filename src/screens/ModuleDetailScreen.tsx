@@ -155,8 +155,42 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
   const { moduleId } = route.params; // Get IDs from route
 
   // --- Use context hook (though values aren't directly used in fetch here, good to have) ---
+  // --- Use context hook (get active path IDs) ---
   const { activeProviderId, activePathId } = useActiveLearningPath();
 
+  // ... rest of the ModuleDetailScreen code ...
+
+  // --- Add navigation handler ---
+  const handleNavigateToQuiz = useCallback(
+    (quizId: string, moduleId: string) => {
+      if (!activeProviderId || !activePathId) {
+        console.error(
+          '[ModuleDetailScreen] Cannot navigate to quiz: Missing activeProviderId or activePathId from context.'
+        );
+        Alert.alert(
+          'Error',
+          'Cannot navigate to quiz: Learning path context is missing.'
+        );
+        return;
+      }
+
+      console.log(`[ModuleDetailScreen] Navigating to QuizzesDetail with params:`, {
+        moduleId: moduleId,
+        providerId: activeProviderId, // Pass activeProviderId
+        pathId: activePathId, // Pass activePathId
+        quizId: quizId,
+      });
+
+      navigation.navigate('QuizzesDetail', {
+        moduleId: moduleId, // Keep passing moduleId
+        providerId: activeProviderId, // Pass activeProviderId
+        pathId: activePathId, // Pass activePathId
+        quizId: quizId, // Pass quizId
+      });
+    },
+    [activeProviderId, activePathId, navigation]
+  );
+  
   const fadeAnim = useSharedValue(0);
 
   const sectionRefs = useRef<React.RefObject<View>[]>([]);
@@ -209,13 +243,6 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
         { timeout: 10000 }
       );
       console.log(`[ModuleDetailScreen] Fetched Sections Response for module ${moduleId}:`, JSON.stringify(sectionsResponse.data, null, 2));
-
-      // --- Adjust data access based on actual API response ---
-      // Example: If response is { status: 'success', data: [...] }
-      //const fetchedSections = sectionsResponse.data?.data || []; // <--- Commented out, good
-      // Example: If response is { status: 'success', data: { sections: [...] } }
-      // Change this:
-      // const fetchedSections = sectionsResponse.data?.data || []; // INCORRECT
 
       // To this:
       const fetchedSections = sectionsResponse.data?.data || []; // CORRECT for { status: '...', data: [...] }
@@ -415,6 +442,8 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
     return <ErrorView message={error} onRetry={handleRetry} />;
   }
 
+  
+
   // --- Render main content ---
   console.log(`[ModuleDetailScreen] Rendering main content. Sections count: ${sections.length}`);
   return (
@@ -459,7 +488,6 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
               <SectionCard
                 key={section.id || `section-${index}`} // Use section.id if available
                 title={section.title || `Section ${index + 1}`}
-                // Pass content, ensuring it's not null/undefined before processing
                 content={preprocessMarkdownWithIcons(section.content || '', colors)}
                 isRead={sectionsRead[index] || false}
                 fadeAnim={fadeAnim} // Pass the shared value directly

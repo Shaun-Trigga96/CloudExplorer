@@ -7,8 +7,9 @@ export interface Answer {
   uniqueKey?: string;
 }
 
+// src/types/exam.ts (partial update for the Question interface)
 export interface Question {
-  id: number;
+  id: string; // Changed from number to string for consistency
   explanation: string[];
   answers: Answer[];
   question: string;
@@ -19,33 +20,44 @@ export interface Question {
 export interface Exam {
   examId: string;
   title: string;
-  providerId: string; // ADDED
-  pathId: string;     // ADDED
+  providerId: string;
+  pathId: string;
   description: string;
-  duration: number | null;
+  duration: number | null; // Duration in minutes
   prerequisites: string[];
   associatedModules?: string[];
-  questions?: Question[];
+  questions?: Question[]; // Optional if fetched separately
   questionsGeneratedAt?: Timestamp | FieldValue;
   createdAt?: Timestamp | FieldValue;
   updatedAt?: Timestamp | FieldValue;
-  passingRate: number;
+  passingRate: number; // Percentage (e.g., 70)
   icon: any;
+  numberOfQuestions?: number; // --- ADDED (Optional if API might not send it) ---
 }
-
+// Update ExamResult passingScore source if needed
 export interface ExamResult {
-  totalQuestions: number;
-  correctAnswers: number;
-  score: number;
-  isPassed: boolean;
-  timestamp?: any;
-  answeredQuestions: {
-    question: string;
-    userAnswer: string;
-    correctAnswer: string;
-    isCorrect: boolean;
-    explanation: string;
+  examId: string;
+  providerId: string;
+  pathId: string;
+  userId: string;
+  score: number; // Raw score (correct answers)
+  percentage: number; // Calculated percentage
+  passed: boolean;
+  answers: Record<string, string>;
+  startTime?: any;
+  endTime?: any;
+  timeSpent?: number; // in seconds
+  timestamp?: any; // Completion timestamp
+  // Add answeredQuestions if needed for review within ResultCard
+  answeredQuestions?: {
+      question: string;
+      userAnswer: string;
+      correctAnswer: string;
+      isCorrect: boolean;
+      explanation: string;
   }[];
+  // Add passingScore if needed directly on result object
+  passingScore?: number; // Percentage threshold
 }
 
 export interface ExamTimingData {

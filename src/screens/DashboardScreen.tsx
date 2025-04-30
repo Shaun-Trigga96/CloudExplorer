@@ -1,6 +1,6 @@
 // c:\Users\thabi\Desktop\CloudExplorer\src\screens\DashboardScreen.tsx
 import React, { FC, useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, ImageSourcePropType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,7 +31,7 @@ import { imageMapRecord } from '../utils/imageMap';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
-const examIcons: Record<string, any> = {
+const examIcons: { [key: string]: ImageSourcePropType } = {
   'cloud-digital-leader-exam': require('../assets/images/cloud-digital-leader.png'),
   // Add other exam icons if needed
 };
@@ -46,9 +46,6 @@ interface DashboardScreenProps {
   // Navigation prop might still be needed if navigating *from* Dashboard
   navigation: NativeStackNavigationProp<RootStackParamList, 'MainApp'>; // Changed to MainApp as it's within TabNavigator
 }
-
-// --- Removed Route Prop Type ---
-// type DashboardScreenRouteProp = RouteProp<RootStackParamList, 'DashboardScreen'>;
 
 // --- Default State Values ---
 const defaultOverallProgress: OverallProgress = {
@@ -73,11 +70,6 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
   // --- Get active path from context ---
   const { activeProviderId, activePathId } = useActiveLearningPath();
 
-  // --- Removed route and route.params access ---
-  // const route = useRoute<DashboardScreenRouteProp>();
-  // const providerId = route.params?.providerId;
-  // const pathId = route.params?.pathId;
-
   // --- Fetch User Data (Updated) ---
   const fetchUserData = useCallback(async (currentProviderId: string, currentPathId: string) => {
     setLoading(true);
@@ -91,8 +83,6 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
     try {
       const storedUserId = await AsyncStorage.getItem('userId');
       if (!storedUserId) {
-        // Consider navigating to Auth via RootNavigator if needed
-        // navigation.navigate('Auth'); // This might not work correctly from inside TabNavigator
         console.error("[DashboardScreen] User ID not found, cannot fetch data.");
         setErrorInfo({ message: 'User session not found. Please log in again.', isIndexError: false });
         setLoading(false);
@@ -230,7 +220,7 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
         title = item.title;
         // providerIdForNav = item.providerId || undefined; // No longer needed from item
         // pathIdForNav = item.pathId || undefined;       // No longer needed from item
-        imageIcon = examIcons[item.examId] || imageMapRecord['default'];
+        imageIcon = examIcons[item.examId] || examIcons['default'];
         color = examColors[item.examId] || '#3b82f6';
       }
     }

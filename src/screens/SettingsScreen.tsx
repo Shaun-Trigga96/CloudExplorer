@@ -22,6 +22,7 @@ import { useCustomTheme } from '../context/ThemeContext';
 import {REACT_APP_BASE_URL} from '@env';
 import Sound from 'react-native-sound'; // Import react-native-sound
 import { darkColors, lightColors } from '../styles/colors';
+import DashboardScreen from './DashboardScreen';
 
 const BASE_URL = REACT_APP_BASE_URL;
 

@@ -9,7 +9,7 @@ import { Question } from '../../types/exam';
 interface QuestionCardProps {
   question: Question;
   userAnswer: string | undefined;
-  onAnswerSelect: (questionId: number, answerLetter: string) => void;
+  onAnswerSelect: (questionId: string, answerLetter: string) => void; // Changed from number to string
 }
 
 const QuestionCard: React.FC<QuestionCardProps> = ({ question, userAnswer, onAnswerSelect }) => {
@@ -23,13 +23,13 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, userAnswer, onAns
           {question.question}
         </Text>
         <RadioButton.Group
-          onValueChange={value => onAnswerSelect(question.id, value)}
+          onValueChange={value => onAnswerSelect(question.id.toString(), value)} // Convert id to string if needed
           value={userAnswer || ''}
         >
           {question.answers.map(answer => (
             <TouchableOpacity
               key={answer.uniqueKey}
-              onPress={() => onAnswerSelect(question.id, answer.letter)}
+              onPress={() => onAnswerSelect(question.id.toString(), answer.letter)} // Convert id to string if needed
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',

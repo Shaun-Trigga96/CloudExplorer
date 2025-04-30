@@ -7,15 +7,15 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useCustomTheme } from '../context/ThemeContext';
 import { darkColors, lightColors } from '../styles/colors';
-import { useExam } from '../components/hooks/useExamDetail';
-import { useTimer } from '../components/hooks/useTimer';
+import { useExamDetail } from '../components/hooks/useExamDetail'; // FIX: Correct import path
+import { useTimer } from '../components/hooks/useTimer'; // Assuming useTimer is correctly implemented
 import {
   ExamStartCard,
   ExamHeader,
   QuestionCard,
   QuestionNavigator,
   ResultCard,
-} from '../components/examDetail';
+} from '../components/examDetail'; // Corrected import path if needed
 import { examDetailsStyles } from '../styles/examDetailsStyles';
 import { ErrorView, LoadingView } from '../components/common';
 
@@ -28,88 +28,102 @@ interface ExamDetailsScreenProps {
 }
 
 const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation }) => {
-  const { examId, title } = route.params;
+  // --- FIX 1: Get ALL required params from route ---
+  const { examId, title: routeTitle, providerId, pathId } = route.params;
+  // Renamed 'title' to 'routeTitle' to avoid conflict with examMeta.title
+
   const { isDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors;
 
+  // --- FIX 2: Correct hook usage with all params ---
   const {
+    examMeta,
     questions,
     loading,
     error,
-    retryCount,
+    userIdError, // Destructure userIdError
     userAnswers,
     currentQuestionIndex,
     examCompleted,
     examResult,
     examStarted,
     examTiming,
-    setUserAnswers,
-    setCurrentQuestionIndex,
-    setExamCompleted,
-    setExamStarted,
-    fetchExamQuestions,
     submitExam,
     startExam,
-    handleAnswerSelection,
+    handleAnswerSelection, // Use the correct handler from hook
     navigateToNextQuestion,
     navigateToPreviousQuestion,
     navigateToQuestion,
-  } = useExam(examId, navigation);
+    refetchExamData, // Use the correct refetch function
+  } = useExamDetail(examId, providerId, pathId, navigation); // Pass all params correctly
 
-  const { timeLeft, formatTime, timerColor, setTimeLeft } = useTimer(
+  // --- FIX 3: Timer Hook (Pass duration from meta) ---
+  const { timeLeft, formatTime, timerColor  } = useTimer( // setTimeLeft likely not needed here
     examStarted,
     examCompleted,
     examTiming,
-    submitExam,
+    submitExam, // Pass submitExam from useExamDetail hook
     colors,
   );
 
+  // --- Loading State ---
   if (loading) {
-    return <LoadingView message="Loading exam questions..." />;
+    return <LoadingView message="Loading exam..." />;
   }
 
-  if (error) {
+  // --- FIX 4: Handle userIdError ---
+  if (userIdError) {
     return (
       <ErrorView
-        message={error}
-        onRetry={fetchExamQuestions}
-        troubleshooting={retryCount > 2 ? [
-          'Check your internet connection',
-          'Make sure your backend server is running',
-          'Check if your server is accessible from your device',
-        ] : undefined}
+        message={userIdError}
+        // No retry needed for userIdError, usually requires re-login/app restart
       />
     );
   }
 
+  // --- FIX 5: Error State (Use refetchExamData, remove retryCount) ---
+  if (error) {
+    return (
+      <ErrorView
+        message={error}
+        onRetry={refetchExamData} // Use the correct retry function
+        // Removed troubleshooting/retryCount logic
+      />
+    );
+  }
+
+  // --- FIX 6: Use examMeta.title when available ---
+  const displayTitle = examMeta?.title || routeTitle || 'Exam'; // Fallback title
+
+  // --- Results View ---
   if (examCompleted && examResult) {
+    // Calculate time spent based on duration and timeLeft
+    const totalDurationSeconds = examMeta?.duration ? examMeta.duration * 60 : null;
+    const timeSpentSeconds = totalDurationSeconds !== null ? totalDurationSeconds - timeLeft : null;
+
     return (
       <ScrollView style={[examDetailsStyles.container, { backgroundColor: colors.background }]}>
+        {/* --- FIX 7: Update ResultCard props --- */}
         <ResultCard
           result={examResult}
-          startTime={examTiming ? new Date(examTiming.startTime) : null}
-          timeSpent={7200 - timeLeft}
-          formatTime={formatTime}
+          timeSpent={timeSpentSeconds ?? 0} // Pass calculated time spent in seconds or use 0 as a default value
+          formatTime={formatTime} // Pass the formatter
+          title={displayTitle} // Use consistent title
+          passingScore={examMeta?.passingRate} // Pass passing score from meta
         />
         <View style={examDetailsStyles.buttonContainer}>
           <Button
             mode="contained"
-            onPress={() => navigation.navigate('Home')}
+            onPress={() => navigation.goBack()} // Go back instead of Home? Or navigate('ExamsScreen')?
             style={{ flex: 1, marginHorizontal: 8, backgroundColor: colors.primary }}
             labelStyle={{ color: colors.buttonText }}
           >
             Back to Exams
           </Button>
+          {/* --- FIX 8: Simplify Retake logic --- */}
           <Button
             mode="outlined"
-            onPress={() => {
-              setExamCompleted(false);
-              setUserAnswers({});
-              setCurrentQuestionIndex(0);
-              setTimeLeft(7200);
-              setExamStarted(false);
-              fetchExamQuestions();
-            }}
+            onPress={refetchExamData} // Call refetch which handles state reset and data fetching
             style={{ flex: 1, marginHorizontal: 8, borderColor: colors.primary }}
             labelStyle={{ color: colors.primary }}
           >
@@ -120,12 +134,15 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
     );
   }
 
+  // --- Start Screen View ---
   if (!examStarted) {
     return (
       <View style={[examDetailsStyles.startScreenContainer, { backgroundColor: colors.background }]}>
+        {/* --- FIX 9: Update ExamStartCard props --- */}
         <ExamStartCard
-          title={title}
-          questionCount={questions.length}
+          title={displayTitle} // Use consistent title
+          questionCount={examMeta?.numberOfQuestions ?? questions.length}
+          passingScore={examMeta?.passingRate} // Pass passing score if available
           onStart={startExam}
           onCancel={() => navigation.goBack()}
         />
@@ -133,12 +150,18 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
     );
   }
 
+  // --- Exam Taking View ---
   const currentQuestion = questions[currentQuestionIndex];
+
+  // Handle case where questions might still be empty briefly after loading=false
+  if (!currentQuestion) {
+     return <LoadingView message="Preparing questions..." />;
+  }
 
   return (
     <View style={[examDetailsStyles.container, { backgroundColor: colors.background }]}>
       <ExamHeader
-        title={title}
+        title={displayTitle} // Use consistent title
         timeLeft={timeLeft}
         timerColor={timerColor}
         formatTime={formatTime}
@@ -146,12 +169,14 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
         totalQuestions={questions.length}
       />
       <ScrollView style={examDetailsStyles.questionContainer}>
+        {/* --- FIX 10: Update QuestionCard props --- */}
         <QuestionCard
           question={currentQuestion}
-          userAnswer={userAnswers[currentQuestion.id]}
-          onAnswerSelect={handleAnswerSelection}
+          userAnswer={userAnswers[currentQuestion.id]} // Use string ID
+          onAnswerSelect={handleAnswerSelection} // Use correct handler from hook
         />
       </ScrollView>
+      {/* Navigation Buttons remain largely the same */}
       <View style={[examDetailsStyles.navigationContainer, { backgroundColor: colors.bottomBarBackground, borderTopColor: colors.border }]}>
         <Button
           mode="outlined"
@@ -172,10 +197,11 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
           Next
         </Button>
       </View>
+      {/* --- FIX 11: Update QuestionNavigator props --- */}
       <QuestionNavigator
         questions={questions}
         currentQuestionIndex={currentQuestionIndex}
-        userAnswers={userAnswers}
+        userAnswers={userAnswers} // Pass userAnswers with string keys
         onNavigate={navigateToQuestion}
       />
       <View style={[examDetailsStyles.submitContainer, { backgroundColor: colors.bottomBarBackground, borderTopColor: colors.border }]}>
@@ -184,7 +210,10 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
           onPress={submitExam}
           style={{ paddingVertical: 8, backgroundColor: colors.primary }}
           labelStyle={{ color: colors.buttonText }}
-          loading={examCompleted}
+          // Use submittingResults state from hook if available, otherwise fallback to examCompleted
+          // loading={submittingResults || examCompleted} // Assuming hook provides submittingResults
+          // disabled={submittingResults || examCompleted}
+          loading={examCompleted} // Fallback if submittingResults not exposed
           disabled={examCompleted}
         >
           Submit Exam

@@ -48,11 +48,11 @@ const RootNavigator = () => {
       {/* Screens accessible before/during authentication */}
       <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
-
+     
       {/* Main application screens, grouped under TabNavigator */}
       {/* The 'MainApp' route points to the TabNavigator component */}
       <Stack.Screen name="MainApp" component={TabNavigator} />
-
+      
       {/* Detail Screens - These are pushed on top of the current stack (including tabs) */}
       <Stack.Screen
         name="ModulesScreen"

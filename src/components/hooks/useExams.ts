@@ -4,8 +4,20 @@ import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
 import { Exam } from '../../types/exam';
+import { handleError } from '../../utils/handleError'; // Import error handler
 
 const BASE_URL = REACT_APP_BASE_URL;
+
+// --- Define the correct API response structure ---
+interface ListExamsApiResponse {
+  status: string;
+  data: {
+    exams: any[]; // Use 'any' for now, or define a more specific raw exam type
+    hasMore?: boolean;
+    lastId?: string | null;
+  };
+  message?: string;
+}
 
 interface UseExamsReturn {
   exams: Exam[];
@@ -14,18 +26,21 @@ interface UseExamsReturn {
   loading: boolean;
   error: string | null;
   userIdError: string | null;
-  fetchExamAttempts: (userId: string) => Promise<void>;
   getIconForExam: (examId: string) => any;
+  refetchExams: () => void;
 }
 
-export const useExams = (providerId: string, pathId: string): UseExamsReturn => {
+// Make providerId and pathId potentially null to handle initial state
+export const useExams = (providerId: string | null, pathId: string | null): UseExamsReturn => {
   const [exams, setExams] = useState<Exam[]>([]);
   const [examAttempts, setExamAttempts] = useState<Record<string, number>>({});
   const [examScores, setExamScores] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false); // Start false, set true during fetch
   const [error, setError] = useState<string | null>(null);
   const [userIdError, setUserIdError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null); // Store userId in state
 
+  // --- Get Icon ---
   const getIconForExam = useCallback((examId: string) => {
     const iconMap: { [key: string]: any } = {
       'cloud-digital-leader-exam': require('../../assets/images/cloud-digital-leader.png'),
@@ -34,97 +49,168 @@ export const useExams = (providerId: string, pathId: string): UseExamsReturn => 
     return iconMap[examId] || require('../../assets/images/cloud_generic.png');
   }, []);
 
-  const fetchExamAttempts = async (userId: string) => {
+  // --- Fetch User ID ---
+  useEffect(() => {
+    const loadUserId = async () => {
+      try {
+        const storedUserId = await AsyncStorage.getItem('userId');
+        if (storedUserId) {
+          setUserId(storedUserId);
+          setUserIdError(null); // Clear user ID error if found
+          console.log('[useExams] Loaded userId:', storedUserId);
+        } else {
+          console.warn('[useExams] userId not found in storage.');
+          setUserIdError('User ID not found. Please log in.');
+          setUserId(null); // Ensure userId state is null
+          setExams([]); // Clear exams if no user
+          setExamAttempts({});
+          setExamScores({});
+        }
+      } catch (e) {
+        console.error('[useExams] Failed to load userId from storage:', e);
+        setUserIdError('Failed to load user session.');
+        setUserId(null);
+      }
+    };
+    loadUserId();
+  }, []); // Run only once on mount
+
+  // --- Main Data Fetching Logic ---
+  const fetchExamsAndProgress = useCallback(async () => {
+    // Guard clauses: Don't fetch if required IDs are missing
+    if (!userId) {
+      console.log('[useExams] Skipping fetch: userId is missing.');
+      // Don't set loading if we're not fetching because of missing userId
+      // Ensure userIdError is set if userId is missing after initial load attempt
+      if (!userIdError) setUserIdError('User session not found. Please log in.');
+      setExams([]);
+      setExamAttempts({});
+      setExamScores({});
+      return;
+    }
+     if (!providerId || !pathId) {
+        console.log('[useExams] Skipping fetch: providerId or pathId is missing.');
+        setLoading(false); // Ensure loading is false if path isn't selected
+        setExams([]); // Clear exams if no path selected
+        setExamAttempts({});
+        setExamScores({});
+        setError(null); // Clear previous path errors
+        return;
+     }
+
+    console.log(`[useExams] Fetching exams and progress for user: ${userId}, path: ${providerId}/${pathId}`);
+    setLoading(true);
+    setError(null);
+    setUserIdError(null); // Clear errors at start of fetch
+
     try {
-      setLoading(true);
-      setError(null);
-      const response = await axios.get(`${BASE_URL}/api/v1/exams/progress/${userId}`);
-      if (Array.isArray(response.data.examProgress)) {
+      // --- Fetch Exams for the specific path ---
+      const examsUrl = `${BASE_URL}/api/v1/exams/list-exams`;
+      console.log(`[useExams] Fetching exams from: ${examsUrl} with params:`, { providerId, pathId });
+
+      const examsResponse = await axios.get<ListExamsApiResponse>(examsUrl, {
+        params: { providerId, pathId },
+        timeout: 10000,
+      });
+
+      console.log('[useExams] Raw examsResponse.data:', JSON.stringify(examsResponse.data, null, 2));
+
+      const fetchedExamsData = examsResponse.data?.data?.exams || [];
+
+      const formattedExams: Exam[] = fetchedExamsData.map((exam: any) => ({
+        id: exam.id,
+        examId: exam.id,
+        title: exam.title,
+        description: exam.description,
+        providerId: exam.providerId,
+        pathId: exam.pathId,
+        duration: exam.duration,
+        prerequisites: exam.prerequisites,
+        associatedModules: exam.associatedModules,
+        passingRate: exam.passingRate,
+        icon: getIconForExam(exam.id),
+        numberOfQuestions: exam.numberOfQuestions || 0, // Ensure Exam type has this
+      }));
+      console.log(`[useExams] Fetched and formatted ${formattedExams.length} exams.`);
+      setExams(formattedExams);
+
+      // --- Fetch Exam Progress ---
+      const progressUrl = `${BASE_URL}/api/v1/exams/progress/${userId}`;
+      console.log(`[useExams] Fetching progress from: ${progressUrl}`);
+      const progressResponse = await axios.get<{ examProgress: any[] }>(progressUrl, {
+          timeout: 10000,
+      });
+
+      if (Array.isArray(progressResponse.data?.examProgress)) {
         const attempts: Record<string, number> = {};
         const scores: Record<string, number> = {};
-        response.data.examProgress.forEach((attempt: any) => {
-          attempts[attempt.examId] = (attempts[attempt.examId] || 0) + 1;
-          if (
-            attempt.score !== undefined &&
-            typeof attempt.score === 'number' &&
-            (!scores[attempt.examId] || attempt.score > scores[attempt.examId])
-          ) {
-            scores[attempt.examId] = attempt.score;
+        progressResponse.data.examProgress.forEach((attempt: any) => {
+          if (formattedExams.some(exam => exam.examId === attempt.examId)) {
+              attempts[attempt.examId] = (attempts[attempt.examId] || 0) + 1;
+              if (
+                attempt.score !== undefined &&
+                typeof attempt.score === 'number' &&
+                (!scores[attempt.examId] || attempt.score > scores[attempt.examId])
+              ) {
+                // Store the highest score (assuming attempt.score is percentage 0-100)
+                scores[attempt.examId] = attempt.score;
+              }
           }
         });
+        console.log('[useExams] Calculated attempts:', attempts);
+        console.log('[useExams] Calculated highest scores:', scores);
         setExamAttempts(attempts);
         setExamScores(scores);
       } else {
-        console.warn('No exam progress data found for user:', userId);
+        console.warn('[useExams] No exam progress data found or invalid format for user:', userId, 'Response data:', progressResponse.data);
         setExamAttempts({});
         setExamScores({});
       }
-    } catch (error) {
-      console.error('Error fetching exam attempts:', error);
-      if (axios.isAxiosError(error)) {
-        const axiosError = error as AxiosError;
-        if (axiosError.response?.status === 404) {
-          setExamAttempts({});
-          setExamScores({});
-        } else {
-          setError(
-            axiosError.response
-              ? `Server Error: ${axiosError.response.status} - ${axiosError.response.data || axiosError.response.statusText}`
-              : 'Network error: Unable to connect to server.'
-          );
-        }
-      } else {
-        setError(`An unexpected error occurred: ${error}`);
-      }
+
+    } catch (err: any) {
+      console.error('[useExams] Error fetching data:', err.response?.data || err.message);
+      handleError(err, (msg) => setError(msg || 'Failed to load exam data.'));
+      setExams([]);
+      setExamAttempts({});
+      setExamScores({});
     } finally {
       setLoading(false);
     }
-  };
+  // --- FIX: Remove userIdError from dependencies ---
+  // It's derived state, not an input that should trigger re-fetching directly.
+  // The fetch logic already handles the case where userId is missing.
+  }, [userId, providerId, pathId, getIconForExam]);
+  // --- END FIX ---
 
+  // --- Effect to trigger fetch ---
   useEffect(() => {
-    const fetchUserIdAndExams = async () => {
-      try {
-        const userId = await AsyncStorage.getItem('userId');
-        if (!userId) {
-          setUserIdError('User ID not found. Please log in.');
-          return;
-        }
-        await fetchExamAttempts(userId);
-        setLoading(true);
-        setError(null);
-        const response = await axios.get(`${BASE_URL}/api/v1/exams/list-exams`);
-        const formattedExams: Exam[] = response.data.exams.map((exam: any) => ({
-          examId: exam.id,
-          title: exam.title,
-          description: exam.description,
-          providerId: exam.providerId, // Assuming backend sends this
-          pathId: exam.pathId, 
-          duration: exam.duration,
-          prerequisites: exam.prerequisites,
-          associatedModules: exam.associatedModules,
-          passingRate: exam.passingRate,
-          icon: getIconForExam(exam.id),
-        }));
-        setExams(formattedExams);
-      } catch (err) {
-        console.error('Error fetching exams:', err);
-        if (axios.isAxiosError(err)) {
-          const axiosError = err as AxiosError;
-          setError(
-            axiosError.response
-              ? `Server Error: ${axiosError.response.status} - ${axiosError.response.data || axiosError.response.statusText}`
-              : 'Network error: Unable to connect to server.'
-          );
-        } else {
-          setError(`An unexpected error occurred: ${err}`);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Fetch only when all required IDs are available
+    if (userId && providerId && pathId) {
+      console.log('[useExams] useEffect triggered: Fetching exams and progress.');
+      fetchExamsAndProgress();
+    } else {
+       console.log('[useExams] useEffect triggered: Waiting for required IDs.', { userId, providerId, pathId });
+       // Reset state if IDs become invalid (e.g., path deselected)
+       setExams([]);
+       setExamAttempts({});
+       setExamScores({});
+       setLoading(false); // Ensure loading is false if not fetching
+       // Don't clear userIdError here, it's handled by the userId fetch effect
+    }
+  // --- FIX: Add fetchExamsAndProgress to dependencies ---
+  // Ensures the effect re-runs if the fetch function itself changes (though unlikely with useCallback)
+  }, [userId, providerId, pathId, fetchExamsAndProgress]);
+  // --- END FIX ---
 
-    fetchUserIdAndExams();
-  }, [getIconForExam]);
+  // --- Implement the refetch function ---
+  const refetchExams = useCallback(() => {
+    console.log('[useExams] Manual refetch triggered.');
+    // Simply call the main fetching logic function
+    fetchExamsAndProgress();
+  // --- FIX: Add fetchExamsAndProgress as dependency ---
+  // Ensures refetchExams is stable if fetchExamsAndProgress is stable
+  }, [fetchExamsAndProgress]);
+  // --- END FIX ---
 
   return {
     exams,
@@ -133,7 +219,7 @@ export const useExams = (providerId: string, pathId: string): UseExamsReturn => 
     loading,
     error,
     userIdError,
-    fetchExamAttempts,
     getIconForExam,
+    refetchExams, // Return the implemented function
   };
 };

@@ -75,6 +75,7 @@ function SettingsStackNavigator() {
       <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
       <Stack.Screen name="CertificationsScreen" component={CertificationsScreen} />
       <Stack.Screen name="CommunityScreen" component={CommunityScreen} />
+      <Stack.Screen name="DashboardScreen" component={DashboardScreen} />
       {/* Add other settings-related screens here */}
     </Stack.Navigator>
   );

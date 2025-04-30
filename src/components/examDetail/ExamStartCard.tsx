@@ -1,4 +1,4 @@
-// src/components/examsDetail/ExamStartCard.tsx
+// src/components/examDetail/ExamStartCard.tsx
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Card, Title, Button } from 'react-native-paper';
@@ -8,13 +8,30 @@ import { darkColors, lightColors } from '../../styles/colors';
 interface ExamStartCardProps {
   title: string;
   questionCount: number;
+  durationMinutes?: number | null; // ADDED - Optional duration in minutes
+  passingScore?: number; // ADDED - Optional passing score percentage
   onStart: () => void;
   onCancel: () => void;
 }
 
-const ExamStartCard: React.FC<ExamStartCardProps> = ({ title, questionCount, onStart, onCancel }) => {
+const ExamStartCard: React.FC<ExamStartCardProps> = ({
+  title,
+  questionCount,
+  durationMinutes, // Destructure new prop
+  passingScore, // Destructure new prop
+  onStart,
+  onCancel,
+}) => {
   const { isDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors;
+
+  // Format duration text
+  const durationText = durationMinutes
+    ? `${durationMinutes} Minute${durationMinutes !== 1 ? 's' : ''}`
+    : 'Not specified';
+
+  // Format passing score text
+  const passingScoreText = passingScore !== undefined ? `${passingScore}%` : 'N/A';
 
   return (
     <Card style={{ padding: 8, backgroundColor: colors.surface, borderRadius: 12 }}>
@@ -32,11 +49,13 @@ const ExamStartCard: React.FC<ExamStartCardProps> = ({ title, questionCount, onS
           </View>
           <View style={{ alignItems: 'center' }}>
             <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 4 }}>Time Limit</Text>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>2 Hours</Text>
+            {/* Use the formatted duration text */}
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>{durationText}</Text>
           </View>
           <View style={{ alignItems: 'center' }}>
             <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 4 }}>Passing Score</Text>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>70%</Text>
+            {/* Use the formatted passing score text */}
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>{passingScoreText}</Text>
           </View>
         </View>
         <Text style={{ backgroundColor: colors.examRulesBackground, padding: 16, borderRadius: 8, color: colors.textSecondary, marginBottom: 16, lineHeight: 20 }}>

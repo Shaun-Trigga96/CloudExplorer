@@ -25,6 +25,6 @@ router.get('/progress/:userId', /* protect, */ examController.getExamProgress);
 
 
 // Get a specific exam definition by ID (protect based on user role/enrollment?)
-router.get('/:examId', /* protect, */ examController.getExamById);
+router.get('/:id', /* protect, */ examController.getExamById);
 
 module.exports = router;

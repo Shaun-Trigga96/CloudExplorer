@@ -7,8 +7,6 @@ export interface Quiz {
   questionCount: number;
   icon: any;
   moduleId: string;
-  providerId: string; // ADDED
-  pathId: string;     // ADDED
 }
 
 export interface LearningProgress {
