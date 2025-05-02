@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
 import { Exam } from '../../types/exam';
 import { handleError } from '../../utils/handleError'; // Import error handler
+import { UserProgressData } from '../../types/modules';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -137,14 +138,14 @@ export const useExams = (providerId: string | null, pathId: string | null): UseE
       // --- Fetch Exam Progress ---
       const progressUrl = `${BASE_URL}/api/v1/exams/progress/${userId}`;
       console.log(`[useExams] Fetching progress from: ${progressUrl}`);
-      const progressResponse = await axios.get<{ examProgress: any[] }>(progressUrl, {
+      const progressResponse = await axios.get<UserProgressData>(progressUrl, {
           timeout: 10000,
       });
 
-      if (Array.isArray(progressResponse.data?.examProgress)) {
+      if (Array.isArray(progressResponse.data?.data)) {
         const attempts: Record<string, number> = {};
         const scores: Record<string, number> = {};
-        progressResponse.data.examProgress.forEach((attempt: any) => {
+        progressResponse.data.data.forEach((attempt: any) => {
           if (formattedExams.some(exam => exam.examId === attempt.examId)) {
               attempts[attempt.examId] = (attempts[attempt.examId] || 0) + 1;
               if (

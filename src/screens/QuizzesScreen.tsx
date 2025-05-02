@@ -16,7 +16,6 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import strings from '../localization/strings';
 import QuizCard from '../components/quizzes/QuizCard';
 import { Quiz } from '../types/quiz'; // Keep Quiz type
-// Remove hook import: import { useQuizList } from '../components/hooks/useQuiz';
 import { useCustomTheme } from '../context/ThemeContext';
 import { useActiveLearningPath } from '../context/ActiveLearningPathContext';
 import {imageMap} from '../utils/imageMap';
@@ -24,7 +23,8 @@ import { handleError } from '../utils/handleError'; // Import error handler
 // Import progress response type and helper types
 import {
     UserProgressResponse as ApiUserProgressResponse,
-    UserLearningPath // Assuming UserLearningPath is defined in modules.ts
+    UserLearningPath, // Assuming UserLearningPath is defined in modules.ts
+    UserProgressData
 } from '../types/modules'; // Adjust path if needed
 
 const BASE_URL = REACT_APP_BASE_URL; // Define BASE_URL
@@ -110,12 +110,12 @@ const QuizzesScreen = () => {
       // --- Fetch User Progress ---
       console.log(`[QuizzesScreen] Fetching progress for user: ${currentUserId}`);
       const progressUrl = `${BASE_URL}/api/v1/users/${currentUserId}/progress`;
-      const progressResponse = await axios.get<ApiUserProgressResponse>(progressUrl, {
+      const progressResponse = await axios.get<UserProgressData>(progressUrl, {
         timeout: 10000,
       });
-      console.log('[QuizzesScreen] Raw progressResponse.data:', JSON.stringify(progressResponse.data, null, 2));
+      console.log('[QuizzesScreen] Raw progressResponse.data:', JSON.stringify(progressResponse.data?.data, null, 2));
 
-      const progressDataPayload = progressResponse.data;
+      const progressDataPayload = progressResponse.data.data;
 
       if (!progressDataPayload?.userExists) {
         console.warn('[QuizzesScreen] User progress data not found or user does not exist.');

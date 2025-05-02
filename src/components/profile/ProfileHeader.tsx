@@ -1,6 +1,6 @@
 // src/components/profile/ProfileHeader.tsx
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useCustomTheme } from '../../context/ThemeContext';

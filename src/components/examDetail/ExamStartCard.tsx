@@ -49,7 +49,6 @@ const ExamStartCard: React.FC<ExamStartCardProps> = ({
           </View>
           <View style={{ alignItems: 'center' }}>
             <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 4 }}>Time Limit</Text>
-            {/* Use the formatted duration text */}
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>{durationText}</Text>
           </View>
           <View style={{ alignItems: 'center' }}>

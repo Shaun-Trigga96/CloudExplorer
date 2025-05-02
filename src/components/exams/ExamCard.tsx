@@ -39,7 +39,11 @@ const ExamCard: React.FC<ExamCardProps> = ({ exam, attempts, score, onStart }) =
           <Title style={{ color: colors.text, flex: 1 }}>{exam.title}</Title>
         </View>
         <Paragraph style={{ color: colors.textSecondary }}>{exam.description}</Paragraph>
-        <ExamDetails duration={exam.duration} passingRate={exam.passingRate} />
+        <ExamDetails
+          duration={exam.duration}
+          passingRate={exam.passingRate}
+          questionCount={exam.numberOfQuestions ?? 0} // Provide 0 as default if undefined
+        />
         {attempts > 0 && <ProgressSection attempts={attempts} score={score} />}
       </Card.Content>
       <Card.Actions>

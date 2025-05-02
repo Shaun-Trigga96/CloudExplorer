@@ -14,6 +14,7 @@ const strings = {
       'Test your knowledge with full-length practice exams for Google Cloud certifications. Each exam simulates the actual certification experience.',
     durationLabel: 'Duration',
     minutesSuffix: 'minutes', // Used like: `${duration} ${strings.minutesSuffix}`
+    questionsLabel: 'Questions', // <-- Add this line
     passRateLabel: 'Pass Rate',
     percentSuffix: '%', // Used like: `${rate}${strings.percentSuffix}` or `${score.toFixed(1)}${strings.percentSuffix}`
     previousAttemptsPrefix: 'Previous attempts: ', // Used like: `${strings.previousAttemptsPrefix}${attempts}`

@@ -14,10 +14,5 @@ router.get('/:moduleId', moduleController.getModuleById);
 // Get sections for a specific module
 router.get('/:moduleId/sections', moduleController.getModuleSections);
 
-// Add routes for creating/updating/deleting modules if needed (likely protected)
-// router.post('/', protect, adminOnly, moduleController.createModule);
-// router.put('/:id', protect, adminOnly, moduleController.updateModule);
-// router.delete('/:id', protect, adminOnly, moduleController.deleteModule);
-
 
 module.exports = router;

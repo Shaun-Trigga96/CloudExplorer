@@ -1,5 +1,5 @@
 import React, { FC, useCallback, useEffect, useState, useMemo } from 'react';
-import { View, Text, FlatList, ScrollView, StyleSheet, ActivityIndicator, Platform, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, FlatList, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';

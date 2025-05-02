@@ -8,9 +8,10 @@ import strings from '../../localization/strings';
 interface ExamDetailsProps {
   duration: number | null;
   passingRate: number;
+  questionCount: number; // Add questionCount prop
 }
 
-const ExamDetails: React.FC<ExamDetailsProps> = ({ duration, passingRate }) => {
+const ExamDetails: React.FC<ExamDetailsProps> = ({ duration, passingRate, questionCount }) => { // Destructure questionCount
   const { isDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors;
 
@@ -26,6 +27,12 @@ const ExamDetails: React.FC<ExamDetailsProps> = ({ duration, passingRate }) => {
         <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{strings.passRateLabel}</Text>
         <Text style={[styles.detailValue, { color: colors.text }]}>
           {passingRate ? `${passingRate}${strings.percentSuffix}` : 'N/A'}
+        </Text>
+      </View>
+      <View style={styles.examDetailItem}>
+        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{strings.questionsLabel || 'Questions'}</Text> {/* Add 'Questions' to strings.ts if needed */}
+        <Text style={[styles.detailValue, { color: colors.text }]}>
+          {questionCount ? `${questionCount}${strings.questionsSuffix}` : 'N/A'}
         </Text>
       </View>
     </View>

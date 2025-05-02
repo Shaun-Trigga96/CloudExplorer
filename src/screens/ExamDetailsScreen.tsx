@@ -142,6 +142,7 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
         <ExamStartCard
           title={displayTitle} // Use consistent title
           questionCount={examMeta?.numberOfQuestions ?? questions.length}
+          durationMinutes={examMeta?.duration} // <-- Pass the duration here
           passingScore={examMeta?.passingRate} // Pass passing score if available
           onStart={startExam}
           onCancel={() => navigation.goBack()}

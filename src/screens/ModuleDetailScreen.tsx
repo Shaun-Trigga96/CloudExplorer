@@ -42,32 +42,32 @@ interface ModuleDetailScreenProps {
 }
 
 // --- preprocessMarkdownWithIcons function (with logging) ---
+// Updated preprocessMarkdownWithIcons function
 const preprocessMarkdownWithIcons = (
   content: string,
-  colors: typeof lightColors | typeof darkColors
+  colors: typeof lightColors | typeof darkColors,
+  onLinkPress?: (url: string) => boolean
 ): JSX.Element[] => {
-  // --- ADD LOGGING ---
+  // --- Logging ---
   console.log('[preprocessMarkdown] Received content length:', content?.length || 0);
   if (!content || !content.trim()) { // Check if content is empty or just whitespace
     console.log('[preprocessMarkdown] Content is empty or whitespace, returning fallback.');
     return [
       <Text
-        key="no-content-processed" // Use a different key
+        key="no-content-processed"
         style={{ color: colors.textSecondary, fontSize: 16, textAlign: 'center', fontFamily: 'System', paddingVertical: 20 }}
       >
         No content available for this section.
       </Text>,
     ];
   }
-  // --- END LOGGING ---
 
   const iconRegex = /!\[icon:([a-zA-Z0-9-_]+)\]/g;
   let modifiedContent = content;
   const replacements: { placeholder: string; component: JSX.Element }[] = [];
   const themedMarkdownStyles = createMarkdownStyles(colors);
-  // --- ADD LOGGING ---
+  // --- Logging ---
   console.log('[preprocessMarkdown] Text color from styles:', themedMarkdownStyles?.text?.color);
-  // --- END LOGGING ---
 
   let match;
   let index = 0;
@@ -104,31 +104,34 @@ const preprocessMarkdownWithIcons = (
         replacementIndex++;
       }
     } else if (segment.trim()) { // This check is important
-      // --- ADD LOGGING ---
+      // --- Logging ---
       console.log(`[preprocessMarkdown] Adding Markdown segment ${i}, length: ${segment.length}`);
-      // --- END LOGGING ---
+      
+      // Pass onLinkPress callback to Markdown
       renderedContent.push(
-        <Markdown key={`markdown-${i}`} style={themedMarkdownStyles}>
+        <Markdown 
+          key={`markdown-${i}`} 
+          style={themedMarkdownStyles}
+          onLinkPress={onLinkPress} // Pass the onLinkPress callback
+        >
           {segment}
         </Markdown>
       );
     } else {
-      // --- ADD LOGGING ---
+      // --- Logging ---
       console.log(`[preprocessMarkdown] Skipping empty/whitespace segment ${i}`);
-      // --- END LOGGING ---
     }
   });
 
-  // --- ADD LOGGING ---
+  // --- Logging ---
   console.log('[preprocessMarkdown] Final renderedContent array length:', renderedContent.length);
-  // --- END LOGGING ---
 
   // Return fallback if renderedContent is still empty after processing
   return renderedContent.length > 0
     ? renderedContent
     : [
       <Text
-        key="no-content-after-processing" // Different key again
+        key="no-content-after-processing"
         style={{ color: colors.textSecondary, fontSize: 16, textAlign: 'center', fontFamily: 'System', paddingVertical: 20 }}
       >
         Content processed but resulted in no displayable elements.
@@ -190,6 +193,22 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
     },
     [activeProviderId, activePathId, navigation]
   );
+
+  const handleLinkPress = useCallback(
+    (url: string): boolean => {
+      console.log(`[ModuleDetailScreen] Link pressed: ${url}`);
+      if (url.startsWith('quiz://')) {
+        const quizId = url.substring('quiz://'.length);
+        console.log(`[ModuleDetailScreen] Detected quiz link for quizId: ${quizId}`);
+        handleNavigateToQuiz(quizId, moduleId);
+        return true; // Indicate the link was handled
+      }
+      // Let default handling occur for other links
+      return false;
+    },
+    [handleNavigateToQuiz, moduleId]
+  );
+  
   
   const fadeAnim = useSharedValue(0);
 
@@ -243,6 +262,10 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
         { timeout: 10000 }
       );
       console.log(`[ModuleDetailScreen] Fetched Sections Response for module ${moduleId}:`, JSON.stringify(sectionsResponse.data, null, 2));
+      // --- START DEBUG LOGGING ---
+      console.log(`[ModuleDetailScreen] Type of sectionsResponse.data: ${typeof sectionsResponse.data}`);
+      console.log(`[ModuleDetailScreen] Does sectionsResponse.data have 'data' property? ${sectionsResponse.data?.hasOwnProperty('data')}`);
+      // --- END DEBUG LOGGING ---
 
       // To this:
       const fetchedSections = sectionsResponse.data?.data || []; // CORRECT for { status: '...', data: [...] }
@@ -400,15 +423,24 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
         resourceType: 'module',
         resourceId: moduleId,
         action: 'complete',
+        providerId: activeProviderId, // <-- Add providerId from context
+        pathId: activePathId,       // <-- Add pathId from context
         timestamp: new Date().toISOString(),
       };
       console.log('[ModuleDetailScreen] Completion Payload:', payload);
 
       await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, payload);
 
-      console.log('[ModuleDetailScreen] Module completed successfully. Navigating back.');
+      console.log('[ModuleDetailScreen] Module completed successfully.');
       // Navigate back to the previous screen (likely ModulesScreen or DashboardScreen)
-      navigation.goBack();
+      // navigation.goBack(); // --- REMOVE THIS ---
+
+      // --- ADD NAVIGATION TO QUIZ ---
+      // Assuming a quizId convention like 'moduleId-quiz-1'
+      const quizIdToNavigate = `${moduleId}-quiz-1`; // Adjust if your convention is different!
+      console.log(`[ModuleDetailScreen] Navigating to quiz with assumed ID: ${quizIdToNavigate}`);
+      handleNavigateToQuiz(quizIdToNavigate, moduleId);
+      // --- END NAVIGATION TO QUIZ ---
     } catch (err) {
       console.error('[ModuleDetailScreen] Error completing module:', err);
       handleError(err, setError);
@@ -480,38 +512,54 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
 
         {/* Section Cards */}
         {sections.length > 0 ? (
-          sections.map((section, index) => {
-            // --- ADD LOGGING INSIDE MAP ---
-            console.log(`[ModuleDetailScreen] Rendering SectionCard ${index}, Title: ${section.title}, Has Content: ${!!section.content}`);
-            // --- END LOGGING ---
-            return (
-              <SectionCard
-                key={section.id || `section-${index}`} // Use section.id if available
-                title={section.title || `Section ${index + 1}`}
-                content={preprocessMarkdownWithIcons(section.content || '', colors)}
-                isRead={sectionsRead[index] || false}
-                fadeAnim={fadeAnim} // Pass the shared value directly
-                innerRef={sectionRefs.current[index]}
-              />
-            );
-          })
-        ) : (
-          // Fallback if sections array is empty after fetch
-          <SectionCard
-            title="No Content Available"
-            content={[
-              <Text
-                key="no-sections-found"
-                style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 16, fontFamily: 'System' }}
-              >
-                No sections were found for this module.
-              </Text>,
-            ]}
-            isRead={false}
-            fadeAnim={fadeAnim} // Pass the shared value directly
-            innerRef={React.createRef()}
-          />
-        )}
+  sections.map((section, index) => {
+    console.log(`[ModuleDetailScreen] Rendering SectionCard ${index}, Title: ${section.title}, Has Content: ${!!section.content}`);
+    
+    // Create a specialized link handler for this specific section
+    const sectionLinkHandler = (url: string): boolean => {
+      console.log(`[ModuleDetailScreen] Link pressed in section "${section.title}": ${url}`);
+      return handleLinkPress(url);
+    };
+    
+    // Process content with the link handler
+    const processedContent = preprocessMarkdownWithIcons(
+      section.content || '', 
+      colors,
+      sectionLinkHandler
+    );
+    
+    return (
+      <SectionCard
+        key={section.id || `section-${index}`}
+        title={section.title || `Section ${index + 1}`}
+        content={processedContent}
+        isRead={sectionsRead[index] || false}
+        fadeAnim={fadeAnim}
+        innerRef={sectionRefs.current[index] || React.createRef()}
+        moduleId={moduleId}
+        onNavigateToQuiz={handleNavigateToQuiz}
+      />
+    );
+  })
+) : (
+  // Fallback for empty sections
+  <SectionCard
+    title="No Content Available"
+    content={[
+      <Text
+        key="no-sections-found"
+        style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 16, fontFamily: 'System' }}
+      >
+        No sections were found for this module.
+      </Text>,
+    ]}
+    isRead={false}
+    fadeAnim={fadeAnim}
+    innerRef={React.createRef()}
+    moduleId={moduleId}
+    onNavigateToQuiz={handleNavigateToQuiz}
+  />
+)}
       </ScrollView>
 
       {/* Complete Button */}

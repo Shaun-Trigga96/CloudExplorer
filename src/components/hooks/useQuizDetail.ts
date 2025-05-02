@@ -82,7 +82,7 @@ export const useQuizDetail = (
       if (!response.data.data.moduleTitle && meta.moduleId) {
         try {
             const moduleUrl = `${BASE_URL}/api/v1/modules/${meta.moduleId}`;
-            const moduleRes = await axios.get<ModuleResponse>(moduleUrl, { timeout: 5000 });
+            const moduleRes = await axios.get<ModuleResponse>(moduleUrl, { timeout: 5001 });
             if (moduleRes.data.status === 'success') {
                 setModuleTitle(moduleRes.data.data.title);
             }

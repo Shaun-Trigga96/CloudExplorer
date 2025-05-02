@@ -26,6 +26,9 @@ const QuizzesDetailScreen: React.FC = () => { // Remove props if using hooks
   const navigation = useNavigation<QuizzesDetailScreenNavigationProp>();
 
   // --- Get all params from route ---
+  // --- ADD LOGGING ---
+  console.log('[QuizzesDetailScreen] Mounting screen...');
+  // --- END LOGGING ---
   const { moduleId, providerId, pathId, quizId } = route.params;
 
   const { isDarkMode } = useCustomTheme();

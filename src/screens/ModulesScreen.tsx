@@ -11,7 +11,7 @@ import { useCustomTheme } from '../context/ThemeContext';
 import { useActiveLearningPath } from '../context/ActiveLearningPathContext'; // Import context hook
 import ModuleCard from '../components/modules/ModuleCard';
 import { ErrorView } from '../components/common/ErrorView';
-import { ApiModule, UserProgressResponse, ListModulesResponse } from '../types/modules';
+import { ApiModule, UserProgressResponse, ListModulesResponse, UserProgressData } from '../types/modules';
 import { handleError } from '../utils/handleError';
 import { imageMap } from '../utils/imageMap';
 
@@ -60,7 +60,6 @@ const ModulesScreen = () => {
       console.log('No userId found, navigating to Auth');
       if (isMounted.current) {
         setLoading(false);
-        // Consider navigation.navigate('Auth') or similar if appropriate
       }
       return;
     }
@@ -92,49 +91,64 @@ const ModulesScreen = () => {
 
       // Fetch user progress
       console.log('Fetching user progress for userId:', userId);
-      const progressResponse = await axios.get<UserProgressResponse>(`${BASE_URL}/api/v1/users/${userId}/progress`, {
+      const progressResponse = await axios.get<UserProgressData>(`${BASE_URL}/api/v1/users/${userId}/progress`, {
         timeout: 10000, // Increased timeout
       });
       console.log('Progress Response:', JSON.stringify(progressResponse.data, null, 2));
 
       if (!isMounted.current) return;
-      if (!progressResponse.data.userExists) {
+      if (!progressResponse.data || !progressResponse.data.data || !progressResponse.data.data.userExists) {
         console.log('User not found in progress response');
         // Handle appropriately, maybe show error or navigate
         return;
       }
+      // Updated section of ModulesScreen.tsx
 
-      const { learningPaths } = progressResponse.data; // Removed quizResults as it's not used here directly
+      // 1. Add this debugging function at the top of the component
+      const logModuleIdComparison = (apiModules: ApiModule[], completedModules: string[] = []) => {
+        console.log('=== MODULE ID COMPARISON DEBUG ===');
+        console.log('API Module IDs:', apiModules.map(m => m.id));
+        console.log('Completed Module IDs from backend:', completedModules);
+        console.log('=================================');
+      };
 
-      // Find the specific learning path progress for the current pathId
-      const currentPathData = learningPaths.find((path: { pathId: string }) => path.pathId === currentPathId);
-      const currentPathProgress = currentPathData?.progress; // Use optional chaining
+     // Access the data properly from the nested structure
+const { learningPaths } = progressResponse.data.data; // IMPORTANT: data is nested inside data
 
-      const progress: Record<string, number> = {};
-      modules.forEach((apiModule) => {
-        const moduleId = apiModule.id;
-        let moduleStatus = 0; // Default to 0 (Not Started)
+// Find the specific learning path progress for the current pathId
+const currentPathData = learningPaths.find((path) => path.pathId === currentPathId);
+const currentPathProgress = currentPathData?.progress; // Use optional chaining
 
-        if (currentPathProgress) {
-          if (currentPathProgress.completedModules?.includes(moduleId)) {
-            moduleStatus = 1.0; // Completed
-          } else if (currentPathProgress.completedQuizzes?.some((quizId: string) => quizId.startsWith(moduleId))) {
-             // Assuming quizId format like 'moduleId-quizSuffix'
-             // This logic might need adjustment based on your actual quizId structure
-             // Or check if any completed quiz belongs to this module via another lookup
-             moduleStatus = 0.75; // Quiz Completed
-          } else if (moduleProgress[moduleId] === 0.25) {
-             // Preserve existing 'started' state if backend doesn't track it explicitly
-             // This might be removed if 'start' action reliably updates backend progress
-             moduleStatus = 0.25; // Started (based on previous optimistic update)
-          }
-          // Add more conditions if needed (e.g., based on completedExams)
-        }
-        progress[moduleId] = moduleStatus;
-      });
+console.log('Current path progress found:', !!currentPathProgress, 
+  'Completed modules:', currentPathProgress?.completedModules?.length || 0);
 
-      console.log('Calculated progress for current path:', progress);
-      setModuleProgress(progress);
+const progress: Record<string, number> = {};
+modules.forEach((apiModule) => {
+  const moduleId = apiModule.id;
+  let moduleStatus = 0; // Default to 0 (Not Started)
+
+  if (currentPathProgress && currentPathProgress.completedModules) {
+    // Debug log the exact strings we're comparing
+    console.log(`Module ID comparison for ${moduleId}:`, {
+      moduleIdFromAPI: moduleId,
+      isCompleted: currentPathProgress.completedModules.includes(moduleId)
+    });
+    
+    if (currentPathProgress.completedModules.includes(moduleId)) {
+      moduleStatus = 1.0; // Completed
+      console.log(`Module ${moduleId} marked as COMPLETED`);
+    } else if (currentPathProgress.completedQuizzes?.some((quizId) => quizId.startsWith(moduleId))) {
+      moduleStatus = 0.75; // Quiz Completed
+    } else if (moduleProgress[moduleId] === 0.25) {
+      moduleStatus = 0.25; // Started
+    }
+  }
+  
+  progress[moduleId] = moduleStatus;
+});
+
+console.log('Final module progress:', progress);
+setModuleProgress(progress);
 
     } catch (err: any) {
       console.error('Error in fetchUserProgress:', { /* ... error logging ... */ });
@@ -148,8 +162,8 @@ const ModulesScreen = () => {
         setLoading(false);
       }
     }
-  // Add useCallback dependency
-  }, [lastId, moduleProgress]); // Dependency on lastId for pagination, moduleProgress for preserving optimistic updates
+    // Add useCallback dependency
+  }, [handleError, setAvailableModules, setError, setHasMore, setLastId, setLoading, setModuleProgress]); // REMOVED lastId, moduleProgress
 
   // --- useEffect to trigger fetch ---
   useEffect(() => {
@@ -168,7 +182,7 @@ const ModulesScreen = () => {
       console.log('ModulesScreen unmounting');
       isMounted.current = false;
     };
-  // Dependency on context values
+    // Dependency on context values
   }, [activeProviderId, activePathId, fetchUserProgress]);
 
 
@@ -176,8 +190,8 @@ const ModulesScreen = () => {
   const handleStartLearning = useCallback(async (moduleId: string) => {
     // Use context values directly
     if (!activeProviderId || !activePathId) {
-        Alert.alert('Error', 'Learning path not selected.');
-        return;
+      Alert.alert('Error', 'Learning path not selected.');
+      return;
     }
 
     const userId = await AsyncStorage.getItem('userId');
@@ -210,7 +224,7 @@ const ModulesScreen = () => {
       setModuleProgress((prev) => ({ ...prev, [moduleId]: prev[moduleId] === 0.25 ? 0 : prev[moduleId] }));
       handleError(err, setError);
     }
-  // Add dependencies for useCallback
+    // Add dependencies for useCallback
   }, [activeProviderId, activePathId, setModuleProgress, setError]);
 
 
@@ -248,7 +262,7 @@ const ModulesScreen = () => {
         setLoading(false);
       }
     }
-  // Add dependencies for useCallback
+    // Add dependencies for useCallback
   }, [loading, hasMore, lastId, activeProviderId, activePathId, setAvailableModules, setHasMore, setLastId, setError]);
 
 
@@ -286,27 +300,30 @@ const ModulesScreen = () => {
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       onScrollEndDrag={({ nativeEvent }) => {
-          // Check if near bottom to trigger load more
-          if (nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y >= nativeEvent.contentSize.height - 20) {
-              handleLoadMore();
-          }
+        // Check if near bottom to trigger load more
+        if (nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y >= nativeEvent.contentSize.height - 20) {
+          handleLoadMore();
+        }
       }}
       scrollEventThrottle={400} // Adjust frequency as needed
     >
-      {availableModules.map((module) => (
-        <ModuleCard
-          key={module.id}
-          moduleId={module.id}
-          title={module.title}
-          description={module.description || 'No description available'}
-          imageSource={imageMap[module.id] || imageMap['default']}
-          progress={moduleProgress[module.id] ?? 0}
-          providerId={activeProviderId || ''} // Pass context value
-          pathId={activePathId || ''}       // Pass context value
-          onStartLearning={() => handleStartLearning(module.id)} // Simplified call
-          navigation={navigation}
-        />
-      ))}
+      {availableModules.map((module) => {
+        console.log(`Rendering ModuleCard for ${module.id} with progress:`, moduleProgress[module.id] || 0);
+        return (
+          <ModuleCard
+            key={module.id}
+            moduleId={module.id}
+            title={module.title}
+            description={module.description || 'No description available'}
+            imageSource={imageMap[module.id] || imageMap['default']}
+            progress={moduleProgress[module.id] ?? 0}
+            providerId={activeProviderId || ''} // Pass context value
+            pathId={activePathId || ''}       // Pass context value
+            onStartLearning={() => handleStartLearning(module.id)} // Simplified call
+            navigation={navigation}
+          />
+        );
+      })}
       {loading && availableModules.length > 0 && ( // Show loading indicator at bottom only when loading more
         <ActivityIndicator size="small" color={colors.primary} style={styles.loadingMore} />
       )}

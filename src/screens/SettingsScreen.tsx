@@ -1,4 +1,4 @@
-import React, {FC, useEffect, useState} from 'react';
+import React, { FC, useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -7,19 +7,19 @@ import {
   Alert,
   ActivityIndicator, // Import ActivityIndicator
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text, Switch} from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, Switch } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import Animated, {FadeInUp, FadeInRight} from 'react-native-reanimated';
+import Animated, { FadeInUp, FadeInRight } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios, {AxiosError} from 'axios';
+import axios, { AxiosError } from 'axios';
 import auth from '@react-native-firebase/auth';
 import messaging from '@react-native-firebase/messaging';
-import {useNavigation} from '@react-navigation/native';
-import {StackNavigationProp} from '@react-navigation/stack';
-import {RootStackParamList} from '../navigation/RootNavigator';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
 import { useCustomTheme } from '../context/ThemeContext';
-import {REACT_APP_BASE_URL} from '@env';
+import { REACT_APP_BASE_URL } from '@env';
 import Sound from 'react-native-sound'; // Import react-native-sound
 import { darkColors, lightColors } from '../styles/colors';
 import DashboardScreen from './DashboardScreen';
@@ -42,7 +42,7 @@ type SettingsScreenNavigationProp = StackNavigationProp<
 
 const SettingsScreen: FC = () => {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
-  const {isDarkMode, toggleDarkMode} = useCustomTheme();
+  const { isDarkMode, toggleDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors; // Use theme colors
   const [userSettings, setUserSettings] = useState<UserSettings>({
     notificationsEnabled: false,
@@ -86,12 +86,12 @@ const SettingsScreen: FC = () => {
       try {
         const storedSettings = await AsyncStorage.getItem('userSettings');
         if (storedSettings) {
-            const parsedStored = JSON.parse(storedSettings);
-            // Ensure stored dark mode matches theme context on load failure
-            setUserSettings({...parsedStored, darkMode: isDarkMode });
+          const parsedStored = JSON.parse(storedSettings);
+          // Ensure stored dark mode matches theme context on load failure
+          setUserSettings({ ...parsedStored, darkMode: isDarkMode });
         } else {
-            // Fallback to defaults if nothing stored, respecting theme context
-            setUserSettings(prev => ({ ...prev, darkMode: isDarkMode }));
+          // Fallback to defaults if nothing stored, respecting theme context
+          setUserSettings(prev => ({ ...prev, darkMode: isDarkMode }));
         }
       } catch (asyncError) {
         console.error('Error loading from AsyncStorage:', asyncError);
@@ -105,7 +105,7 @@ const SettingsScreen: FC = () => {
   // Update settings
   const updateUserSettings = async (updatedSettings: Partial<UserSettings>) => {
     // Optimistically update local state for better UX
-    const newSettings = {...userSettings, ...updatedSettings};
+    const newSettings = { ...userSettings, ...updatedSettings };
     setUserSettings(newSettings);
 
     // Handle dark mode toggle immediately
@@ -153,20 +153,20 @@ const SettingsScreen: FC = () => {
   // Handle notifications
   const handleNotifications = async (enabled: boolean) => {
     try {
-        if (enabled) {
-          await messaging().requestPermission(); // Ensure permission is granted
-          const token = await messaging().getToken();
-          await messaging().subscribeToTopic('learning_reminders');
-          console.log('Subscribed to notifications:', token);
-        } else {
-          await messaging().unsubscribeFromTopic('learning_reminders');
-          console.log('Unsubscribed from notifications');
-        }
+      if (enabled) {
+        await messaging().requestPermission(); // Ensure permission is granted
+        const token = await messaging().getToken();
+        await messaging().subscribeToTopic('learning_reminders');
+        console.log('Subscribed to notifications:', token);
+      } else {
+        await messaging().unsubscribeFromTopic('learning_reminders');
+        console.log('Unsubscribed from notifications');
+      }
     } catch (permError) {
-        console.error("Notification permission or subscription error:", permError);
-        Alert.alert("Notification Error", "Could not update notification settings. Please check app permissions.");
-        // Revert the switch state if permission fails
-        setUserSettings(prev => ({ ...prev, notificationsEnabled: !enabled }));
+      console.error("Notification permission or subscription error:", permError);
+      Alert.alert("Notification Error", "Could not update notification settings. Please check app permissions.");
+      // Revert the switch state if permission fails
+      setUserSettings(prev => ({ ...prev, notificationsEnabled: !enabled }));
     }
   };
 
@@ -187,8 +187,8 @@ const SettingsScreen: FC = () => {
     } catch (error) {
       console.error('Error updating email subscription:', error);
       handleAxiosError(error);
-       // Revert UI on error
-       setUserSettings(prev => ({ ...prev, emailUpdates: !enabled }));
+      // Revert UI on error
+      setUserSettings(prev => ({ ...prev, emailUpdates: !enabled }));
     }
   };
 
@@ -204,7 +204,7 @@ const SettingsScreen: FC = () => {
       // Stop listening for changes in Firestore
       console.log('Stopping Firestore real-time listeners...');
     }
-     // Note: No backend call needed here unless sync itself needs server confirmation
+    // Note: No backend call needed here unless sync itself needs server confirmation
   };
 
   // Handle sound effects
@@ -248,29 +248,29 @@ const SettingsScreen: FC = () => {
   // Handle logout
   const handleLogout = async () => {
     Alert.alert(
-        "Confirm Logout",
-        "Are you sure you want to sign out?",
-        [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Sign Out",
-                style: "destructive",
-                onPress: async () => {
-                    try {
-                        await auth().signOut();
-                        await AsyncStorage.clear(); // Clear all async storage on logout
-                        // Navigate to Auth screen, resetting the stack
-                        navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'Auth' }],
-                        });
-                    } catch (error) {
-                        console.error('Logout failed:', error);
-                        Alert.alert('Logout Error', 'Failed to log out. Please try again.');
-                    }
-                }
+      "Confirm Logout",
+      "Are you sure you want to sign out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await auth().signOut();
+              await AsyncStorage.clear(); // Clear all async storage on logout
+              // Navigate to Auth screen, resetting the stack
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Auth' }],
+              });
+            } catch (error) {
+              console.error('Logout failed:', error);
+              Alert.alert('Logout Error', 'Failed to log out. Please try again.');
             }
-        ]
+          }
+        }
+      ]
     );
   };
 
@@ -283,8 +283,8 @@ const SettingsScreen: FC = () => {
       } else if (axiosError.response.status === 404) {
         Alert.alert('Not Found', 'User settings not found on the server. Using local settings.');
       } else if (axiosError.response.status === 401) {
-          Alert.alert('Unauthorized', 'Authentication error. Please log in again.');
-          // Optionally trigger logout here
+        Alert.alert('Unauthorized', 'Authentication error. Please log in again.');
+        // Optionally trigger logout here
       } else {
         const errorData = axiosError.response.data as any; // Type assertion
         const message = errorData?.message || errorData?.error || 'Unknown server error';
@@ -303,17 +303,17 @@ const SettingsScreen: FC = () => {
     fetchUserSettings();
     // Cleanup sound on unmount
     return () => {
-        if (sound) {
-            sound.release();
-        }
+      if (sound) {
+        sound.release();
+      }
     };
   }, []); // Run only once on mount
 
   // Re-fetch settings if isDarkMode changes externally (e.g., system theme change)
   // This might be redundant if toggleDarkMode already handles state correctly
-   useEffect(() => {
-     fetchUserSettings();
-   }, [isDarkMode]);
+  useEffect(() => {
+    fetchUserSettings();
+  }, [isDarkMode]);
 
 
   // Settings groups definition (remains the same)
@@ -330,7 +330,7 @@ const SettingsScreen: FC = () => {
           iconColor: '#4158D0',
           state: userSettings.notificationsEnabled,
           setState: (value: boolean) =>
-            updateUserSettings({notificationsEnabled: value}),
+            updateUserSettings({ notificationsEnabled: value }),
         },
         {
           title: 'Dark Mode',
@@ -338,7 +338,7 @@ const SettingsScreen: FC = () => {
           icon: 'theme-light-dark',
           iconColor: '#6A11CB',
           state: isDarkMode, // Use isDarkMode from context for the Switch state
-          setState: (value: boolean) => updateUserSettings({darkMode: value}),
+          setState: (value: boolean) => updateUserSettings({ darkMode: value }),
         },
         {
           title: 'Email Updates',
@@ -347,7 +347,7 @@ const SettingsScreen: FC = () => {
           iconColor: '#C850C0',
           state: userSettings.emailUpdates,
           setState: (value: boolean) =>
-            updateUserSettings({emailUpdates: value}),
+            updateUserSettings({ emailUpdates: value }),
         },
         {
           title: 'Sync Data',
@@ -355,7 +355,7 @@ const SettingsScreen: FC = () => {
           icon: 'sync',
           iconColor: '#3B7CD3',
           state: userSettings.syncData,
-          setState: (value: boolean) => updateUserSettings({syncData: value}),
+          setState: (value: boolean) => updateUserSettings({ syncData: value }),
         },
         {
           title: 'Sound Effects',
@@ -364,7 +364,7 @@ const SettingsScreen: FC = () => {
           iconColor: '#4F3DF5',
           state: userSettings.soundEffects,
           setState: (value: boolean) =>
-            updateUserSettings({soundEffects: value}),
+            updateUserSettings({ soundEffects: value }),
         },
       ],
     },
@@ -386,7 +386,10 @@ const SettingsScreen: FC = () => {
           description: 'View detailed learning statistics',
           icon: 'chart-line',
           iconColor: '#F09819',
-          onPress: () => navigation.navigate('DashboardScreen'),
+          onPress: () => navigation.navigate('DashboardScreen', {
+            provider: '',
+            path: '',
+          }),
           actionable: true,
         },
         {
@@ -424,14 +427,14 @@ const SettingsScreen: FC = () => {
   }
 
   // SettingItem Component using theme colors
-  const SettingItem: FC<SettingItemProps> = ({item, index}) => (
+  const SettingItem: FC<SettingItemProps> = ({ item, index }) => (
     <Animated.View
       entering={FadeInRight.duration(400).delay(index * 100)}
       // Apply border color from theme
       style={[styles.settingItem, { borderBottomColor: colors.border }]}>
       <View style={styles.settingContent}>
         <View
-          style={[styles.iconCircle, {backgroundColor: `${item.iconColor}1A`}]}>
+          style={[styles.iconCircle, { backgroundColor: `${item.iconColor}1A` }]}>
           {/* Use item.iconColor for the icon itself */}
           <Icon name={item.icon} size={22} color={item.iconColor} />
         </View>
@@ -439,14 +442,14 @@ const SettingsScreen: FC = () => {
           <Text
             style={[
               styles.settingTitle,
-              {color: colors.text}, // Use theme text color
+              { color: colors.text }, // Use theme text color
             ]}>
             {item.title}
           </Text>
           <Text
             style={[
               styles.settingDescription,
-              {color: colors.textSecondary}, // Use theme secondary text color
+              { color: colors.textSecondary }, // Use theme secondary text color
             ]}>
             {item.description}
           </Text>
@@ -454,11 +457,11 @@ const SettingsScreen: FC = () => {
       </View>
       {item.actionable ? (
         <TouchableOpacity
-            style={styles.actionButton}
-            onPress={item.onPress}
-            // Add accessibility role for better screen reader support
-            accessibilityRole="button"
-            accessibilityLabel={item.title}
+          style={styles.actionButton}
+          onPress={item.onPress}
+          // Add accessibility role for better screen reader support
+          accessibilityRole="button"
+          accessibilityLabel={item.title}
         >
           <Icon
             name="chevron-right"
@@ -488,19 +491,19 @@ const SettingsScreen: FC = () => {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false} // Hide scrollbar
-        >
+      >
         <Animated.View entering={FadeInUp.duration(600)} style={styles.header}>
           <Text
             style={[
               styles.headerTitle,
-              {color: colors.text}, // Use theme text color
+              { color: colors.text }, // Use theme text color
             ]}>
             Settings
           </Text>
           <Text
             style={[
               styles.headerSubtitle,
-              {color: colors.textSecondary}, // Use theme secondary text color
+              { color: colors.textSecondary }, // Use theme secondary text color
             ]}>
             Customize your experience
           </Text>
@@ -508,8 +511,8 @@ const SettingsScreen: FC = () => {
         {loading ? (
           // Use ActivityIndicator for loading state
           <View style={styles.loadingContainer}>
-             <ActivityIndicator size="large" color={colors.primary} />
-             <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Settings...</Text>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Settings...</Text>
           </View>
         ) : (
           settingsGroups.map((group, groupIndex) => (
@@ -518,12 +521,12 @@ const SettingsScreen: FC = () => {
               entering={FadeInUp.duration(600).delay(groupIndex * 150)} // Slightly faster delay
               // Apply background, border from theme
               style={[
-                  styles.sectionContainer,
-                  {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                      borderWidth: isDarkMode ? 1 : 0, // Add border in dark mode
-                  }
+                styles.sectionContainer,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  borderWidth: isDarkMode ? 1 : 0, // Add border in dark mode
+                }
               ]}>
               <View style={styles.sectionContent}>
                 {group.items.map((item, index) => (
@@ -540,24 +543,24 @@ const SettingsScreen: FC = () => {
 
 // Updated Styles using theme colors where applicable
 const styles = StyleSheet.create({
-  safeArea: {flex: 1},
-  container: {flex: 1},
-  contentContainer: {padding: 20, paddingBottom: 40}, // Increased padding
-  header: {marginBottom: 32, paddingHorizontal: 0}, // Removed horizontal padding here
-  headerTitle: {fontSize: 34, fontWeight: 'bold', marginBottom: 4}, // Larger title
-  headerSubtitle: {fontSize: 17}, // Larger subtitle
+  safeArea: { flex: 1 },
+  container: { flex: 1 },
+  contentContainer: { padding: 20, paddingBottom: 40 }, // Increased padding
+  header: { marginBottom: 32, paddingHorizontal: 0 }, // Removed horizontal padding here
+  headerTitle: { fontSize: 34, fontWeight: 'bold', marginBottom: 4 }, // Larger title
+  headerSubtitle: { fontSize: 17 }, // Larger subtitle
   sectionContainer: {
     marginBottom: 24,
     borderRadius: 18, // More rounded corners like ProfileScreen
     overflow: 'hidden',
     // Shadows for light mode (subtle)
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 5},
+    shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.1,
     shadowRadius: 15,
     elevation: 8, // Keep elevation for Android
   },
-  sectionContent: {paddingVertical: 8}, // Reduced vertical padding inside card
+  sectionContent: { paddingVertical: 8 }, // Reduced vertical padding inside card
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -567,7 +570,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     // borderBottomColor is now applied dynamically inline
   },
-  settingContent: {flexDirection: 'row', alignItems: 'center', flex: 1},
+  settingContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   iconCircle: {
     width: 40,
     height: 40,
@@ -576,10 +579,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 16,
   },
-  textContainer: {flex: 1, marginRight: 8}, // Added margin to prevent text touching switch/chevron
-  settingTitle: {fontSize: 17, fontWeight: '500'}, // Adjusted font size/weight
-  settingDescription: {fontSize: 14, marginTop: 2}, // Adjusted font size
-  actionButton: {padding: 8}, // Increased touch area for chevron
+  textContainer: { flex: 1, marginRight: 8 }, // Added margin to prevent text touching switch/chevron
+  settingTitle: { fontSize: 17, fontWeight: '500' }, // Adjusted font size/weight
+  settingDescription: { fontSize: 14, marginTop: 2 }, // Adjusted font size
+  actionButton: { padding: 8 }, // Increased touch area for chevron
   loadingContainer: { // Style for loading indicator
     flex: 1,
     justifyContent: 'center',

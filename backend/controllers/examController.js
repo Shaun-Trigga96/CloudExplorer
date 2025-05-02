@@ -240,8 +240,6 @@ exports.listExams = async (req, res, next) => {
         prerequisites: data.prerequisites,
         associatedModules: data.associatedModules,
         passingRate: data.passingRate,
-        // Avoid sending full questions in list view
-        // questionCount: data.questions?.length || 0, // Example if questions stored directly
         createdAt: data.createdAt?.toDate()?.toISOString() || null,
         updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
       };

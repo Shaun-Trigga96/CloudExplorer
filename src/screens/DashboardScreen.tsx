@@ -363,8 +363,6 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
           {quizzes.length > 0 ? (
             quizzes.map(quiz => {
               const moduleDetails = getResourceDetails(quiz.moduleId, 'module');
-              // Get details without provider/path for nav
-              // const { providerIdForNav, pathIdForNav } = getResourceDetails(quiz.id, 'quiz'); // No longer needed
               const isCompleted = allCompletedQuizIds.has(quiz.id);
               const status = isCompleted ? 'Completed' : 'Not Started';
               const latestResult = quizResults.find(qr => qr.quizId === quiz.id);

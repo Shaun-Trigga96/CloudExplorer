@@ -88,9 +88,9 @@ steps:
       - '--allow-unauthenticated'
       - '--timeout'
       - '600s'
-      - '--set-env-vars'
-      - 'NODE_ENV=production'
-      - '--health-check-path=/health'  # Add health check
+      # - '--set-env-vars'
+      # - 'NODE_ENV=production'
+      # - '--health-check-path=/health'  # Add health check
 
   # 5. Build React Native app for Android
   - name: 'gcr.io/cloud-builders/docker'

@@ -1,14 +1,16 @@
 import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
-import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, SharedValue } from 'react-native-reanimated';
 import { useCustomTheme } from '../../context/ThemeContext';
 
 interface SectionCardProps {
   title?: string;
   content: JSX.Element[];
   isRead: boolean;
-  fadeAnim: Animated.SharedValue<number>;
+  fadeAnim: SharedValue<number>;
   innerRef: React.RefObject<View>;
+  onNavigateToQuiz: (quizId: string, moduleId: string) => void;
+  moduleId: string;
 }
 
 const SectionCard: React.FC<SectionCardProps> = ({ 
@@ -16,10 +18,12 @@ const SectionCard: React.FC<SectionCardProps> = ({
   content, 
   isRead, 
   fadeAnim,
-  innerRef 
+  innerRef,
+  moduleId,
+  onNavigateToQuiz, // We still keep this prop but it's handled in preprocessMarkdownWithIcons
 }) => {
   const { colors } = useCustomTheme().theme;
-  
+
   const animatedStyle = useAnimatedStyle(() => {
     return {
       opacity: fadeAnim.value,
@@ -38,18 +42,11 @@ const SectionCard: React.FC<SectionCardProps> = ({
         styles.readIndicator, 
         { backgroundColor: isRead ? colors.success : colors.disabled }
       ]} />
-      
-      {/* Title section */}
-      {title && (
-        <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>
-            {title}
-          </Text>
-        </View>
-      )}
-      
+
+
       {/* Content section - THIS VIEW GETS THE REF */}
       <View ref={innerRef} style={styles.contentContainer}>
+        {/* Render the content elements - link handling is already set in preprocessMarkdownWithIcons */}
         {content}
       </View>
     </Animated.View>
