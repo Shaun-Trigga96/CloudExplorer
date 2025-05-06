@@ -46,6 +46,9 @@ interface Theme {
     troubleshootingBackground: string;
     examInfoBackground: string;
     examRulesBackground: string;
+    cardBackground: string;
+    notificationBackground: string;
+
   };
   cardStyle: {
     borderRadius: number;

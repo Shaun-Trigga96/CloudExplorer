@@ -43,10 +43,12 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
               ))
             ) : (
               ['True', 'False'].map(option => (
+                // Use the option ('True' or 'False') itself as part of the key for uniqueness
+                // Pass the option as the answer text and handle selection/press
                 <AnswerButton
-                  key={`${question.id}-${option}`}
+                  key={`${question.id}-${option}`} // Combine question ID and option for a unique key
                   answer={option}
-                  letter={option}
+                  letter=""
                   isSelected={userAnswer === option}
                   onPress={() => handleAnswer(question.id, option)}
                 />

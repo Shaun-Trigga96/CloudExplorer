@@ -1,86 +1,86 @@
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 export const communityStyles = StyleSheet.create({
-    container: {
-      flex: 1,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingTop: Platform.OS === 'android' ? 12 : 0,
-      paddingBottom: 12,
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: 'bold',
-    },
-    notificationButton: {
-      position: 'relative',
-      padding: 4,
-    },
-    notificationBadge: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      width: 16,
-      height: 16,
-      borderRadius: 8,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    notificationCount: {
-      color: 'white',
-      fontSize: 10,
-      fontWeight: 'bold',
-    },
-    topicsScroll: {
-      maxHeight: 40,
-      marginBottom: 16,
-      paddingHorizontal: 16,
-    },
-    feedContainer: {
-      paddingHorizontal: 16,
-      paddingBottom: 80,
-    },
-    membersContainer: {
-      paddingHorizontal: 16,
-      paddingBottom: 80,
-    },
-    membersHeader: {
-      marginBottom: 20,
-    },
-    sectionTitle: {
-      fontSize: 22,
-      fontWeight: 'bold',
-      marginBottom: 4,
-    },
-    sectionSubtitle: {
-      fontSize: 15,
-    },
-    eventsContent: {
-      padding: 16,
-      paddingBottom: 80,
-    },
-    emptyContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 60,
-    },
-    emptyText: {
-      marginTop: 16,
-      fontSize: 16,
-      textAlign: 'center',
-    },
-    endListText: {
-      textAlign: 'center',
-      paddingVertical: 20,
-      fontSize: 14,
-    },
-  });
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationCount: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  topicsScroll: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  feedContainer: {
+    paddingBottom: 80,
+  },
+  membersContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 80,
+  },
+  membersHeader: {
+    marginVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  eventsContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 80,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  endListText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+});

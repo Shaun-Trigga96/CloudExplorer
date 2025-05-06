@@ -53,8 +53,8 @@ const pathsData = [
     providerId: "aws",
     logoUrl: "https://firebasestorage.googleapis.com/v0/b/cloud-explorer-c3d98.firebasestorage.app/o/cloud-practitioner.png?alt=media&token=dd6bc080-4703-4608-bf71-aecf379aa9a7",
     description: "Understand AWS Cloud concepts, services, and terminology.",
-    totalModules: 5,
-    totalQuizzes: 5,
+    totalModules: 10,
+    totalQuizzes: 10,
     totalExams: 1,
   },
   // Azure Paths

@@ -39,7 +39,8 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ question, userAnswer, isCorrect
           {question.answers.length > 0 ? (
             question.answers.map(answer => (
               <View
-                key={answer.uniqueKey}
+                // Use a combination of question ID and answer letter for a more robust key
+                key={`${question.id}-${answer.letter}`}
                 style={[
                   styles.reviewAnswer,
                   answer.letter.toLowerCase() === question.correctAnswer.toLowerCase()

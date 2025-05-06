@@ -1,7 +1,7 @@
 // src/screens/ExamsScreen.tsx
 import React, { useEffect } from 'react'; // Import useEffect
 import { ScrollView, View, Text } from 'react-native'; // Removed Button from here
-import { Title, Paragraph, Button, ActivityIndicator } from 'react-native-paper'; // Added Button, ActivityIndicator from paper
+import { Title, Paragraph, Button } from 'react-native-paper'; // Added Button, ActivityIndicator from paper
 import { useNavigation } from '@react-navigation/native'; // Removed useRoute, RouteProp
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useCustomTheme } from '../context/ThemeContext';
@@ -16,7 +16,6 @@ import { Exam } from '../types/exam';
 import { useActiveLearningPath } from '../context/ActiveLearningPathContext'; // <-- Import context hook
 
 type ExamsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ExamDetail'>;
-// Removed ExamsScreenRouteProp as route params are no longer used
 
 const ExamsScreen = () => {
   const navigation = useNavigation<ExamsScreenNavigationProp>();

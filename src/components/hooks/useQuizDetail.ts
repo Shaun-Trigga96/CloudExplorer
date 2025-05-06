@@ -26,6 +26,15 @@ interface ModuleResponse {
     message?: string;
 }
 
+// Response from saving the quiz result
+interface SaveQuizResultResponse {
+    status: 'success' | 'error';
+    message?: string;
+    resultId?: string; // ID of the saved result document
+    passed: boolean;   // Whether the user passed
+    totalQuestions: number; // Add the 'totalQuestions' property
+}
+
 interface SubmitProgressResponse {
     status: 'success' | 'error';
     message?: string;
@@ -130,7 +139,7 @@ export const useQuizDetail = (
     return userAnswers[questionId]?.toLowerCase() === question.correctAnswer.toLowerCase();
   }, [quiz, userAnswers]);
 
-  const submitQuizResults = useCallback(async () => {
+    const submitQuizResults = useCallback(async () => {
     if (!quiz || !quizMeta) {
       Alert.alert('Error', 'Quiz data is missing.');
       return;
@@ -155,42 +164,76 @@ export const useQuizDetail = (
     console.log(`[useQuizDetail] Submitting results for quiz: ${quizMeta.id}, user: ${userId}`);
     console.log(`[useQuizDetail] Score: ${score}/${totalQuestions} (${percentage}%), Passed: ${passed}`);
     console.log(`[useQuizDetail] Path context: ${providerId}/${pathId}`);
+    console.log(`[useQuizDetail] Module context: ${quizMeta.moduleId}`);
 
     try {
-      const progressUrl = `${BASE_URL}/api/v1/users/${userId}/progress`;
-      const payload: Partial<QuizResult> & { resourceType: string; action: string; resourceId: string } = {
-        resourceType: 'quiz',
-        resourceId: quizMeta.id, // Use the actual quiz ID
-        action: 'complete', // Action type
+      // --- Step 1: Save the detailed quiz result --- // Corrected endpoint name
+      const saveResultUrl = `${BASE_URL}/api/v1/quizzes/save-result`;
+      const savePayload: Omit<QuizResult, 'id'> = { // Use QuizResult type from types/quiz
+        quizId: quizMeta.id,
+        userId: userId,
         providerId: providerId, // Include providerId
         pathId: pathId,         // Include pathId
         moduleId: quizMeta.moduleId, // Include moduleId
         score: score,
+        totalQuestions: totalQuestions, // *** ADD THIS LINE ***
         percentage: percentage,
         passed: passed,
-        answers: userAnswers, // Send the user's answers
+        answers: userAnswers,
         timestamp: new Date().toISOString(), // Use ISO string for consistency
       };
 
-      console.log('[useQuizDetail] Progress payload:', payload);
+      console.log('[useQuizDetail] Saving quiz result payload:', savePayload);
+      const saveResponse = await axios.post<SaveQuizResultResponse>(saveResultUrl, savePayload, { timeout: 10000 });
 
-      const response = await axios.post<SubmitProgressResponse>(progressUrl, payload, { timeout: 10000 });
-
-      if (response.data.status !== 'success') {
-        throw new Error(response.data.message || 'Failed to submit quiz results.');
+      if (saveResponse.data.status !== 'success') {
+        throw new Error(saveResponse.data.message || 'Failed to save quiz result.');
       }
 
-      console.log('[useQuizDetail] Submission successful.');
-      setShowResults(true); // Show results card on success
+      console.log(`[useQuizDetail] Quiz result saved successfully (ID: ${saveResponse.data.resultId}). Passed: ${saveResponse.data.passed}`);
+
+      // --- Step 2: If passed, update the overall user progress for the learning path ---
+      if (saveResponse.data.passed) {
+        console.log('[useQuizDetail] Quiz passed. Updating user progress...');
+        const progressUrl = `${BASE_URL}/api/v1/users/${userId}/progress`;
+        const progressPayload = {
+          resourceType: 'quiz',
+          resourceId: quizMeta.id, // The ID of the quiz definition
+          action: 'complete', // Action type
+          providerId: providerId,
+          pathId: pathId,
+          // Optionally include score/percentage again if needed by trackProgress, but it might be redundant
+          // score: score,
+          // percentage: percentage,
+          passed: true, // Explicitly state passed
+          timestamp: savePayload.timestamp, // Use the same timestamp
+        };
+
+        console.log('[useQuizDetail] User progress update payload:', progressPayload);
+        const progressResponse = await axios.post<SubmitProgressResponse>(progressUrl, progressPayload, { timeout: 10000 });
+
+        if (progressResponse.data.status !== 'success') {
+          // Log a warning but don't necessarily block showing results, as the attempt *was* saved
+          console.warn('[useQuizDetail] Failed to update user progress:', progressResponse.data.message || 'Unknown error');
+          // Optionally set a different kind of error/warning state here
+        } else {
+          console.log('[useQuizDetail] User progress updated successfully.');
+        }
+      } else {
+         console.log('[useQuizDetail] Quiz not passed. Skipping user progress update.');
+      }
+
+      // Show results regardless of progress update success, as the attempt was saved
+      setShowResults(true);
 
     } catch (err: any) {
       console.error('[useQuizDetail] Error submitting quiz results:', err.response?.data || err.message);
-      handleError(err, (msg) => setError(msg || 'Failed to submit results. Please try again.'));
+      handleError(err, (msg) => setError(msg || 'Failed to save results. Please try again.'));
       // Don't show results card on error, keep user on questions
     } finally {
       setSubmittingResults(false);
     }
-  }, [quiz, quizMeta, userAnswers, calculateScore, providerId, pathId, submittingResults]); // Add dependencies
+  }, [quiz, quizMeta, userAnswers, calculateScore, providerId, pathId, submittingResults]); // Keep dependencies
 
   const handleRetry = () => {
     // Reset state and fetch again

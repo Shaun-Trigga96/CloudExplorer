@@ -1,22 +1,25 @@
 export const lightColors = {
-  background: '#F0F2F5',
+  primary: '#00ACC1', // Vibrant teal for interactive elements
+  accent: '#FF6F61', // Warm coral for secondary actions
+  background: '#F5F7FA',
+  cardBackground: '#F8FAFC', // Softer neutral for PostItem cards
+  notificationBackground: '#E6F7FA',
+  text: '#1A202C',
+  textSecondary: '#4A5568',
+  border: '#E2E8F0',
+  chipBackground: '#EDF2F7',
+  inputBackground: '#FFFFFF',
+  success: '#4CAF50',
+  error: '#F44336',
   surface: '#FFFFFF',
-  primary: '#007AFF',
-  text: '#1C1C1E',
-  textSecondary: '#6E6E73',
-  border: '#D1D1D6',
-  error: '#FF3B30',
-  success: '#34C759',
+  onlineIndicatorBorder: '#FFFFFF',
+  discussionItemBackground: '#FFFFFF',
   warning: '#FFC107',
   progressBarBackground: '#e0e0e0',
   gridItemBackground: '#FFFFFF',
   progressItemBackground: '#f8f9fa',
   quizModuleBackground: '#f8f9fa',
   quizItemBackground: '#FFFFFF',
-  discussionItemBackground: '#FFFFFF',
-  chipBackground: '#EDF2F7',
-  inputBackground: '#FFFFFF',
-  onlineIndicatorBorder: '#FFFFFF',
   buttonPrimaryBackground: '#007AFF',
   buttonCompletedBackground: '#34C759',
   buttonText: '#FFFFFF',
@@ -45,6 +48,7 @@ export const lightColors = {
 export const darkColors = {
   background: '#000000',
   surface: '#1C1C1E',
+  accent: '#FF6F61',
   primary: '#0A84FF',
   text: '#FFFFFF',
   textSecondary: '#8E8E93',
@@ -84,4 +88,6 @@ export const darkColors = {
   examRulesBackground: 'rgba(50, 215, 75, 0.15)', // Darker green rule background
   textPrimary: '#FFFFFF',
   disabled: '#8E8E93',
+  cardBackground: '#2D3748',
+  notificationBackground: '#2A4365',
 };

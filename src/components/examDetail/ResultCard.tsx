@@ -144,4 +144,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ResultCard;
+export default ResultCard; 

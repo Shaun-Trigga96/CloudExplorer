@@ -115,9 +115,9 @@ exports.startLearningPath = async (req, res, next) => {
 
     // --- Explicit Check for userId from URL ---
     if (!userIdFromParams || typeof userIdFromParams !== 'string' || userIdFromParams.trim() === '') {
-        console.error('[providerPathCtrl] Invalid or missing userId in URL path:', userIdFromParams);
-        // Send 400 Bad Request as the URL itself is malformed or missing the ID
-        return next(new AppError('Valid User ID must be provided in the URL path.', 400, 'INVALID_USER_ID_PARAM'));
+      console.error('[providerPathCtrl] Invalid or missing userId in URL path:', userIdFromParams);
+      // Send 400 Bad Request as the URL itself is malformed or missing the ID
+      return next(new AppError('Valid User ID must be provided in the URL path.', 400, 'INVALID_USER_ID_PARAM'));
     }
     // Use the validated & trimmed ID going forward
     const userId = userIdFromParams.trim();
@@ -268,15 +268,15 @@ exports.startLearningPath = async (req, res, next) => {
 
     // Check if it's the specific Firestore error
     if (error.message?.includes('Path must be a non-empty string')) {
-        // This indicates the userId passed to .doc() was invalid
-        next(new AppError(`Internal Server Error: Invalid User ID used for database path. User ID: "${userIdFromParams}". Error: ${error.message}`, 500, 'FIRESTORE_INVALID_PATH_ID'));
+      // This indicates the userId passed to .doc() was invalid
+      next(new AppError(`Internal Server Error: Invalid User ID used for database path. User ID: "${userIdFromParams}". Error: ${error.message}`, 500, 'FIRESTORE_INVALID_PATH_ID'));
     } else if (error instanceof AppError) {
-        // Re-throw AppErrors (like validation errors)
-        next(error);
+      // Re-throw AppErrors (like validation errors)
+      next(error);
     }
-     else {
-        // General error
-        next(new AppError(`Error starting learning path: ${error.message}`, 500, 'PATH_START_ERROR'));
+    else {
+      // General error
+      next(new AppError(`Error starting learning path: ${error.message}`, 500, 'PATH_START_ERROR'));
     }
   }
 };
@@ -371,7 +371,7 @@ exports.updateLearningProgress = async (req, res, next) => {
 
     // At least one progress item must be provided
     if (!moduleId && !quizId && !examId && score === undefined && completed === undefined) {
-        return next(new AppError('No progress update data provided (moduleId, quizId, examId, score, or completed flag required).', 400, 'MISSING_PROGRESS_DATA'));
+      return next(new AppError('No progress update data provided (moduleId, quizId, examId, score, or completed flag required).', 400, 'MISSING_PROGRESS_DATA'));
     }
 
     // Get the learning path
@@ -381,89 +381,89 @@ exports.updateLearningProgress = async (req, res, next) => {
     let finalCompletionPercentage = 0;
 
     await db.runTransaction(async (transaction) => {
-        const pathDoc = await transaction.get(pathRef);
+      const pathDoc = await transaction.get(pathRef);
 
-        if (!pathDoc.exists) {
-            throw new AppError(`Learning path with ID ${learningPathId} not found for this user.`, 404, 'LEARNING_PATH_NOT_FOUND');
-        }
-        const pathData = pathDoc.data();
+      if (!pathDoc.exists) {
+        throw new AppError(`Learning path with ID ${learningPathId} not found for this user.`, 404, 'LEARNING_PATH_NOT_FOUND');
+      }
+      const pathData = pathDoc.data();
 
-        const updates = {
-            lastAccessedAt: serverTimestamp(),
-        };
-        let needsPercentageRecalc = false;
+      const updates = {
+        lastAccessedAt: serverTimestamp(),
+      };
+      let needsPercentageRecalc = false;
 
-        // Update completed modules if provided and not already present
-        if (moduleId && !pathData.learningProgress?.completedModules?.includes(moduleId)) {
-            updates["learningProgress.completedModules"] = FieldValue.arrayUnion(moduleId);
-            needsPercentageRecalc = true;
-        }
+      // Update completed modules if provided and not already present
+      if (moduleId && !pathData.learningProgress?.completedModules?.includes(moduleId)) {
+        updates["learningProgress.completedModules"] = FieldValue.arrayUnion(moduleId);
+        needsPercentageRecalc = true;
+      }
 
-        // Update completed quizzes if provided and not already present
-        if (quizId && !pathData.learningProgress?.completedQuizzes?.includes(quizId)) {
-            updates["learningProgress.completedQuizzes"] = FieldValue.arrayUnion(quizId);
-            needsPercentageRecalc = true;
-        }
+      // Update completed quizzes if provided and not already present
+      if (quizId && !pathData.learningProgress?.completedQuizzes?.includes(quizId)) {
+        updates["learningProgress.completedQuizzes"] = FieldValue.arrayUnion(quizId);
+        needsPercentageRecalc = true;
+      }
 
-        // Update completed exams if provided and not already present
-        if (examId && !pathData.learningProgress?.completedExams?.includes(examId)) {
-            updates["learningProgress.completedExams"] = FieldValue.arrayUnion(examId);
-            needsPercentageRecalc = true;
-        }
+      // Update completed exams if provided and not already present
+      if (examId && !pathData.learningProgress?.completedExams?.includes(examId)) {
+        updates["learningProgress.completedExams"] = FieldValue.arrayUnion(examId);
+        needsPercentageRecalc = true;
+      }
 
-        // Update score if provided (Assuming 'score' replaces the current score)
-        // If it's meant to be incremental, use FieldValue.increment(score)
-        if (score !== undefined && typeof score === 'number') {
-            updates["learningProgress.score"] = score;
-        }
+      // Update score if provided (Assuming 'score' replaces the current score)
+      // If it's meant to be incremental, use FieldValue.increment(score)
+      if (score !== undefined && typeof score === 'number') {
+        updates["learningProgress.score"] = score;
+      }
 
-        // Mark path as completed if specified and not already completed
-        if (completed === true && !pathData.completed) {
-            updates["completed"] = true;
-            updates["completedAt"] = serverTimestamp();
-            // Optionally force percentage to 100? Or let calculation handle it?
-            // updates["learningProgress.completionPercentage"] = 100;
-            needsPercentageRecalc = true; // Recalculate to be sure
-        }
+      // Mark path as completed if specified and not already completed
+      if (completed === true && !pathData.completed) {
+        updates["completed"] = true;
+        updates["completedAt"] = serverTimestamp();
+        // Optionally force percentage to 100? Or let calculation handle it?
+        // updates["learningProgress.completionPercentage"] = 100;
+        needsPercentageRecalc = true; // Recalculate to be sure
+      }
 
-        // Apply initial updates within the transaction
-        transaction.update(pathRef, updates);
+      // Apply initial updates within the transaction
+      transaction.update(pathRef, updates);
 
-        // --- Recalculate Completion Percentage ---
-        // We need the potentially updated arrays, so simulate the update locally
-        const currentModules = pathData.learningProgress?.completedModules || [];
-        const currentQuizzes = pathData.learningProgress?.completedQuizzes || [];
-        const currentExams = pathData.learningProgress?.completedExams || [];
+      // --- Recalculate Completion Percentage ---
+      // We need the potentially updated arrays, so simulate the update locally
+      const currentModules = pathData.learningProgress?.completedModules || [];
+      const currentQuizzes = pathData.learningProgress?.completedQuizzes || [];
+      const currentExams = pathData.learningProgress?.completedExams || [];
 
-        const newModulesCount = moduleId && !currentModules.includes(moduleId) ? currentModules.length + 1 : currentModules.length;
-        const newQuizzesCount = quizId && !currentQuizzes.includes(quizId) ? currentQuizzes.length + 1 : currentQuizzes.length;
-        const newExamsCount = examId && !currentExams.includes(examId) ? currentExams.length + 1 : currentExams.length;
+      const newModulesCount = moduleId && !currentModules.includes(moduleId) ? currentModules.length + 1 : currentModules.length;
+      const newQuizzesCount = quizId && !currentQuizzes.includes(quizId) ? currentQuizzes.length + 1 : currentQuizzes.length;
+      const newExamsCount = examId && !currentExams.includes(examId) ? currentExams.length + 1 : currentExams.length;
 
-        const totalItems = (pathData.totalModules || 0) + (pathData.totalQuizzes || 0) + (pathData.totalExams || 0);
-        const completedItems = newModulesCount + newQuizzesCount + newExamsCount;
+      const totalItems = (pathData.totalModules || 0) + (pathData.totalQuizzes || 0) + (pathData.totalExams || 0);
+      const completedItems = newModulesCount + newQuizzesCount + newExamsCount;
 
-        let completionPercentage = pathData.learningProgress?.completionPercentage || 0; // Default to existing
-        if (needsPercentageRecalc && totalItems > 0) {
-            completionPercentage = Math.round((completedItems / totalItems) * 100);
-        } else if (needsPercentageRecalc && totalItems === 0) {
-            completionPercentage = 100; // If no items defined, mark as 100% complete? Or 0? Let's say 100 if completed flag is true.
-            if (completed === true) completionPercentage = 100;
-            else completionPercentage = 0;
-        }
+      let completionPercentage = pathData.learningProgress?.completionPercentage || 0; // Default to existing
+      if (needsPercentageRecalc && totalItems > 0) {
+        completionPercentage = Math.round((completedItems / totalItems) * 100);
+      } else if (needsPercentageRecalc && totalItems === 0) {
+        completionPercentage = 100; // If no items defined, mark as 100% complete? Or 0? Let's say 100 if completed flag is true.
+        if (completed === true) completionPercentage = 100;
+        else completionPercentage = 0;
+      }
 
-        // Ensure percentage doesn't exceed 100
-        finalCompletionPercentage = Math.min(completionPercentage, 100);
+      // Ensure percentage doesn't exceed 100
+      finalCompletionPercentage = Math.min(completionPercentage, 100);
 
-        // Update the percentage within the same transaction
-        transaction.update(pathRef, {
-            "learningProgress.completionPercentage": finalCompletionPercentage,
-        });
+      // Update the percentage within the same transaction
+      transaction.update(pathRef, {
+        "learningProgress.completionPercentage": finalCompletionPercentage,
+      });
 
-        // Update user's last activity
-        const userRef = db.collection("users").doc(userId);
-        transaction.update(userRef, {
-            lastActivity: serverTimestamp(),
-        });
+      // Update user's last activity
+      const userRef = db.collection("users").doc(userId);
+      transaction.update(userRef, {
+        lastActivity: serverTimestamp(),
+      });
 
     }); // End Transaction
 
@@ -480,9 +480,9 @@ exports.updateLearningProgress = async (req, res, next) => {
   } catch (error) {
     console.error(`[providerPathCtrl] Error updating learning progress for user ${req.user?.uid}:`, error);
     if (error instanceof AppError) { // Re-throw AppErrors from transaction
-        next(error);
+      next(error);
     } else {
-        next(new AppError(`Error updating learning progress: ${error.message}`, 500, 'PROGRESS_UPDATE_ERROR'));
+      next(new AppError(`Error updating learning progress: ${error.message}`, 500, 'PROGRESS_UPDATE_ERROR'));
     }
   }
 };
@@ -526,7 +526,10 @@ exports.getUserProgress = async (req, res, next) => {
     const userData = userDoc.data(); // Get user data for overall progress later if needed
 
     // Get user's learning paths subcollection
-    const pathsSnapshot = await userRef.collection('learningPaths').orderBy('lastAccessedAt', 'desc').get();
+    // Only fetch the active learning path or the most recently accessed one if none is active
+    const pathsSnapshot = await userRef.collection('learningPaths')
+      .orderBy('lastAccessedAt', 'desc')
+      .limit(3).get(); // Limit to 1 path
 
     const learningPaths = [];
     let overallModulesCompleted = 0;
@@ -544,18 +547,18 @@ exports.getUserProgress = async (req, res, next) => {
       // --- Fetch Path Definition Details (Optional but good for name/logo/totals) ---
       let pathDetails = { name: 'Unknown Path', logoUrl: null, totalModules: 0, totalQuizzes: 0, totalExams: 0 };
       if (pathId) {
-          const pathDefDoc = await db.collection('paths').doc(pathId).get();
-          if (pathDefDoc.exists) {
-              const defData = pathDefDoc.data();
-              pathDetails.name = defData.name || pathDetails.name;
-              pathDetails.logoUrl = defData.logoUrl || pathDetails.logoUrl;
-              // Use totals from definition if not stored on user's path doc, or prefer definition's?
-              pathDetails.totalModules = defData.totalModules || 0;
-              pathDetails.totalQuizzes = defData.totalQuizzes || 0;
-              pathDetails.totalExams = defData.totalExams || 0;
-          } else {
-              console.warn(`[providerPathCtrl] Path definition ${pathId} not found for user ${userId}'s path ${doc.id}`);
-          }
+        const pathDefDoc = await db.collection('paths').doc(pathId).get();
+        if (pathDefDoc.exists) {
+          const defData = pathDefDoc.data();
+          pathDetails.name = defData.name || pathDetails.name;
+          pathDetails.logoUrl = defData.logoUrl || pathDetails.logoUrl;
+          // Use totals from definition if not stored on user's path doc, or prefer definition's?
+          pathDetails.totalModules = defData.totalModules || 0;
+          pathDetails.totalQuizzes = defData.totalQuizzes || 0;
+          pathDetails.totalExams = defData.totalExams || 0;
+        } else {
+          console.warn(`[providerPathCtrl] Path definition ${pathId} not found for user ${userId}'s path ${doc.id}`);
+        }
       }
       // Use totals stored on the user's path document if available, otherwise fallback to definition
       const totalModules = pathData.totalModules ?? pathDetails.totalModules;
@@ -574,11 +577,11 @@ exports.getUserProgress = async (req, res, next) => {
       let completionPercentage = progress.completionPercentage; // Prefer stored value
 
       if (completionPercentage === undefined || completionPercentage === null) {
-          // Calculate if not stored
-          const totalItems = totalModules + totalQuizzes + totalExams;
-          const completedItems = completedModules.length + completedQuizzes.length + completedExams.length;
-          completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : (pathData.completed ? 100 : 0);
-          completionPercentage = Math.min(completionPercentage, 100); // Ensure max 100
+        // Calculate if not stored
+        const totalItems = totalModules + totalQuizzes + totalExams;
+        const completedItems = completedModules.length + completedQuizzes.length + completedExams.length;
+        completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : (pathData.completed ? 100 : 0);
+        completionPercentage = Math.min(completionPercentage, 100); // Ensure max 100
       }
 
 
@@ -626,7 +629,7 @@ exports.getUserProgress = async (req, res, next) => {
           totalExamsCompleted: overallExamsCompleted, // Added
           totalScore: overallScore,
           // You might also get overall progress from the main user document if stored there
-         ... (userData.overallProgress || {})
+          ... (userData.overallProgress || {})
         }
       }
     });

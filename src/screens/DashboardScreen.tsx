@@ -1,6 +1,6 @@
 // c:\Users\thabi\Desktop\CloudExplorer\src\screens\DashboardScreen.tsx
-import React, { FC, useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, ImageSourcePropType } from 'react-native';
+import React, { FC, useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,8 +9,9 @@ import { REACT_APP_BASE_URL } from '@env';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { useCustomTheme } from '../context/ThemeContext';
-import { useActiveLearningPath } from '../context/ActiveLearningPathContext'; // Import context hook
+import { useActiveLearningPath } from '../context/ActiveLearningPathContext';
 import GridItem from '../components/dashboard/GridItem';
+import QuizModule from '../components/dashboard/QuizModule'; // Import the new component
 import ProgressItem from '../components/dashboard/ProgressItem';
 import ErrorBanner from '../components/dashboard/ErrorBanner';
 import WarningBanner from '../components/dashboard/WarningBanner';
@@ -31,20 +32,12 @@ import { imageMapRecord } from '../utils/imageMap';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
-const examIcons: { [key: string]: ImageSourcePropType } = {
-  'cloud-digital-leader-exam': require('../assets/images/cloud-digital-leader.png'),
-  // Add other exam icons if needed
-};
-
 const examColors: Record<string, string> = {
   'cloud-digital-leader-exam': '#4285F4',
-  // Add other exam colors if needed
 };
-// --- End Icon Maps ---
 
 interface DashboardScreenProps {
-  // Navigation prop might still be needed if navigating *from* Dashboard
-  navigation: NativeStackNavigationProp<RootStackParamList, 'MainApp'>; // Changed to MainApp as it's within TabNavigator
+  navigation: NativeStackNavigationProp<RootStackParamList, 'MainApp'>;
 }
 
 // --- Default State Values ---
@@ -66,6 +59,7 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [examResults, setExamResults] = useState<ExamResult[]>([]);
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
+  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({}); // State for expanded modules
 
   // --- Get active path from context ---
   const { activeProviderId, activePathId } = useActiveLearningPath();
@@ -73,12 +67,25 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
   // --- Fetch User Data (Updated) ---
   const fetchUserData = useCallback(async (currentProviderId: string, currentPathId: string) => {
     setLoading(true);
+    // Reset states before fetching
     setErrorInfo(null);
     setOverallProgress(defaultOverallProgress);
     setLearningPaths([]);
     setModules([]);
     setQuizzes([]);
     setExams([]);
+    setQuizResults([]); // Also reset results
+    setExamResults([]); // Also reset results
+
+    // Variables to hold fetched data before setting state
+    let fetchedProgress: OverallProgress = defaultOverallProgress;
+    let fetchedLearningPaths: LearningPath[] = [];
+    let fetchedQuizResults: QuizResult[] = []; // For dedicated fetch
+    let fetchedExamResults: ExamResult[] = []; // Keep from progress for now
+    let fetchedModules: ApiModule[] = [];
+    let fetchedQuizzes: ApiQuiz[] = [];
+    let fetchedExams: ApiExam[] = [];
+    let fetchError: ErrorInfo | null = null;
 
     try {
       const storedUserId = await AsyncStorage.getItem('userId');
@@ -91,71 +98,146 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
 
       console.log(`[DashboardScreen] Fetching data for user: ${storedUserId}, path: ${currentProviderId}/${currentPathId}`);
 
-      // --- Call 1: Get User Progress Summary ---
-      const progressResponse = await axios.get(
-        `${BASE_URL}/api/v1/users/${storedUserId}/progress`
-      );
-      console.log("[DashboardScreen] Progress Data Received:", progressResponse.data);
-      if (progressResponse.data.status !== 'success') throw new Error('Failed to fetch user progress');
-      setOverallProgress(progressResponse.data.data.overallProgress || defaultOverallProgress);
-      setLearningPaths(progressResponse.data.data.learningPaths || []);
-      setQuizResults(progressResponse.data.data.quizResults || []);
-      setExamResults(progressResponse.data.data.examResults || []);
+      // Define response types inline for clarity
+      interface ListModulesResponse { status: string; data: { modules: ApiModule[]; hasMore: boolean; lastId: string | null; } }
+      interface ListQuizzesResponse { status: string; data: { quizzes: ApiQuiz[]; hasMore: boolean; lastId: string | null; } }
+      interface ListExamsResponse { status: string; data: { exams: ApiExam[]; hasMore: boolean; lastId: string | null; } }
+      // --- Corrected QuizHistoryResponse to match actual API structure ---
+      interface QuizHistoryResponse {
+        status: string;
+        data: { quizHistory: QuizResult[] }; // Data contains a quizHistory array
+      }
 
-      // --- Call 2: Get Available Modules for the Active Path ---
-      try {
-        interface ListModulesResponse { status: string; data: { modules: ApiModule[]; hasMore: boolean; lastId: string | null; } }
-        const modulesResponse = await axios.get<ListModulesResponse>(`${BASE_URL}/api/v1/modules/list`, {
-          params: { providerId: currentProviderId, pathId: currentPathId, limit: 20 }
-        });
+     // --- Add ExamHistoryResponse type ---
+      interface ExamHistoryResponse {
+      status: string;
+       data: { examHistory: ExamResult[] }; // Data contains an examHistory array
+     }
+
+      // Use Promise.allSettled to fetch concurrently and handle partial failures
+      const results = await Promise.allSettled([
+        // Call 1: Progress (still useful for overall stats and learning paths)
+        axios.get(`${BASE_URL}/api/v1/users/${storedUserId}/progress`),
+        // Call 2: Modules
+        axios.get<ListModulesResponse>(`${BASE_URL}/api/v1/modules/list`, {
+          params: { providerId: currentProviderId, pathId: currentPathId, limit: 50 } // Increased limit?
+        }),
+        // Call 3: Quizzes (definitions)
+        axios.get<ListQuizzesResponse>(`${BASE_URL}/api/v1/quizzes/list-quizzes`, {
+          params: { providerId: currentProviderId, pathId: currentPathId, limit: 50 } // Increased limit?
+        }),
+        // Call 4: Exams (definitions)
+        axios.get<ListExamsResponse>(`${BASE_URL}/api/v1/exams/list-exams`, {
+          params: { providerId: currentProviderId, pathId: currentPathId, limit: 50 } // Increased limit?
+        }),
+        // Call 5: Quiz Results History (dedicated endpoint)
+        axios.get<QuizHistoryResponse>(`${BASE_URL}/api/v1/quizzes/history/${storedUserId}`),
+      // --- Call 6: Exam Results History ---
+      axios.get<ExamHistoryResponse>(`${BASE_URL}/api/v1/exams/user/${storedUserId}/exam-history`),
+      ]);
+
+      // Process Progress results (Call 1)
+      if (results[0].status === 'fulfilled') {
+        const progressResponse = results[0].value;
+        console.log("[DashboardScreen] Progress Data Received:", progressResponse.data);
+        if (progressResponse.data.status === 'success') {
+          fetchedProgress = progressResponse.data.data.overallProgress || defaultOverallProgress;
+          fetchedLearningPaths = progressResponse.data.data.learningPaths || [];
+          // Exam results are now fetched separately
+          fetchedExamResults = progressResponse.data.data.examResults || [];          // We still fetch exam results from here for now, unless you add a dedicated exam history endpoint
+        } else {
+          console.error("Error in progress response status:", progressResponse.data);
+          fetchError = { message: 'Failed to load progress data.', isIndexError: false };
+        }
+      } else {
+        console.error("Error fetching progress:", results[0].reason);
+        fetchError = { message: 'Failed to load progress.', isIndexError: false };
+      }
+
+      // Process Modules results (Call 2)
+      if (results[1].status === 'fulfilled') {
+        const modulesResponse = results[1].value;
         console.log("[DashboardScreen] Modules Data Received:", modulesResponse.data);
-        if (modulesResponse.data.status !== 'success') throw new Error('Failed to fetch modules');
-        setModules(modulesResponse.data.data.modules || []);
-      } catch (moduleError) {
-         console.error("Error fetching modules for dashboard:", moduleError);
-         setErrorInfo(prev => ({
-             message: `${prev?.message || ''} Failed to load modules.`.trim(),
-             isIndexError: false,
-             indexUrl: prev?.indexUrl
-         }));
+        if (modulesResponse.data.status === 'success') {
+          fetchedModules = modulesResponse.data.data.modules || [];
+        } else {
+          console.error("Error in modules response status:", modulesResponse.data);
+          fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load quizzes.`.trim(), isIndexError: fetchError?.isIndexError || false }; // Ensure isIndexError is boolean
+        }
+      } else {
+        console.error("Error fetching modules:", results[1].reason);
+        fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load quizzes.`.trim(), isIndexError: fetchError?.isIndexError || false }; // Ensure isIndexError is boolean
       }
 
-      // --- Call 3: Get Available Quizzes for the Active Path ---
-      try {
-        interface ListQuizzesResponse { status: string; data: { quizzes: ApiQuiz[]; hasMore: boolean; lastId: string | null; } }
-        const quizzesResponse = await axios.get<ListQuizzesResponse>(`${BASE_URL}/api/v1/quizzes/list-quizzes`, {
-          params: { providerId: currentProviderId, pathId: currentPathId, limit: 20 }
-        });
+      // Process Quizzes results (Call 3 - Definitions)
+      if (results[2].status === 'fulfilled') {
+        const quizzesResponse = results[2].value;
         console.log("[DashboardScreen] Quizzes Data Received:", quizzesResponse.data);
-         if (quizzesResponse.data.status !== 'success') throw new Error('Failed to fetch quizzes');
-        setQuizzes(quizzesResponse.data.data.quizzes || []);
-      } catch (quizError) {
-         console.error("Error fetching quizzes for dashboard:", quizError);
-         setErrorInfo(prev => ({
-             message: `${prev?.message || ''} Failed to load quizzes.`.trim(),
-             isIndexError: false,
-             indexUrl: prev?.indexUrl
-         }));
+        if (quizzesResponse.data.status === 'success') {
+          fetchedQuizzes = quizzesResponse.data.data.quizzes || [];
+        } else {
+          console.error("Error in quizzes response status:", quizzesResponse.data);
+          fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load exams.`.trim(), isIndexError: fetchError?.isIndexError || false }; // Ensure isIndexError is boolean
+        }
+      } else {
+        console.error("Error fetching quizzes:", results[2].reason);
+        fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load exams.`.trim(), isIndexError: fetchError?.isIndexError || false }; // Ensure isIndexError is boolean
       }
 
-      // --- Call 4: Get Available Exams for the Active Path ---
-      try {
-        interface ListExamsResponse { status: string; data: { exams: ApiExam[]; hasMore: boolean; lastId: string | null; } }
-        const examsResponse = await axios.get<ListExamsResponse>(`${BASE_URL}/api/v1/exams/list-exams`, {
-          params: { providerId: currentProviderId, pathId: currentPathId, limit: 20 }
-        });
+      // Process Exams results (Call 4 - Definitions)
+      if (results[3].status === 'fulfilled') {
+        const examsResponse = results[3].value;
         console.log("[DashboardScreen] Exams Data Received:", examsResponse.data);
-        if (examsResponse.data.status !== 'success') throw new Error('Failed to fetch exams');
-        setExams(examsResponse.data.data.exams || []);
-      } catch (examError) {
-         console.error("Error fetching exams for dashboard:", examError);
-         setErrorInfo(prev => ({
-             message: `${prev?.message || ''} Failed to load exams.`.trim(),
-             isIndexError: false,
-             indexUrl: prev?.indexUrl
-         }));
+        if (examsResponse.data.status === 'success') {
+          fetchedExams = examsResponse.data.data.exams || [];
+        } else {
+          console.error("Error in exams response status:", examsResponse.data);
+          fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load exams.`.trim(), isIndexError: fetchError?.isIndexError || false }; // Ensure isIndexError is boolean
+        }
+      } else {
+        console.error("Error fetching exams:", results[3].reason);
+        fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load quiz results.`.trim(), isIndexError: fetchError?.isIndexError || false }; // Ensure isIndexError is boolean
       }
 
+      // Process Quiz Results History (Call 5)
+      if (results[4].status === 'fulfilled') {
+        const quizHistoryResponse = results[4].value;
+        console.log("[DashboardScreen] Quiz History Data Received:", quizHistoryResponse.data);
+        if (quizHistoryResponse.data.status === 'success') {
+          // Correctly access the nested quizHistory array
+          fetchedQuizResults = quizHistoryResponse.data.data.quizHistory || []; // Access data.quizHistory
+          // --- ADD LOG: Show the actual fetched quiz results ---
+          console.log("[DashboardScreen] Fetched Quiz Results Array:", JSON.stringify(fetchedQuizResults, null, 2));
+        } else {
+          console.error("Error in quiz history response status:", quizHistoryResponse.data);
+          fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load quiz results.`.trim(), isIndexError: fetchError?.isIndexError || false }; // Ensure isIndexError is boolean
+        }
+      } else {
+        console.error("Error fetching quiz history:", results[4].reason);
+        fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load quiz results.`.trim(), isIndexError: fetchError?.isIndexError || false }; // Ensure isIndexError is boolean
+      }
+
+      // Process Exam Results History (Call 6)
+      if (results[5].status === 'fulfilled') {
+        const examHistoryResponse = results[5].value;
+        console.log("[DashboardScreen] Exam History Data Received:", examHistoryResponse.data);
+        if (examHistoryResponse.data.status === 'success') {
+          fetchedExamResults = examHistoryResponse.data.data?.examHistory || []; // Get results from dedicated endpoint
+          console.log("[DashboardScreen] Fetched Exam Results Array:", JSON.stringify(fetchedExamResults, null, 2));
+        } else {
+          console.error("Error in exam history response status:", examHistoryResponse.data);
+          fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load exam results.`.trim(), isIndexError: fetchError?.isIndexError || false };
+        }
+      } else {
+        console.error("Error fetching exam history:", results[5].reason);
+        fetchError = { ...fetchError, message: `${fetchError?.message || ''} Failed to load exam results.`.trim(), isIndexError: fetchError?.isIndexError || false };
+      }
+
+
+      // Check if any fetch failed and set a general error message if needed
+      if (fetchError && !fetchError.message) {
+         fetchError.message = 'An unknown error occurred while fetching data.';
+      }
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err.response?.data || err.message);
       const indexUrl = extractFirestoreIndexUrl(err.message);
@@ -165,16 +247,26 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
         indexUrl: indexUrl || undefined,
       });
     } finally {
+      // --- Batch state updates ---
+      setOverallProgress(fetchedProgress);
+      setLearningPaths(fetchedLearningPaths);
+      setQuizResults(fetchedQuizResults); // Set results from dedicated fetch
+      setExamResults(fetchedExamResults);
+      setModules(fetchedModules);
+      setQuizzes(fetchedQuizzes);
+      setExams(fetchedExams);
+      setErrorInfo(fetchError); // Set error state based on accumulated errors
       setLoading(false);
+      console.log('[DashboardScreen] Fetching complete. Final state updates applied.');
     }
+  }, []);
   // Removed navigation dependency as it's not used directly for fetching
-  }, []); // Removed navigation dependency
 
   useEffect(() => {
     // Log how DashboardScreen gets the IDs from context
     console.log('[DashboardScreen] Trying to determine active path from context.');
     console.log('[DashboardScreen] Context Values:', { activeProviderId, activePathId });
-
+  
     if (activeProviderId && activePathId) {
       // --- Call fetchUserData with context values ---
       fetchUserData(activeProviderId, activePathId);
@@ -192,24 +284,17 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
     let title = resourceId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     let imageIcon = imageMapRecord['default'];
     let color = '#3b82f6';
-    // Provider/Path IDs for navigation will now come from context, not item data
-    // let providerIdForNav: string | undefined;
-    // let pathIdForNav: string | undefined;
 
     if (resourceType === 'module') {
       item = modules.find(m => m.id === resourceId);
       if (item) {
         title = item.title;
         imageIcon = imageMapRecord[resourceId] || imageMapRecord['default'];
-        // providerIdForNav = item.providerId || undefined; // No longer needed from item
-        // pathIdForNav = item.pathId || undefined;       // No longer needed from item
       }
     } else if (resourceType === 'quiz') {
       item = quizzes.find(q => q.id === resourceId);
        if (item) {
          title = item.title;
-         // providerIdForNav = item.providerId || undefined; // No longer needed from item
-         // pathIdForNav = item.pathId || undefined;       // No longer needed from item
          const moduleDetails = getResourceDetails(item.moduleId, 'module');
          imageIcon = moduleDetails.imageIcon;
          color = moduleDetails.color;
@@ -217,14 +302,16 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
     } else if (resourceType === 'exam') {
       item = exams.find(e => e.id === resourceId);
       if (item) {
+        // Corrected log to show the actual key being used for lookup
+        console.log(`[getResourceDetails] Processing exam: ID=${item.id}, Title=${item.title}. Attempting image lookup with key: '${item.id}'`);
         title = item.title;
-        // providerIdForNav = item.providerId || undefined; // No longer needed from item
-        // pathIdForNav = item.pathId || undefined;       // No longer needed from item
-        imageIcon = examIcons[item.examId] || examIcons['default'];
-        color = examColors[item.examId] || '#3b82f6';
+        imageIcon = imageMapRecord[item.id] || imageMapRecord['default']; // Try using item.id as the key
+        color = examColors[item.id] || '#3b82f6'; // Also update color lookup if it uses the same key
+        console.log(`[getResourceDetails] Specific image found for key '${item.id}':`, imageIcon !== imageMapRecord['default']); // Log if specific image (not default) was found using item.id
+      } else {
+        console.log(`[getResourceDetails] Exam item not found for resourceId: ${resourceId}`);
       }
     }
-
     // Return details without provider/path IDs for navigation
     return { imageIcon, color, title };
   };
@@ -246,6 +333,47 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
     ? Math.round((overallProgress.totalModulesCompleted / totalAvailableModules) * 100)
     : 0;
 
+  // --- Group Quiz Results by Module ID ---
+  const quizzesByModule = useMemo(() => {
+    return quizResults.reduce((acc, quiz) => {
+      const moduleId = quiz.moduleId;
+      if (!acc[moduleId]) {
+        acc[moduleId] = [];
+      }
+      acc[moduleId].push(quiz);
+      // Optional: Sort quizzes within each module by timestamp descending
+      acc[moduleId].sort((a, b) => {
+        if (a.timestamp && b.timestamp) {
+          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+        }
+        return 0;
+      });
+      return acc;
+    }, {} as Record<string, QuizResult[]>);
+  }, [quizResults]);
+
+    // --- Group Exam Results by Exam ID ---
+    const examsById = useMemo(() => {
+      console.log("[DashboardScreen] useMemo calculating examsById. Input examResults:", JSON.stringify(examResults, null, 2));
+      return examResults.reduce((acc, exam) => {
+        const examId = exam.examId; // Group by the exam definition ID
+        if (!acc[examId]) acc[examId] = [];
+        acc[examId].push(exam);
+        acc[examId].sort((a, b) => {
+          if (a.timestamp && b.timestamp) {
+            return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+          }
+          return 0;
+        }); // Sort attempts by date desc
+        return acc;
+      }, {} as Record<string, ExamResult[]>);
+    }, [examResults]);
+  // --- ADD LOG: Show the result of grouping ---
+  console.log("[DashboardScreen] Quizzes grouped by module:", JSON.stringify(quizzesByModule, null, 2));
+
+  const toggleModuleExpansion = useCallback((moduleId: string) => {
+    setExpandedModules(prev => ({ ...prev, [moduleId]: !prev[moduleId] }));
+  }, []);
   // --- Loading State (No changes needed) ---
   if (loading) {
     return (
@@ -336,29 +464,41 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
           <Text style={[dashboardStyles.sectionTitle, { color: colors.text }]}>Modules</Text>
           {modules.length > 0 ? (
             modules.map(module => {
-              // Get details without provider/path for nav
               const { imageIcon, color, title } = getResourceDetails(module.id, 'module');
-              const isCompleted = allCompletedModuleIds.has(module.id);
-              const status = isCompleted ? 'Completed' : 'Not Started';
+              const moduleQuizzes = quizzesByModule[module.id] || [];
+              const isExpanded = expandedModules[module.id] || false;
+              // --- ADD LOG: Show what's being passed to QuizModule ---
+              console.log(`[DashboardScreen] For Module "${title}" (ID: ${module.id}), passing ${moduleQuizzes.length} quizzes to QuizModule.`);
+
               return (
+                /*
                 <ProgressItem
                   key={module.id}
                   title={title}
                   status={status}
                   color={color}
                   imageIcon={imageIcon}
-                  // --- Pass context provider/path IDs to ModuleDetail ---
                   onPress={() => navigation.navigate('ModuleDetail', {
                       moduleId: module.id,
                   })}
+                />
+                */
+                // --- Use the new QuizModule component ---
+                <QuizModule
+                  key={module.id}
+                  moduleId={module.id}
+                  title={title}
+                  quizzes={moduleQuizzes}
+                  isExpanded={isExpanded}
+                  color={color}
+                  imageIcon={imageIcon}
+                  onToggle={toggleModuleExpansion}
                 />
               );
             })
           ) : (
             <Text style={[dashboardStyles.noDataText, { color: colors.textSecondary }]}>No modules available for this path.</Text>
           )}
-
-          {/* Quizzes List */}
           <Text style={[dashboardStyles.sectionTitle, { color: colors.text }]}>Quizzes</Text>
           {quizzes.length > 0 ? (
             quizzes.map(quiz => {
@@ -366,7 +506,7 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
               const isCompleted = allCompletedQuizIds.has(quiz.id);
               const status = isCompleted ? 'Completed' : 'Not Started';
               const latestResult = quizResults.find(qr => qr.quizId === quiz.id);
-
+              // Hide quizzes list if they are shown inside modules
               return (
                 <ProgressItem
                   key={quiz.id}
@@ -392,23 +532,26 @@ const DashboardScreen: FC<DashboardScreenProps> = ({ navigation }) => {
           {/* Exams List */}
           <Text style={[dashboardStyles.sectionTitle, { color: colors.text }]}>Exams</Text>
           {exams.length > 0 ? (
+            // --- Add this log ---
+            console.log('[DashboardScreen] Rendering Exams List. Exams state:', exams),
             exams.map(exam => {
               // Get details without provider/path for nav
               const { imageIcon, color, title } = getResourceDetails(exam.id, 'exam');
+              const examAttempts = examsById[exam.id] || []; // Get attempts for this exam
+              const latestResult = examAttempts[0]; // Latest attempt is the first after sorting
               const isCompleted = allCompletedExamIds.has(exam.id);
               const status = isCompleted ? 'Completed' : 'Not Started';
-              const latestResult = examResults.find(er => er.examId === exam.id);
 
               return (
                 <ProgressItem
                   key={exam.id}
                   title={title}
-                  status={status}
+                  status={latestResult ? `Latest: ${latestResult.percentage}% (${latestResult.percentage ? 'Passed' : 'Failed'})` : status} // Show latest result status
                   color={color}
                   imageIcon={imageIcon}
-                  // --- Pass context provider/path IDs to ExamDetail ---
+                  percentage={latestResult ? Math.round((latestResult.score / exam.totalScore) * 100) : undefined}
                   onPress={() => navigation.navigate('ExamDetail', {
-                      examId: exam.examId,
+                      examId: exam.id,
                       title: exam.title,
                       providerId: activeProviderId || '', // Use context value
                       pathId: activePathId || '',       // Use context value

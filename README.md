@@ -113,9 +113,7 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
 
 ## Screenshots
 
-
 ![Alt](src/screenshots/ezgif.com-animated-gif-maker.gif)
-
 
 ## Getting Started
 

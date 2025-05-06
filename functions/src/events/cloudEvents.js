@@ -5,72 +5,78 @@
 // functions/src/events/cloudEvents.js
 
 // --- V2 Imports ---
-const {onSchedule} = require("firebase-functions/v2/scheduler"); // For scheduled functions
-const {onCall, HttpsError} = require("firebase-functions/v2/https"); // For callable functions
-const {logger} = require("firebase-functions"); // Use logger for V2
+const {onRequest} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {logger} = require("firebase-functions");
 
 // --- Other Imports ---
 const admin = require("firebase-admin");
 const axios = require("axios");
 const cheerio = require("cheerio");
-const {getFirestore, FieldValue, Timestamp} = require("firebase-admin/firestore"); // Use specific Firestore imports
+const {getFirestore, FieldValue, Timestamp} = require("firebase-admin/firestore");
 
 // Initialize Admin SDK if not already initialized
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-const db = getFirestore(); // Use getFirestore()
+const db = getFirestore();
 
 /**
- * WARNING: WEB SCRAPING IS FRAGILE. Selectors must be verified against the live page.
- * Fetch latest GCP events from Google Cloud OnAir events page
+ * Fetch latest GCP events from Google Cloud events page
  * @returns {Promise<Array>} Array of GCP event objects
  */
 async function fetchGCPEvents() {
-  const gcpUrl = "https://cloudonair.withgoogle.com/events"; // Updated URL for static event listings
-  logger.info(`Scraping GCP events from: ${gcpUrl}`);
+  const gcpUrl = "https://cloud.google.com/events";
+  logger.info(`Fetching GCP events from: ${gcpUrl}`);
   try {
-    const response = await axios.get(gcpUrl);
+    const response = await axios.get(gcpUrl, {timeout: 15000});
+    const htmlSnippet = response.data.substring(0, 500);
+    logger.info(`GCP HTML snippet: ${htmlSnippet}`);
     const $ = cheerio.load(response.data);
     const events = [];
 
-    // Updated GCP selectors
-    const eventCardSelector = ".devsite-landing-row-item";
-    const titleSelector = "h3.devsite-landing-row-item-title";
-    const descriptionSelector = ".devsite-landing-row-item-description";
-    const dateSelector = ".devsite-landing-row-item-metadata";
-    const linkSelector = "a.devsite-landing-row-item-link";
+    // Broadened GCP selectors to handle DOM changes
+    const eventCardSelector = "div[class*='event'], article, section, [class*='card'], [class*='item']";
+    const titleSelector = "h3, h4, h5, [class*='title'], [class*='heading']";
+    const descriptionSelector = "p, [class*='description'], [class*='body'], [class*='content']";
+    const dateSelector = "[class*='date'], time, [class*='meta'], [class*='when']";
+    const linkSelector = "a[href]";
 
-    $(eventCardSelector).each((i, element) => {
-      const title = $(element).find(titleSelector).text().trim();
-      const description = $(element).find(descriptionSelector).text().trim();
-      const dateText = $(element).find(dateSelector).text().trim();
-      let link = $(element).find(linkSelector).attr("href");
+    const cards = $(eventCardSelector);
+    logger.info(`GCP Scraper found ${cards.length} potential event cards.`);
 
-      if (title && link) {
-        // Ensure link is absolute
-        if (!link.startsWith("http")) {
-          const baseUrl = "https://cloudonair.withgoogle.com";
-          link = link.startsWith("/") ? `${baseUrl}${link}` : `${baseUrl}/${link}`;
+    cards.each((i, element) => {
+      try {
+        const title = $(element).find(titleSelector).first().text().trim();
+        const description = $(element).find(descriptionSelector).first().text().trim();
+        const dateText = $(element).find(dateSelector).first().text().trim();
+        let link = $(element).find(linkSelector).first().attr("href");
+
+        if (title && link) {
+          if (!link.startsWith("http")) {
+            const baseUrl = "https://cloud.google.com";
+            link = link.startsWith("/") ? `${baseUrl}${link}` : `${baseUrl}/${link}`;
+          }
+
+          events.push({
+            title,
+            description: description || "Google Cloud event",
+            date: dateText || new Date().toISOString(),
+            link: link,
+            platform: "GCP",
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          if (!title) logger.warn(`GCP Scraper: Skipping card ${i} due to missing title.`);
+          if (!link) logger.warn(`GCP Scraper: Skipping card ${i} ("${title}") due to missing link.`);
         }
-
-        events.push({
-          title,
-          description: description || "Google Cloud event", // Default description
-          date: dateText || new Date().toISOString(), // Fallback date
-          link: link,
-          platform: "GCP",
-          createdAt: FieldValue.serverTimestamp(),
-        });
-      } else {
-        if (!title) logger.warn(`GCP Scraper: Skipping card ${i} due to missing title.`);
-        if (!link) logger.warn(`GCP Scraper: Skipping card ${i} ("${title}") due to missing link.`);
+      } catch (error) {
+        logger.warn(`Error processing GCP card ${i}:`, error.message);
       }
     });
 
     logger.info(`GCP Scraper found ${events.length} potential events.`);
-    // Filter unique events by title and link
     const uniqueEvents = Array.from(new Map(events.map((e) => [`${e.title}-${e.link}`, e])).values());
     if (uniqueEvents.length < events.length) {
       logger.info(`GCP Scraper filtered down to ${uniqueEvents.length} unique events.`);
@@ -84,53 +90,60 @@ async function fetchGCPEvents() {
 }
 
 /**
- * WARNING: WEB SCRAPING IS FRAGILE. Selectors must be verified against the live page.
  * Fetch latest AWS events from AWS events page
  * @returns {Promise<Array>} Array of AWS event objects
  */
 async function fetchAWSEvents() {
-  const awsUrl = "https://aws.amazon.com/events/"; // URL remains valid
-  logger.info(`Scraping AWS events from: ${awsUrl}`);
+  const awsUrl = "https://aws.amazon.com/events/";
+  logger.info(`Fetching AWS events from: ${awsUrl}`);
   try {
-    const response = await axios.get(awsUrl);
+    const response = await axios.get(awsUrl, {timeout: 15000});
+    const htmlSnippet = response.data.substring(0, 500);
+    logger.info(`AWS HTML snippet: ${htmlSnippet}`);
     const $ = cheerio.load(response.data);
     const events = [];
 
-    // Updated AWS selectors
-    const eventCardSelector = ".aws-grid .aws-grid-column";
-    const titleSelector = "h3";
-    const descriptionSelector = "p";
-    const dateSelector = ".date-display";
-    const linkSelector = "a";
+    // Broadened AWS selectors to handle DOM changes
+    const eventCardSelector = "div[class*='event'], article, section, [class*='card'], [class*='item'], [class*='grid']";
+    const titleSelector = "h3, h4, h5, [class*='title'], [class*='heading']";
+    const descriptionSelector = "p, [class*='description'], [class*='body'], [class*='content']";
+    const dateSelector = "[class*='date'], time, [class*='meta'], [class*='when']";
+    const linkSelector = "a[href]";
 
-    $(eventCardSelector).each((i, element) => {
-      const title = $(element).find(titleSelector).text().trim();
-      const description = $(element).find(descriptionSelector).text().trim();
-      const dateText = $(element).find(dateSelector).text().trim();
-      let link = $(element).find(linkSelector).attr("href");
+    const cards = $(eventCardSelector);
+    logger.info(`AWS Scraper found ${cards.length} potential event cards.`);
 
-      if (title && link) {
-        // Ensure link is absolute
-        if (!link.startsWith("http")) {
-          const baseUrl = "https://aws.amazon.com";
-          link = link.startsWith("/") ? `${baseUrl}${link}` : `${baseUrl}/${link}`;
+    cards.each((i, element) => {
+      try {
+        const title = $(element).find(titleSelector).first().text().trim();
+        const description = $(element).find(descriptionSelector).first().text().trim();
+        const dateText = $(element).find(dateSelector).first().text().trim();
+        let link = $(element).find(linkSelector).first().attr("href");
+
+        if (title && link) {
+          if (!link.startsWith("http")) {
+            const baseUrl = "https://aws.amazon.com";
+            link = link.startsWith("/") ? `${baseUrl}${link}` : `${baseUrl}/${link}`;
+          }
+
+          events.push({
+            title,
+            description: description || "AWS event",
+            date: dateText || new Date().toISOString(),
+            link: link,
+            platform: "AWS",
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          if (!title) logger.warn(`AWS Scraper: Skipping card ${i} due to missing title.`);
+          if (!link) logger.warn(`AWS Scraper: Skipping card ${i} ("${title}") due to missing link.`);
         }
-        events.push({
-          title,
-          description: description || "AWS event",
-          date: dateText || new Date().toISOString(),
-          link: link,
-          platform: "AWS",
-          createdAt: FieldValue.serverTimestamp(),
-        });
-      } else {
-        if (!title) logger.warn(`AWS Scraper: Skipping card ${i} due to missing title.`);
-        if (!link) logger.warn(`AWS Scraper: Skipping card ${i} ("${title}") due to missing link.`);
+      } catch (error) {
+        logger.warn(`Error processing AWS card ${i}:`, error.message);
       }
     });
 
     logger.info(`AWS Scraper found ${events.length} potential events.`);
-    // Filter unique events by title and link
     const uniqueEvents = Array.from(new Map(events.map((e) => [`${e.title}-${e.link}`, e])).values());
     if (uniqueEvents.length < events.length) {
       logger.info(`AWS Scraper filtered down to ${uniqueEvents.length} unique events.`);
@@ -144,54 +157,60 @@ async function fetchAWSEvents() {
 }
 
 /**
- * WARNING: WEB SCRAPING IS FRAGILE. Selectors should be verified periodically.
  * Fetch latest Azure events from Microsoft Azure events page
  * @returns {Promise<Array>} Array of Azure event objects
  */
 async function fetchAzureEvents() {
-  const azureUrl = "https://azure.microsoft.com/en-us/community/events/"; // Verify URL
-  logger.info(`Workspaceing Azure events from: ${azureUrl}`);
+  const azureUrl = "https://azure.microsoft.com/en-us/community/events/";
+  logger.info(`Fetching Azure events from: ${azureUrl}`);
   try {
-    const response = await axios.get(azureUrl);
+    const response = await axios.get(azureUrl, {timeout: 15000});
+    const htmlSnippet = response.data.substring(0, 500);
+    logger.info(`Azure HTML snippet: ${htmlSnippet}`);
     const $ = cheerio.load(response.data);
     const events = [];
 
-    // >>> IMPORTANT: Verify these selectors periodically, even if they work now <<<
-    const eventCardSelector = ".event-card, .card, .column, .event-item"; // Examples
-    const titleSelector = ".card-title, h3, h4"; // Examples
-    const descriptionSelector = ".card-body, p, .description"; // Examples
-    const dateSelector = ".event-date, .date"; // Examples
-    const linkSelector = "a"; // Examples
+    // Refined Azure selectors to exclude invalid cards
+    const eventCardSelector = ".event-card, .card:not(.empty), .event-item:not(:empty)";
+    const titleSelector = ".card-title, h3:not(:empty), h4:not(:empty)";
+    const descriptionSelector = ".card-body, p:not(:empty), .description";
+    const dateSelector = ".event-date, .date, time";
+    const linkSelector = "a[href]:not([href=''])";
 
-    $(eventCardSelector).each((i, element) => {
-      const title = $(element).find(titleSelector).first().text().trim();
-      const description = $(element).find(descriptionSelector).first().text().trim();
-      const dateText = $(element).find(dateSelector).first().text().trim();
-      let link = $(element).find(linkSelector).first().attr("href");
+    const cards = $(eventCardSelector);
+    logger.info(`Azure Scraper found ${cards.length} potential event cards.`);
 
-      if (title && link) {
-        // Ensure link is absolute
-        if (!link.startsWith("http")) {
-          const baseUrl = "https://azure.microsoft.com"; // Azure Base URL
-          link = link.startsWith("/") ? `${baseUrl}${link}` : `${baseUrl}/${link}`;
+    cards.each((i, element) => {
+      try {
+        const title = $(element).find(titleSelector).first().text().trim();
+        const description = $(element).find(descriptionSelector).first().text().trim();
+        const dateText = $(element).find(dateSelector).first().text().trim();
+        let link = $(element).find(linkSelector).first().attr("href");
+
+        if (title && link) {
+          if (!link.startsWith("http")) {
+            const baseUrl = "https://azure.microsoft.com";
+            link = link.startsWith("/") ? `${baseUrl}${link}` : `${baseUrl}/${link}`;
+          }
+
+          events.push({
+            title,
+            description: description || "Microsoft Azure event",
+            date: dateText || new Date().toISOString(),
+            link: link,
+            platform: "Azure",
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          if (!title) logger.warn(`Azure Scraper: Skipping card ${i} due to missing title.`);
+          if (!link) logger.warn(`Azure Scraper: Skipping card ${i} ("${title}") due to missing link.`);
         }
-
-        events.push({
-          title,
-          description: description || "Microsoft Azure event",
-          date: dateText || new Date().toISOString(),
-          link: link,
-          platform: "Azure",
-          createdAt: FieldValue.serverTimestamp(),
-        });
-      } else {
-        if (!title) logger.warn(`Azure Scraper: Skipping card ${i} due to missing title.`);
-        if (!link) logger.warn(`Azure Scraper: Skipping card ${i} ("${title}") due to missing link.`);
+      } catch (error) {
+        logger.warn(`Error processing Azure card ${i}:`, error.message);
       }
     });
 
     logger.info(`Azure Scraper found ${events.length} potential events.`);
-    // Filter out potential duplicates
     const uniqueEvents = Array.from(new Map(events.map((e) => [`${e.title}-${e.link}`, e])).values());
     if (uniqueEvents.length < events.length) {
       logger.info(`Azure Scraper filtered down to ${uniqueEvents.length} unique events.`);
@@ -344,17 +363,15 @@ async function notifyUsersAboutEvents(newEvents) {
   }
 }
 
-// --- V2 Scheduled Function ---
-exports.fetchCloudEvents = onSchedule(
+// --- V2 HTTP Trigger Function ---
+exports.fetchCloudEvents = onRequest(
     {
-      schedule: "0 */12 * * *",
-      timeZone: "UTC",
       timeoutSeconds: 540,
       memory: "1GiB",
     },
-    async (event) => {
-      const executionId = event.jobName;
-      logger.info(`Starting scheduled cloud events fetch job (v2). Execution: ${executionId}`);
+    async (req, res) => {
+      const executionId = req.get("X-Cloud-Trace-Context") || "unknown";
+      logger.info(`Starting HTTP-triggered cloud events fetch job (v2). Execution: ${executionId}`);
 
       try {
         const [gcpEvents, awsEvents, azureEvents] = await Promise.all([
@@ -366,11 +383,12 @@ exports.fetchCloudEvents = onSchedule(
         const allEvents = [...gcpEvents, ...awsEvents, ...azureEvents];
 
         if (allEvents.length === 0) {
-          logger.info("Scheduled job found no events across all platforms.");
-          return null;
+          logger.info("HTTP-triggered job found no events across all platforms.");
+          res.status(200).json({success: true, message: "No events found.", count: {total: 0, gcp: 0, aws: 0, azure: 0}});
+          return;
         }
 
-        logger.info(`Scheduled job found ${allEvents.length} total events (GCP: ${gcpEvents.length}, AWS: ${awsEvents.length}, Azure: ${azureEvents.length})`);
+        logger.info(`HTTP-triggered job found ${allEvents.length} total events (GCP: ${gcpEvents.length}, AWS: ${awsEvents.length}, Azure: ${azureEvents.length})`);
 
         await saveEventsToFirestore(allEvents);
 
@@ -384,11 +402,20 @@ exports.fetchCloudEvents = onSchedule(
 
         await notifyUsersAboutEvents(eventsWithIds);
 
-        logger.info(`Scheduled cloud events fetch job completed successfully (v2). Execution: ${executionId}`);
-        return null;
+        logger.info(`HTTP-triggered cloud events fetch job completed successfully (v2). Execution: ${executionId}`);
+        res.status(200).json({
+          success: true,
+          message: `Successfully fetched and processed ${allEvents.length} events`,
+          count: {
+            total: allEvents.length,
+            gcp: gcpEvents.length,
+            aws: awsEvents.length,
+            azure: azureEvents.length,
+          },
+        });
       } catch (error) {
-        logger.error(`FATAL Error in scheduled cloud events fetch job (v2): ${error.message}`, {error: error, stack: error.stack, executionId: executionId});
-        return null;
+        logger.error(`FATAL Error in HTTP-triggered cloud events fetch job (v2): ${error.message}`, {error: error, stack: error.stack, executionId: executionId});
+        res.status(500).json({success: false, message: "Internal server error", error: error.message});
       }
     });
 

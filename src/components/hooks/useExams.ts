@@ -20,6 +20,12 @@ interface ListExamsApiResponse {
   message?: string;
 }
 
+// --- Define the correct API response structure for Exam History ---
+interface ExamHistoryApiResponse {
+  status: string;
+  data?: { examHistory: any[] }; // History is nested under data.examHistory
+  message?: string;
+}
 interface UseExamsReturn {
   exams: Exam[];
   examAttempts: Record<string, number>;
@@ -136,16 +142,21 @@ export const useExams = (providerId: string | null, pathId: string | null): UseE
       setExams(formattedExams);
 
       // --- Fetch Exam Progress ---
-      const progressUrl = `${BASE_URL}/api/v1/exams/progress/${userId}`;
+      // --- FIX: Use the new exam history endpoint ---
+      const progressUrl = `${BASE_URL}/api/v1/exams/user/${userId}/exam-history`;
       console.log(`[useExams] Fetching progress from: ${progressUrl}`);
-      const progressResponse = await axios.get<UserProgressData>(progressUrl, {
+      // --- FIX: Use the correct response type ---
+      const progressResponse = await axios.get<ExamHistoryApiResponse>(progressUrl, {
           timeout: 10000,
       });
 
-      if (Array.isArray(progressResponse.data?.data)) {
+      // --- FIX: Access the nested examHistory array ---
+      const examHistoryData = progressResponse.data?.data?.examHistory;
+
+      if (Array.isArray(examHistoryData)) {
         const attempts: Record<string, number> = {};
         const scores: Record<string, number> = {};
-        progressResponse.data.data.forEach((attempt: any) => {
+        examHistoryData.forEach((attempt: any) => {
           if (formattedExams.some(exam => exam.examId === attempt.examId)) {
               attempts[attempt.examId] = (attempts[attempt.examId] || 0) + 1;
               if (

@@ -17,7 +17,13 @@ interface ExamDetailResponse {
   };
   message?: string;
 }
-
+// Response from saving the exam result
+interface SaveExamResultResponse {
+  status: 'success' | 'error';
+  message?: string;
+  resultId?: string; // ID of the saved result document
+  passed: boolean;   // Whether the user passed
+}
 interface SubmitProgressResponse {
     status: 'success' | 'error';
     message?: string;
@@ -122,10 +128,19 @@ export const useExamDetail = (
         throw new Error(response.data.message || 'Failed to load exam details (invalid response)');
       }
 
-      const { exam: examData } = response.data.data;
-      const { questions: fetchedQuestions, ...meta } = examData;
+      // Cast the API response data temporarily to access 'id'
+      const examDataFromApi = response.data.data.exam as any;
+      const apiExamId = examDataFromApi.id; // Get the ID from the raw API data
+      const { questions: fetchedQuestions, ...restOfMeta } = examDataFromApi; // Destructure the rest
 
-      console.log(`[useExamDetail] Fetched exam "${meta.title}" with ${fetchedQuestions.length} questions. Passing score: ${meta.passingRate}`);
+      // Construct the meta object ensuring examId is populated from the API's id field
+      // Use the type Omit<ExamDetail, 'questions'> which expects 'examId'
+      const meta: Omit<ExamDetail, 'questions'> = {
+          ...restOfMeta,   // Spread the rest of the properties
+          examId: apiExamId, // Assign the fetched 'id' to the 'examId' field
+      };
+
+      console.log(`[useExamDetail] Fetched exam "${meta.title}" (ID: ${meta.examId}) with ${fetchedQuestions.length} questions. Passing score: ${meta.passingRate}`);
       setQuestions(fetchedQuestions || []); // Ensure questions is always an array
       setExamMeta(meta);
 
@@ -161,7 +176,7 @@ export const useExamDetail = (
     }
     if (submittingResults) return; // Prevent double submission
 
-    console.log(`[useExamDetail] Processing submission for exam: ${examMeta.examId}, user: ${userId}, path: ${providerId}/${pathId}`);
+    console.log(`[useExamDetail] Processing submission for exam: ${examMeta.examId}, user: ${userId}, path: ${providerId}/${pathId}`); // Use examMeta.examId
     setSubmittingResults(true);
     setError(null); // Clear previous errors
 
@@ -187,11 +202,11 @@ export const useExamDetail = (
       const passingScoreThreshold = examMeta.passingRate ?? 70;
       const passed = score >= passingScoreThreshold;
 
-      console.log(`[useExamDetail] Score: ${correctAnswers}/${totalQuestions} (${score}%), Passing Threshold: ${passingScoreThreshold}, Passed: ${passed}`);
+      console.log(`[useExamDetail] Calculated Score: ${correctAnswers}/${totalQuestions} (${score}%), Passing Threshold: ${passingScoreThreshold}%, Passed: ${passed}`);
 
       // Construct the result object for display
       const displayResult: ExamResult = {
-        examId: examMeta.examId,
+        examId: examMeta.examId, // Use examMeta.examId
         providerId: providerId, // Include context
         pathId: pathId, // Include context
         userId: userId,
@@ -207,48 +222,73 @@ export const useExamDetail = (
         })),
         timestamp: new Date().toISOString(), // Add timestamp now
         answers: userAnswers,
+        totalQuestions: totalQuestions, // Add total questions
       };
-      setExamResult(displayResult); // Set result for display immediately
-      setExamCompleted(true); // Mark as completed
+       // --- Step 1: Save the detailed exam result ---
+       const saveResultUrl = `${BASE_URL}/api/v1/exams/save-result`;
+       // Create payload matching backend expectations (use validated fields)
+       const savePayload = {
+         userId: userId,
+         examId: examMeta.examId, // Use examMeta.examId
+         providerId: providerId,
+         pathId: pathId,
+         score: correctAnswers, // Raw score count
+         totalQuestions: totalQuestions,
+         percentage: score,     // Send percentage
+         passed: passed,
+         answers: userAnswers, // Send the user's answers map { questionId: answerLetter }
+         timestamp: displayResult.timestamp, // Use the same timestamp
+         // Optional: Send timing info if available
+         startTime: examTiming?.startTime,
+         endTime: displayResult.timestamp, // Use completion timestamp as end time
+         timeSpent: examTiming ? Math.round((new Date(displayResult.timestamp).getTime() - new Date(examTiming.startTime).getTime()) / 1000) : null,
+       };
 
-      // --- Submit to Backend Progress Endpoint ---
-      const progressUrl = `${BASE_URL}/api/v1/users/${userId}/progress`;
-      const payload = {
-        resourceType: 'exam',
-        resourceId: examId,
-        action: 'complete',
-        providerId: providerId,
-        pathId: pathId,
-        score: correctAnswers, // Send raw score count
-        percentage: score,     // Send percentage
-        passed: passed,
-        answers: userAnswers, // Send the user's answers map { questionId: answerLetter }
-        timestamp: displayResult.timestamp, // Use the same timestamp
-        durationTaken: examTiming ? (new Date().getTime() - new Date(examTiming.startTime).getTime()) / 1000 : null, // Optional: Send duration
-      };
+       console.log('[useExamDetail] Saving exam result payload:', savePayload);
 
-      console.log('[useExamDetail] Submitting progress payload:', payload);
-
-      // Use retry logic similar to original hook? Or rely on user retry? Let's simplify for now.
-      const response = await axios.post<SubmitProgressResponse>(progressUrl, payload, { timeout: 15000 });
-
-      if (response.data.status !== 'success') {
-        throw new Error(response.data.message || 'Failed to save exam results to server.');
-      }
-
-      console.log('[useExamDetail] Server submission successful.');
-      await AsyncStorage.removeItem(`exam_${examId}_state`); // Clear local state on successful submission
-
-    } catch (err: any) {
-      console.error('[useExamDetail] Error submitting exam results:', err.response?.data || err.message);
-      handleError(err, (msg) => setError(msg || 'Failed to submit results. Please try again.'));
-      // Keep examCompleted true, but show error. User might need to retry submission manually?
-      // Or revert examCompleted? Let's keep it completed but show error.
-      Alert.alert('Submission Error', error || 'Failed to save results. Your results are shown, but please try submitting again later if needed.');
-    } finally {
-      setSubmittingResults(false);
-    }
-  }, [examId, examMeta, questions, userAnswers, userId, providerId, pathId, examTiming, submittingResults]); // Add dependencies
+       const saveResponse = await axios.post<SaveExamResultResponse>(saveResultUrl, savePayload, { timeout: 15000 });
+ 
+       if (saveResponse.data.status !== 'success') {
+         throw new Error(saveResponse.data.message || 'Failed to save exam result details.');
+       }
+       console.log(`[useExamDetail] Exam result saved successfully (ID: ${saveResponse.data.resultId}). Passed: ${saveResponse.data.passed}`);
+ 
+       // --- Step 2: If passed, update the overall user progress for the learning path ---
+       if (saveResponse.data.passed) {
+         console.log('[useExamDetail] Exam passed. Updating user progress...');
+         const progressUrl = `${BASE_URL}/api/v1/users/${userId}/progress`;
+         const progressPayload = {
+           resourceType: 'exam',
+           resourceId: examMeta.examId, // Use examMeta.examId
+           action: 'complete',
+           providerId: providerId,
+           pathId: pathId,
+           // No need to send score/percentage here, just completion status
+         };
+         console.log('[useExamDetail] User progress update payload:', progressPayload);
+         const progressResponse = await axios.post<SubmitProgressResponse>(progressUrl, progressPayload, { timeout: 10000 });
+ 
+         if (progressResponse.data.status !== 'success') {
+           console.warn('[useExamDetail] Failed to update user progress:', progressResponse.data.message || 'Unknown error');
+         } else {
+           console.log('[useExamDetail] User progress updated successfully.');
+         }
+       } else {
+         console.log('[useExamDetail] Exam not passed. Skipping user progress update.');
+       }
+ 
+       // --- Final UI Updates ---
+       setExamResult(displayResult); // Set result for display
+       setExamCompleted(true); // Mark as completed
+       await AsyncStorage.removeItem(`exam_${examMeta.examId}_user_${userId}_state`); // Use examMeta.examId for key
+ 
+     } catch (err: any) {
+       console.error('[useExamDetail] Error submitting exam results:', err.response?.data || err.message);
+     } finally {
+       setSubmittingResults(false);
+     }
+   }, [examMeta, questions, userAnswers, userId, providerId, pathId, examTiming, submittingResults]);
+ 
 
   // --- Submit Exam (Handles confirmation) ---
   const submitExam = useCallback(() => {

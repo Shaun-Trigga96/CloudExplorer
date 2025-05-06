@@ -1,11 +1,11 @@
 const admin = require('firebase-admin');
 const AppError = require('../utils/appError');
 const { FieldValue } = require('firebase-admin/firestore'); // Import FieldValue
-const { serverTimestamp } = require('../utils/firestoreHelpers'); // Import serverTimestamp
+const { serverTimestamp, isValidFirebaseStorageUrl } = require('../utils/firestoreHelpers'); // Import serverTimestamp and validation helper
 
 const db = admin.firestore();
 
-// POST /save-result
+// POST /api/v1/exams/save-result
 // RESPONSIBILITY: Saves the details of a specific exam attempt to the 'examResults' collection.
 // Does NOT update the user's overall learning path progress directly anymore.
 exports.saveExamResult = async (req, res, next) => {
@@ -14,10 +14,10 @@ exports.saveExamResult = async (req, res, next) => {
     // Destructure providerId and pathId from the main body, not nested in result
     const {
         userId,
-        examId,
-        providerId, // ADDED
-        pathId,     // ADDED
-        result      // Keep result object for attempt details
+        examId,     // ID of the exam definition
+        providerId, // Context: Provider ID
+        pathId,     // Context: Path ID
+        // Expecting result details directly in the body now, not nested
     } = req.body;
 
     // --- Input Validation ---
@@ -26,40 +26,39 @@ exports.saveExamResult = async (req, res, next) => {
     if (!examId || typeof examId !== 'string')
       return next(new AppError('Valid examId is required.', 400, 'INVALID_EXAM_ID'));
     // ADDED Validation
-    if (!providerId || typeof providerId !== 'string')
+    if (!providerId || typeof providerId !== 'string') // Keep validation
       return next(new AppError('Valid providerId is required.', 400, 'INVALID_PROVIDER_ID'));
-    if (!pathId || typeof pathId !== 'string')
+    if (!pathId || typeof pathId !== 'string') // Keep validation
       return next(new AppError('Valid pathId is required.', 400, 'INVALID_PATH_ID'));
     // --- End ADDED Validation ---
-    if (!result || typeof result !== 'object')
-      return next(new AppError('Exam result object is required.', 400, 'MISSING_RESULT_OBJECT'));
 
-    // Validate required fields within the result object
+    // Validate required fields directly from the body
     const {
       totalQuestions,
-      correctAnswers, // Use correctAnswers for raw score
+      score,          // Use 'score' for raw correct answers count
       percentage,     // Expect percentage (0-100) from frontend or calculate
       passed,         // Expect boolean from frontend
       answers,        // Renamed from answeredQuestions for consistency
-      startTime,      // Optional ISO string
+      startTime,      // Optional start time (ISO string)
       endTime,        // Optional ISO string
       timeSpent,      // Optional number in seconds
       timestamp,      // Optional completion timestamp ISO string
-    } = result;
+    } = req.body; // Change 'result' to 'req.body'
 
     if (totalQuestions === undefined || typeof totalQuestions !== 'number' || totalQuestions <= 0)
       return next(new AppError('Valid result.totalQuestions is required.', 400, 'INVALID_TOTAL_QUESTIONS'));
-    if (correctAnswers === undefined || typeof correctAnswers !== 'number' || correctAnswers < 0)
-      return next(new AppError('Valid result.correctAnswers is required.', 400, 'INVALID_CORRECT_ANSWERS'));
-    if (percentage === undefined || typeof percentage !== 'number' || percentage < 0 || percentage > 100)
+    if (score === undefined || typeof score !== 'number' || score < 0) // Validate 'score'
+    //   return next(new AppError('Valid result.score (correct answers count) is required.', 400, 'INVALID_SCORE'));
+    // if (!result || typeof result !== 'object') return next(new AppError('Exam result object is required.', 400, 'MISSING_RESULT_OBJECT'));
+      if (percentage === undefined || typeof percentage !== 'number' || percentage < 0 || percentage > 100)
       return next(new AppError('Valid result.percentage (0-100) is required.', 400, 'INVALID_SCORE_PERCENTAGE'));
     if (passed === undefined || typeof passed !== 'boolean')
       return next(new AppError('Valid result.passed (boolean) is required.', 400, 'INVALID_IS_PASSED'));
     if (answers && typeof answers !== 'object')
       return next(new AppError('result.answers should be an object if provided.', 400, 'INVALID_ANSWERS'));
     if (timeSpent !== undefined && typeof timeSpent !== 'number')
-        return next(new AppError('result.timeSpent should be a number (seconds) if provided.', 400, 'INVALID_TIME_SPENT'));
-
+      return next(new AppError('result.timeSpent should be a number (seconds) if provided.', 400, 'INVALID_TIME_SPENT'));
+    // Add validation for startTime and endTime if needed (e.g., valid date strings)
     // --- Prepare Exam Result Data ---
     const examResultRef = db.collection('examResults').doc(); // Auto-generate ID
 
@@ -74,7 +73,7 @@ exports.saveExamResult = async (req, res, next) => {
       providerId, // ADDED
       pathId,     // ADDED
       totalQuestions,
-      score: correctAnswers, // Store raw number of correct answers as 'score'
+      score: score, // Store raw number of correct answers as 'score'
       percentage, // Store calculated/provided percentage
       passed,     // Store boolean passed status
       answers: answers || {}, // Store answer details if available
@@ -117,9 +116,9 @@ exports.saveExamResult = async (req, res, next) => {
   }
 };
 
-// GET /progress/:userId
+// GET /api/v1/exams/user/:userId/exam-history (Renamed from getExamProgress)
 // Optionally filter by providerId and pathId
-exports.getExamProgress = async (req, res, next) => {
+exports.getExamHistory = async (req, res, next) => { // Renamed function
   try {
     const {userId} = req.params;
     const {
@@ -135,16 +134,16 @@ exports.getExamProgress = async (req, res, next) => {
     let query = db.collection('examResults').where('userId', '==', userId);
 
     if (examId && typeof examId === 'string') {
-      console.log(`Filtering exam progress for user ${userId} by exam ${examId}`);
+      console.log(`Filtering exam history for user ${userId} by exam ${examId}`);
       query = query.where('examId', '==', examId);
     }
     // ADDED: Add provider/path filters if provided
     if (providerId && typeof providerId === 'string') {
-        console.log(`Filtering exam progress for user ${userId} by provider ${providerId}`);
+        console.log(`Filtering exam history for user ${userId} by provider ${providerId}`);
         query = query.where('providerId', '==', providerId);
     }
     if (pathId && typeof pathId === 'string') {
-        console.log(`Filtering exam progress for user ${userId} by path ${pathId}`);
+        console.log(`Filtering exam history for user ${userId} by path ${pathId}`);
         query = query.where('pathId', '==', pathId);
     }
     // --- End ADDED ---
@@ -153,7 +152,7 @@ exports.getExamProgress = async (req, res, next) => {
 
     const examResultsSnapshot = await query.get();
 
-    const examProgress = examResultsSnapshot.docs.map(doc => {
+    const examHistory = examResultsSnapshot.docs.map(doc => { // Renamed variable
       const data = doc.data();
       return {
         resultId: doc.id, // ID of the result document
@@ -170,14 +169,14 @@ exports.getExamProgress = async (req, res, next) => {
     });
 
     res.json({
-        status: 'success',
-        data: { examProgress }
+      status: 'success',
+      data: { examHistory } // Return as object with key 'examHistory'
     }); // Return as object with key
   } catch (error) {
-    console.error(`Error fetching exam progress for user ${req.params.userId}:`, error);
-    next(new AppError('Failed to retrieve exam progress.', 500, 'DB_FETCH_ERROR'));
+    console.error(`Error fetching exam history for user ${req.params.userId}:`, error);
+    next(new AppError('Failed to retrieve exam history.', 500, 'DB_FETCH_ERROR'));
   }
-};
+}; // End getExamHistory
 
 // GET /list
 // Requires providerId and pathId query parameters

@@ -1,7 +1,6 @@
 const admin = require('firebase-admin');
 const AppError = require('../utils/appError');
 const {serverTimestamp} = require('../utils/firestoreHelpers');
-const { FieldValue } = require('firebase-admin/firestore'); // Import FieldValue
 
 const db = admin.firestore();
 
@@ -82,7 +81,7 @@ exports.saveQuizResult = async (req, res, next) => {
 
     res.status(201).json({
       status: 'success',
-      message: 'Quiz result saved successfully. Remember to call user progress endpoint.',
+      message: 'Quiz result saved successfully. Update user progress if passed.', // Updated message
       resultId: quizResultRef.id,
       passed: passed,
     });

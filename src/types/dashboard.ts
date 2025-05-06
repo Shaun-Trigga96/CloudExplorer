@@ -88,6 +88,7 @@ export interface OverallProgress {
   
   // Represents a single Exam item from the /exams/list endpoint
   export interface ApiExam {
+    totalScore: number;
     id: string; // Assuming the list returns a unique DB id
     examId: string; // The specific ID like 'cloud-digital-leader-exam'
     title: string;

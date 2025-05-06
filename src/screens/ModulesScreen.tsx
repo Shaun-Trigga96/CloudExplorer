@@ -11,7 +11,7 @@ import { useCustomTheme } from '../context/ThemeContext';
 import { useActiveLearningPath } from '../context/ActiveLearningPathContext'; // Import context hook
 import ModuleCard from '../components/modules/ModuleCard';
 import { ErrorView } from '../components/common/ErrorView';
-import { ApiModule, UserProgressResponse, ListModulesResponse, UserProgressData } from '../types/modules';
+import { ApiModule, ListModulesResponse, UserProgressData } from '../types/modules';
 import { handleError } from '../utils/handleError';
 import { imageMap } from '../utils/imageMap';
 

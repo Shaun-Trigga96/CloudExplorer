@@ -36,6 +36,7 @@ export interface Exam {
 }
 // Update ExamResult passingScore source if needed
 export interface ExamResult {
+  id?: string; // Document ID from Firestore (optional on frontend)
   examId: string;
   providerId: string;
   pathId: string;
@@ -44,6 +45,7 @@ export interface ExamResult {
   percentage: number; // Calculated percentage
   passed: boolean;
   answers: Record<string, string>;
+  totalQuestions: number; // Total questions in the exam
   startTime?: any;
   endTime?: any;
   timeSpent?: number; // in seconds

@@ -1,5 +1,4 @@
-// src/components/community/EventCard.tsx
-import React, {FC, useState, useCallback} from 'react';
+import React, { FC, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,18 +9,18 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Linking, // Import Linking
+  Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-import { Chip } from 'react-native-paper'; // Import Chip
+import { Chip, Button } from 'react-native-paper';
+import Animated, { FadeIn, ZoomIn } from 'react-native-reanimated';
 import axios from 'axios';
-import {REACT_APP_BASE_URL} from '@env';
-import {CommunityEvent} from '../../types/community'; // Ensure this type includes platform and link
-import {useCustomTheme} from '../../context/ThemeContext';
-import {formatDate} from '../../utils/formatDate';
-import {formatRelativeTime} from '../../utils/formatTime';
+import { REACT_APP_BASE_URL } from '@env';
+import { CommunityEvent } from '../../types/community';
+import { useCustomTheme } from '../../context/ThemeContext';
+import { formatDate } from '../../utils/formatDate';
+import { formatRelativeTime } from '../../utils/formatTime';
 
-// Enable LayoutAnimation on Android
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -31,20 +30,17 @@ if (Platform.OS === 'android') {
 const BASE_URL = REACT_APP_BASE_URL;
 
 interface EventCardProps {
-  event: CommunityEvent & {isRegistered?: boolean; isSaved?: boolean};
+  event: CommunityEvent & { isRegistered?: boolean; isSaved?: boolean };
   userId: string | null;
 }
 
-const EventCard: FC<EventCardProps> = ({event, userId}) => {
-  const {theme} = useCustomTheme();
-  const {colors} = theme;
-
+const EventCard: FC<EventCardProps> = ({ event, userId }) => {
+  const { theme: { colors } } = useCustomTheme();
   const [isAttending, setIsAttending] = useState(event.isRegistered || false);
   const [isSavedState, setIsSavedState] = useState(event.isSaved || false);
   const [loadingAttend, setLoadingAttend] = useState(false);
   const [loadingSave, setLoadingSave] = useState(false);
 
-  // --- Actions (Attend/Save - Keep the logic) ---
   const handleAttendToggle = useCallback(async () => {
     if (!userId || loadingAttend || !event.id) return;
     setLoadingAttend(true);
@@ -54,10 +50,33 @@ const EventCard: FC<EventCardProps> = ({event, userId}) => {
     try {
       const action = originalAttendState ? 'unregister' : 'register';
       const url = `${BASE_URL}/api/v1/community/events/${event.id}/${action}`;
-      await axios.post(url, {userId});
+      await axios.post(url, { userId });
     } catch (error) {
-      const action = originalAttendState ? 'unregister' : 'register'; // Declare the action variable here
-      console.error(`Error ${action}ing event:`, error);
+      let action;
+      try {
+        action = originalAttendState ? 'unregister' : 'register';
+        const url = `${BASE_URL}/api/v1/community/events/${event.id}/${action}`;
+        await axios.post(url, { userId });
+      } catch (error) {
+        let action;
+        try {
+          action = originalAttendState ? 'unregister' : 'register';
+          const url = `${BASE_URL}/api/v1/community/events/${event.id}/${action}`;
+          await axios.post(url, { userId });
+        } catch (error) {
+          console.error(`Error ${action}ing event:`, error);
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setIsAttending(originalAttendState);
+          Alert.alert('Error', `Could not ${action} for the event.`);
+        } finally {
+          setLoadingAttend(false);
+        }
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setIsAttending(originalAttendState);
+        Alert.alert('Error', `Could not ${action} for the event.`);
+      } finally {
+        setLoadingAttend(false);
+      }
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setIsAttending(originalAttendState);
       Alert.alert('Error', `Could not ${action} for the event.`);
@@ -70,21 +89,23 @@ const EventCard: FC<EventCardProps> = ({event, userId}) => {
     if (!userId || loadingSave || !event.id) return;
     setLoadingSave(true);
     const originalSaveState = isSavedState;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsSavedState(!originalSaveState);
     try {
       const action = originalSaveState ? 'unsave' : 'save';
       const url = `${BASE_URL}/api/v1/community/events/${event.id}/${action}`;
-      await axios.post(url, {userId});
+      await axios.post(url, { userId });
     } catch (error) {
-      console.error(`Error ${"action"}ing event:`, error);
+      let action;
+      console.error(`Error ${action}ing event:`, error);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setIsSavedState(originalSaveState);
-      Alert.alert('Error', `Could not ${"action"} the event.`);
+      Alert.alert('Error', `Could not ${action} the event.`);
     } finally {
       setLoadingSave(false);
     }
   }, [userId, event.id, isSavedState, loadingSave]);
 
-  // --- Open Link Action ---
   const handleOpenLink = useCallback(async () => {
     if (!event.link) return;
     const supported = await Linking.canOpenURL(event.link);
@@ -95,195 +116,147 @@ const EventCard: FC<EventCardProps> = ({event, userId}) => {
     }
   }, [event.link]);
 
-  // --- Date Formatting ---
   const eventDate = new Date(event.date);
   const isPastEvent = eventDate < new Date();
   const day = eventDate.getDate();
-  const month = eventDate.toLocaleString('default', {month: 'short'}).toUpperCase();
+  const month = eventDate.toLocaleString('default', { month: 'short' }).toUpperCase();
 
-  // --- Render Logic ---
   if (isPastEvent) {
-    // --- Past Event Card ---
     return (
-      <View
-        style={[
-          styles.cardBase,
-          styles.pastCard,
-          {backgroundColor: colors.surface, borderColor: colors.border},
-        ]}>
+      <Animated.View entering={FadeIn.duration(500)} style={[styles.cardBase, styles.pastCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
         <View style={styles.pastContent}>
-          <View style={styles.pastDateBlock}>
+          <View style={[styles.pastDateBlock, { backgroundColor: colors.textSecondary }]}>
             <Text style={styles.pastDateText}>{formatDate(event.date)}</Text>
           </View>
           <View style={styles.pastInfo}>
-            <Text style={[styles.pastTitle, {color: colors.textSecondary}]}>
-              {event.title}
-            </Text>
-            {/* Optionally show platform for past events */}
-            <Text style={[styles.pastPlatform, {color: colors.textSecondary}]}>
-              Platform: {event.platform || 'N/A'}
-            </Text>
+            <Text style={[styles.pastTitle, { color: colors.textSecondary }]}>{event.title}</Text>
+            <Text style={[styles.pastPlatform, { color: colors.textSecondary }]}>Platform: {event.platform || 'N/A'}</Text>
           </View>
         </View>
-        {/* Simple link for past events */}
         {event.link && (
           <TouchableOpacity onPress={handleOpenLink} style={styles.pastLinkButton}>
-             <Icon name="external-link" size={18} color={colors.primary} />
+            <Icon name="external-link" size={20} color={colors.primary} />
           </TouchableOpacity>
         )}
-        <View style={styles.pastBadge}>
+        <View style={[styles.pastBadge, { backgroundColor: colors.textSecondary }]}>
           <Text style={styles.pastBadgeText}>Past</Text>
         </View>
-      </View>
+      </Animated.View>
     );
   } else {
-    // --- Upcoming Event Card ---
     return (
-      <View
-        style={[
-          styles.cardBase,
-          styles.upcomingCard,
-          {backgroundColor: colors.surface, borderColor: colors.border},
-        ]}>
+      <Animated.View entering={FadeIn.duration(500)} style={[styles.cardBase, styles.upcomingCard, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
         <View style={styles.cardContentRow}>
-          {/* Date Block */}
-          <View style={[styles.dateBlock, {backgroundColor: colors.primary}]}>
+          <View style={[styles.dateBlock, { backgroundColor: colors.primary }]}>
             <Text style={styles.dateDay}>{day}</Text>
             <Text style={styles.dateMonth}>{month}</Text>
           </View>
-
-          {/* Main Content */}
           <View style={styles.mainContent}>
-            <Text style={[styles.title, {color: colors.text}]}>
-              {event.title}
-            </Text>
-            {/* Platform Chip */}
+            <Text style={[styles.title, { color: colors.text }]}>{event.title}</Text>
             <Chip
-              style={[styles.platformChip, {backgroundColor: colors.chipBackground}]}
-              textStyle={[styles.platformChipText, {color: colors.primary}]}
-              mode="flat">
+              style={[styles.platformChip, { backgroundColor: colors.chipBackground }]}
+              textStyle={[styles.platformChipText, { color: colors.primary }]}
+              mode="flat"
+            >
               {event.platform || 'General'}
             </Chip>
-            {/* Details */}
             <View style={styles.detailRow}>
-              <Icon name="clock" size={14} color={colors.textSecondary} />
-              <Text style={[styles.detailText, {color: colors.textSecondary}]}>
+              <Icon name="clock" size={16} color={colors.textSecondary} />
+              <Text style={[styles.detailText, { color: colors.textSecondary }]}>
                 {event.time ? formatRelativeTime(event.time) : 'Time TBD'}
               </Text>
             </View>
             {event.location && (
               <View style={styles.detailRow}>
-                <Icon name="map-pin" size={14} color={colors.textSecondary} />
-                <Text
-                  style={[styles.detailText, {color: colors.textSecondary}]}
-                  numberOfLines={1}>
+                <Icon name="map-pin" size={16} color={colors.textSecondary} />
+                <Text style={[styles.detailText, { color: colors.textSecondary }]} numberOfLines={1}>
                   {event.location}
                 </Text>
               </View>
             )}
             {event.description && (
-              <Text
-                style={[styles.description, {color: colors.textSecondary}]}
-                numberOfLines={2}>
+              <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
                 {event.description}
               </Text>
             )}
           </View>
         </View>
-
-        {/* Footer Actions */}
-        <View style={[styles.footer, {borderTopColor: colors.border}]}>
-          {/* Left side: Attendees & View Link */}
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
           <View style={styles.footerLeft}>
             <View style={styles.attendeesContainer}>
-              <Icon name="users" size={14} color={colors.textSecondary} />
-              <Text style={[styles.attendeesText, {color: colors.textSecondary}]}>
+              <Icon name="users" size={16} color={colors.textSecondary} />
+              <Text style={[styles.attendeesText, { color: colors.textSecondary }]}>
                 {event.attending || 0} attending
               </Text>
             </View>
-            {/* View Event Link Button */}
             {event.link && (
-              <TouchableOpacity
-                style={styles.viewEventButton}
-                onPress={handleOpenLink}>
-                <Icon name="external-link" size={14} color={colors.primary} />
-                <Text style={[styles.viewEventButtonText, {color: colors.primary}]}>
+              <Animated.View entering={ZoomIn.duration(300)}>
+                <Button
+                  mode="text"
+                  onPress={handleOpenLink}
+                  style={styles.viewEventButton}
+                  labelStyle={[styles.viewEventButtonText, { color: colors.primary }]}
+                  icon="external-link"
+                >
                   View Event
-                </Text>
-              </TouchableOpacity>
+                </Button>
+              </Animated.View>
             )}
           </View>
-
-          {/* Right side: Save & Attend Buttons */}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={handleSaveToggle}
-              disabled={loadingSave}>
-              {loadingSave ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Icon
-                  name="bookmark"
-                  size={20}
-                  color={isSavedState ? colors.primary : colors.textSecondary}
-                />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.attendButton,
-                isAttending
-                  ? {backgroundColor: colors.primary, borderColor: colors.success, borderWidth: 1}
-                  : {backgroundColor: colors.primary},
-              ]}
-              onPress={handleAttendToggle}
-              disabled={loadingAttend}>
-              {loadingAttend ? (
-                <ActivityIndicator
-                  size="small"
-                  color={isAttending ? colors.success : colors.background}
-                />
-              ) : (
-                <>
+          <Animated.View style={styles.actionButtonsContainer}>
+            <Animated.View entering={ZoomIn.duration(300)}>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={handleSaveToggle}
+                disabled={loadingSave}
+              >
+                {loadingSave ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
                   <Icon
-                    name={isAttending ? 'check' : 'plus'}
-                    size={16}
-                    color={isAttending ? colors.success : colors.background}
+                    name="bookmark"
+                    size={22}
+                    color={isSavedState ? colors.primary : colors.textSecondary}
                   />
-                  <Text
-                    style={[
-                      styles.attendButtonText,
-                      {color: isAttending ? colors.success : colors.background},
-                    ]}>
-                    {isAttending ? 'Attending' : 'Attend'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+            <Animated.View entering={ZoomIn.duration(300).delay(100)}>
+              <Button
+                mode={isAttending ? 'contained' : 'outlined'}
+                onPress={handleAttendToggle}
+                disabled={loadingAttend}
+                style={[styles.attendButton, isAttending && { borderColor: colors.success }]}
+                labelStyle={[styles.attendButtonText, { color: isAttending ? colors.background : colors.primary }]}
+                icon={isAttending ? 'check' : 'plus'}
+                loading={loadingAttend}
+              >
+                {isAttending ? 'Attending' : 'Attend'}
+              </Button>
+            </Animated.View>
+          </Animated.View>
         </View>
-      </View>
+      </Animated.View>
     );
   }
 };
 
-// --- Styles --- (Includes additions for platform chip and link button)
 const styles = StyleSheet.create({
   cardBase: {
-    borderRadius: 12,
-    marginBottom: 16,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   upcomingCard: {},
   pastCard: {
-    opacity: 0.75,
+    opacity: 0.85,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -294,106 +267,111 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 10, // Space before link/badge
+    marginRight: 12,
   },
   pastDateBlock: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: '#e0e0e0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     marginRight: 12,
   },
   pastDateText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#666',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFF',
   },
   pastInfo: {
     flex: 1,
   },
   pastTitle: {
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '600',
     flexShrink: 1,
   },
   pastPlatform: {
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 4,
   },
   pastLinkButton: {
-    padding: 8, // Make touch target larger
+    padding: 10,
     marginHorizontal: 8,
   },
   pastBadge: {
-    backgroundColor: '#a0a0a0',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    marginLeft: 'auto', // Push to the far right if no link
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 'auto',
   },
   pastBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   cardContentRow: {
     flexDirection: 'row',
     padding: 16,
   },
   dateBlock: {
-    width: 55,
-    height: 55,
-    borderRadius: 8,
+    width: 60,
+    height: 60,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
     padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   dateDay: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '800',
     color: '#FFFFFF',
-    lineHeight: 24,
+    lineHeight: 26,
   },
   dateMonth: {
-    fontSize: 11,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#FFFFFF',
-    lineHeight: 12,
+    lineHeight: 14,
   },
   mainContent: {
     flex: 1,
     justifyContent: 'center',
   },
   title: {
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 6,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   platformChip: {
-    alignSelf: 'flex-start', // Don't stretch chip
-    height: 24,
+    alignSelf: 'flex-start',
+    height: 28,
+    borderRadius: 14,
     marginBottom: 8,
-    justifyContent: 'center', // Center text vertically
+    justifyContent: 'center',
   },
   platformChipText: {
-    fontSize: 11,
-    fontWeight: '500',
-    lineHeight: 14, // Adjust for vertical centering
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 14,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   detailText: {
     marginLeft: 8,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '500',
     flexShrink: 1,
   },
   description: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     marginTop: 6,
   },
   footer: {
@@ -407,52 +385,47 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   footerLeft: {
-    flexDirection: 'column', // Stack attendees and link
+    flexDirection: 'column',
     alignItems: 'flex-start',
-    flexShrink: 1, // Allow shrinking
-    marginRight: 10, // Space before action buttons
+    flexShrink: 1,
+    marginRight: 12,
   },
   attendeesContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4, // Space between attendees and link
+    marginBottom: 6,
   },
   attendeesText: {
-    fontSize: 13,
-    marginLeft: 6,
+    fontSize: 14,
+    marginLeft: 8,
+    fontWeight: '500',
   },
   viewEventButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4, // Add padding for touch area
+    paddingVertical: 4,
   },
   viewEventButtonText: {
-    marginLeft: 6,
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
   },
   actionButtonsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   iconButton: {
-    padding: 8,
+    padding: 10,
     marginRight: 8,
   },
   attendButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 20,
-    minWidth: 90,
-    height: 32,
+    minWidth: 100,
+    height: 36,
+    justifyContent: 'center',
   },
   attendButtonText: {
-    marginLeft: 6,
-    fontWeight: '600',
-    fontSize: 13,
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
 

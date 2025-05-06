@@ -67,5 +67,6 @@ export interface QuizResult {
   percentage: number;
   passed: boolean;
   answers: Record<string, string>; // { questionId: userAnswerLetter }
- timestamp: any; // Firestore Timestamp or ISO String
+  timestamp: any; // Firestore Timestamp or ISO String
+  totalQuestions: number; // Add this line
 }
