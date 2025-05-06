@@ -74,6 +74,7 @@
     "@react-native/eslint-config": "0.77.0",
     "@react-native/metro-config": "0.77.0",
     "@react-native/typescript-config": "0.77.0",
+    "@testing-library/react-native": "^13.2.0",
     "@types/firebase": "^2.4.32",
     "@types/jest": "^29.5.13",
     "@types/node": "^20.14.10",

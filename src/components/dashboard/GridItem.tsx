@@ -14,15 +14,13 @@ interface GridItemProps {
   screen: keyof RootStackParamList | string; // Allow string for Tab names
   index: number;
   navigation: NativeStackNavigationProp<RootStackParamList, 'MainApp'>;
-  providerId: string;
-  pathId: string;
 }
 
 const screenWidth = Dimensions.get('window').width;
 const itemWidth = (screenWidth - 48) / 2;
 
 const GridItem: FC<GridItemProps> = ({ icon, title, description, color, screen, index, navigation }) => {
-  const { isDarkMode } = useCustomTheme();
+  useCustomTheme();
   const { colors, cardStyle } = useCustomTheme().theme;
 
   const handlePress = () => {

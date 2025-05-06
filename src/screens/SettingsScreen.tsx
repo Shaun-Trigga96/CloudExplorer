@@ -22,7 +22,6 @@ import { useCustomTheme } from '../context/ThemeContext';
 import { REACT_APP_BASE_URL } from '@env';
 import Sound from 'react-native-sound'; // Import react-native-sound
 import { darkColors, lightColors } from '../styles/colors';
-import DashboardScreen from './DashboardScreen';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -214,9 +213,12 @@ const SettingsScreen: FC = () => {
       // Load and play a sound
       const newSound = new Sound('click.mp3', Sound.MAIN_BUNDLE, (error) => {
         if (error) {
-          console.error('Failed to load the sound', error);
+          console.error('Failed to load the sound "click.mp3":', error);
           // Revert UI if sound fails to load
-          setUserSettings(prev => ({ ...prev, soundEffects: false }));
+          Alert.alert(
+            'Sound Error',
+            'Could not load sound effect (click.mp3). Please ensure the file is correctly placed in the app assets and rebuild the app.'
+          ); setUserSettings(prev => ({ ...prev, soundEffects: false }));
           return;
         }
         // Play the sound with an onEnd callback

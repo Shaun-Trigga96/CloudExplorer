@@ -9,6 +9,11 @@ import QuizzesDetailScreen from '../screens/QuizzesDetailScreen';
 import ExamDetailsScreen from '../screens/ExamDetailsScreen';
 import CreatePostScreen from '../screens/CreatePostScreen';
 import { useCustomTheme } from '../context/ThemeContext'; // Import theme hook
+import ModulesScreen from '../screens/ModulesScreen';
+import QuizzesScreen from '../screens/QuizzesScreen';
+import ExamsScreen from '../screens/ExamsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import CommunityScreen from '../screens/CommunityScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -20,10 +25,15 @@ export type RootStackParamList = {
   QuizzesDetail: {
     moduleId: string;
     providerId: string; // ADDED
-    pathId: string;     // ADDED
-    quizId?: string;    // Optional: Pass quizId if available/needed
+    pathId: string; // ADDED
+    quizId?: string; // Optional: Pass quizId if available/needed
   };
-  ExamDetail: { examId: string; title: string; providerId: string; pathId: string }; // Pass context
+  ExamDetail: {
+    examId: string;
+    title: string;
+    providerId: string;
+    pathId: string;
+  }; // Pass context
   SettingsScreen: undefined; // Direct access, likely within TabNavigator
   CertificationsScreen: undefined; // Direct access, likely within TabNavigator
   ProfileScreen: undefined; // Direct access, likely within TabNavigator
@@ -42,21 +52,20 @@ const RootNavigator = () => {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        gestureEnabled: false, 
-      }}
-    >
+        gestureEnabled: false,
+      }}>
       {/* Screens accessible before/during authentication */}
       <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
-     
+
       {/* Main application screens, grouped under TabNavigator */}
       {/* The 'MainApp' route points to the TabNavigator component */}
       <Stack.Screen name="MainApp" component={TabNavigator} />
-      
+
       {/* Detail Screens - These are pushed on top of the current stack (including tabs) */}
       <Stack.Screen
         name="ModulesScreen"
-        component={TabNavigator}
+        component={ModulesScreen}
         options={{ headerShown: true, title: 'Modules' }} // Example: Show header for detail screens
       />
       <Stack.Screen
@@ -65,14 +74,34 @@ const RootNavigator = () => {
         options={{ headerShown: true, title: 'Module Details' }} // Example: Show header for detail screens
       />
       <Stack.Screen
+        name="QuizzesScreen"
+        component={QuizzesScreen}
+        options={{ headerShown: true, title: 'Quizzes' }} // Example: Show header for detail screens
+      />
+      <Stack.Screen
         name="QuizzesDetail"
         component={QuizzesDetailScreen}
         options={{ headerShown: true, title: 'Quiz' }}
       />
       <Stack.Screen
+        name="ExamsScreen"
+        component={ExamsScreen}
+        options={{ headerShown: true, title: 'Exams' }}
+      />
+      <Stack.Screen
         name="ExamDetail"
         component={ExamDetailsScreen}
         options={{ headerShown: true, title: 'Exam Practice' }}
+      />
+      <Stack.Screen
+        name="CommunityScreen"
+        component={CommunityScreen}
+        options={{ headerShown: true, title: 'Community' }}
+      />
+      <Stack.Screen
+        name="SettingsScreen"
+        component={SettingsScreen}
+        options={{ headerShown: true, title: 'Settings' }}
       />
       <Stack.Screen
         name="CreatePostScreen"
@@ -90,8 +119,7 @@ const RootNavigator = () => {
           headerBackTitleVisible: false,
         }}
       />
-
     </Stack.Navigator>
   );
-}
+};
 export default RootNavigator;

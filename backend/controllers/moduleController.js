@@ -70,9 +70,7 @@ exports.listModules = async (req, res, next) => {
 
     const modules = modulesSnapshot.docs.map((doc) => {
       const data = doc.data();
-      // *** ADDED DETAILED LOG ***
-      console.log(`Mapping doc ID: ${doc.id}, Raw data:`, JSON.stringify(data));
-      // *** END ADDED LOG ***
+      // console.log(`Mapping doc ID: ${doc.id}`); // Keep this simpler log if needed for debugging
 
       const learningPathInfo = data.learningPath || {};
 

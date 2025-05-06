@@ -46,6 +46,9 @@ const strings = {
     iconNotFound: (iconName) => `[Icon not found: ${iconName}]`, // Example function for dynamic text
     
     // Add other common strings as needed
+    // Credly Helpers
+    credlyUsernameHelpText: "Enter your Credly username (e.g., 'thabiso-matsaba' from https://www.credly.com/users/thabiso-matsaba)",
+
   };
   
   export default strings;

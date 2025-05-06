@@ -2,7 +2,7 @@ import React, { FC } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useTheme } from '../../context/ThemeContext';
+import { useCustomTheme } from '../../context/ThemeContext';
 import Animated, { SlideInRight } from 'react-native-reanimated';
 
 interface CloudProvider {
@@ -30,7 +30,7 @@ const Filters: FC<FiltersProps> = ({
   setSortBy,
   cloudProviders,
 }) => {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode } = useCustomTheme();
 
   const getCloudProviderIcon = (providerId?: string) => {
     if (!providerId) return 'cloud';

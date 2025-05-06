@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { useTheme } from '../../context/ThemeContext';
+import { useCustomTheme } from '../../context/ThemeContext';
 import Clipboard from '@react-native-clipboard/clipboard';
 
 interface Certification {
@@ -83,7 +83,7 @@ interface CertificationCardProps {
 }
 
 const CertificationCard: FC<CertificationCardProps> = ({ certification }) => {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode } = useCustomTheme();
   const statusColor = getCertificateStatusColor(certification);
   const providerIcon = getCloudProviderIcon(certification.cloudProvider);
 

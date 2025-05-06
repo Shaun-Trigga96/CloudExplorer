@@ -6,7 +6,7 @@ const router = express.Router();
 router.post('/get-token', credlyController.getAccessToken);
 
 // Get Badges
-router.post('/get-badges', credlyController.getUserBadges);
+router.get('/badges/:credlyUsername', credlyController.getUserBadges);
 
 // Import Badges
 router.post('/import-badges', credlyController.importBadges);

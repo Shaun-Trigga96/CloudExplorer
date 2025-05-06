@@ -14,6 +14,7 @@ import {
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useCustomTheme } from '../../context/ThemeContext';
+import strings from '../../localization/strings'; // Assuming this is your strings import
 import axios from 'axios';
 
 interface CredlyBadge {
@@ -97,7 +98,7 @@ const CredlyImportModal: FC<CredlyImportModalProps> = ({
           entering={FadeInDown.duration(300)}
           style={[
             styles.modalContainer,
-            { backgroundColor: isDarkMode ? '#2A2A2A' : '#FFFFFF' },
+            { backgroundColor: isDarkMode ? '#2A2A2A' : '#FFFFFF' }
           ]}
         >
           <View style={styles.modalHeader}>
@@ -126,6 +127,9 @@ const CredlyImportModal: FC<CredlyImportModalProps> = ({
               value={credlyUsername}
               onChangeText={setCredlyUsername}
             />
+            <Text style={[styles.helpText, { color: isDarkMode ? '#A0A0A0' : '#666' }]}>
+              {strings.credlyUsernameHelpText}
+            </Text>
 
             <TouchableOpacity
               style={[
@@ -340,6 +344,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontSize: 16,
     // color handled dynamically based on isDarkMode
+  },
+  helpText: {
+    fontSize: 12,
+    marginBottom: 10,
   },
 });
 

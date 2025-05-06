@@ -152,7 +152,7 @@ export const useProfile = () => {
         bio: profileData.bio,
         photoURL: profileData.photoURL,
       };
-      await axios.put(`${BASE_URL}/api/v1/users/${user.uid}/profile`, backendPayload);
+      await axios.put(`${BASE_URL}/api/v1/users/${user.uid}/profile-image`, backendPayload);
 
       const updatedProfile: UserProfile = {
         displayName: profileData.displayName,
@@ -185,6 +185,7 @@ export const useProfile = () => {
   return {
     userProfile,
     editedProfile,
+    setEditedProfile,  // Exposing this setter function
     loading,
     uploading,
     isEditing,

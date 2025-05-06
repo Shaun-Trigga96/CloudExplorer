@@ -6,17 +6,26 @@ import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Feather';
 import { useCustomTheme } from '../../context/ThemeContext';
 import { darkColors, lightColors } from '../../styles/colors';
-import { useProfile } from '../hooks/useProfile';
+
+// Define UserProfile interface to match the one in useProfile
+interface UserProfile {
+  displayName: string;
+  email: string;
+  photoURL: string | null;
+  bio: string;
+  uid: string;
+}
 
 interface ProfileCardProps {
-  userProfile: ReturnType<typeof useProfile>['userProfile'];
-  editedProfile: ReturnType<typeof useProfile>['editedProfile'];
+  userProfile: UserProfile | null;
+  editedProfile: UserProfile;
   isEditing: boolean;
   uploading: boolean;
-  setEditedProfile: React.Dispatch<React.SetStateAction<typeof useProfile>>;
+  setEditedProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
   handleImagePicker: () => void;
   handleSaveProfile: () => void;
   cancelEdit: () => void;
+  setIsEditing: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
@@ -24,9 +33,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   editedProfile,
   isEditing,
   uploading,
+  setEditedProfile,
   handleImagePicker,
   handleSaveProfile,
   cancelEdit,
+  setIsEditing,
 }) => {
   const { isDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors;
@@ -70,6 +81,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               placeholder="Enter your display name"
               placeholderTextColor={colors.textSecondary}
               value={editedProfile.displayName}
+              onChangeText={(text) => setEditedProfile(prev => ({ ...prev, displayName: text }))}
             />
           </View>
           <View style={styles.inputGroup}>
@@ -85,6 +97,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               multiline
               numberOfLines={4}
               value={editedProfile.bio}
+              onChangeText={(text) => setEditedProfile(prev => ({ ...prev, bio: text }))}
               textAlignVertical="top"
             />
           </View>
@@ -122,7 +135,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           )}
           <TouchableOpacity
             style={[styles.editButton, { backgroundColor: colors.primary }]}
-            onPress={() => isEditing = true}
+            onPress={() => setIsEditing(true)}
           >
             <Icon name="edit-2" size={16} color="#FFFFFF" style={{ marginRight: 5 }} />
             <Text style={styles.editButtonText}>Edit Profile</Text>

@@ -9,7 +9,7 @@ const {serverTimestamp,} = require('../utils/firestoreHelpers');
 const db = admin.firestore();
 const storage = admin.storage(); // Initialize storage
 
-// GET /user/:userId/settings
+// GET /users/:userId/settings
 exports.getUserSettings = async (req, res, next) => {
   try {
     const {userId} = req.params;
@@ -51,7 +51,7 @@ exports.getUserSettings = async (req, res, next) => {
   }
 };
 
-// PUT /user/:userId/settings
+// PUT /users/:userId/settings
 exports.updateUserSettings = async (req, res, next) => {
   try {
     const {userId} = req.params;
@@ -189,7 +189,7 @@ exports.getUserCertifications = async (req, res, next) => {
   }
 };
 
-// GET /user/:userId/profile-image
+// GET /users/:userId/profile-image
 exports.getUserProfileImage = async (req, res, next) => {
   // Use environment variable for default or fallback
   const DEFAULT_PROFILE_IMAGE =
@@ -299,7 +299,7 @@ exports.getUserProfileImage = async (req, res, next) => {
   }
 };
 
-// PUT /user/:userId/profile
+// PUT /users/:userId/profile
 exports.updateUserProfile = async (req, res, next) => {
   try {
     const {userId} = req.params;
@@ -353,13 +353,14 @@ exports.updateUserProfile = async (req, res, next) => {
       if (
         photoURL === null ||
         photoURL === '' ||
-        isValidFirebaseStorageUrl(photoURL)
+        isValidFirebaseStorageUrl(photoURL) || // Check for Firebase Storage URL
+        (typeof photoURL === 'string' && photoURL.startsWith('https://')) // Also allow any generic HTTPS URL
       ) {
         updateData.photoURL = photoURL;
       } else {
         return next(
           new AppError(
-            'Invalid photo URL provided. Must be a valid Firebase Storage URL, empty, or null.',
+            'Invalid photo URL provided. Must be a valid Firebase Storage URL, a generic HTTPS URL, empty, or null.',
             400,
             'INVALID_PHOTO_URL',
           ),

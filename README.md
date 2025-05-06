@@ -86,8 +86,7 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
 ### AI Frameworks and Tools
 
 1. **TensorFlow**: For various AI tasks, including natural language processing (NLP) and data analysis.
-2. **Hugging Face Transformers**: For state-of-the-art NLP models to generate questions and analyze text data.
-3. **OpenAI GPT-3**: For generating human-like text, creating quizzes, and providing explanations.
+2. **GEMINI API**: For generating human-like text, creating quizzes, and providing explanations.
 
 ### Data Ingestion and Processing
 
