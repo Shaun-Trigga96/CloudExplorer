@@ -199,14 +199,18 @@ const globalErrorHandler = (err, req, res, next) => {
 app.use(globalErrorHandler);
 
 // --- Start Server ---
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, '0.0.0.0', () => {
-  // Assign to 'server' for graceful shutdown
-  console.log(
-    `Server running in ${
-      process.env.NODE_ENV || 'development'
-    } mode on port ${PORT}`,
-  );
+// Cloud Run sets the PORT environment variable.
+// Use it, or a default like 5000 or 8080 for local development.
+const port = process.env.PORT || 5000;
+
+app.get('/', (req, res) => {
+  res.send('Hello from the backend!');
+});
+
+// Important: Listen on '0.0.0.0' to accept connections from any IP,
+// which is necessary for Cloud Run.
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server listening on port ${port} and host 0.0.0.0`);
 });
 
 // --- Graceful Shutdown --- (Good practice)
@@ -226,5 +230,3 @@ const shutdown = signal => {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT')); // Handle Ctrl+C
 
-// Export the Express app instance (optional, useful for testing)
-// module.exports.app = app; // Use a different export name than the hf instance
