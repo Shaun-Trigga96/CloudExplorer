@@ -60,7 +60,7 @@ steps:
       - '-t'
       - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
       - '-f'
-      - 'Dockerfile.dev'  # <--- CORRECTED: Assumes Dockerfile.prod is at the root
+      - 'Dockerfile.prod'  # <--- CORRECTED: Assumes Dockerfile.prod is at the root
       - './backend'     # <--- CORRECTED: Assumes backend code is in backend/
 
   - name: 'gcr.io/cloud-builders/docker'
