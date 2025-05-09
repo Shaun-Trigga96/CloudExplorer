@@ -25,7 +25,7 @@ steps:
         # Clean up temporary file
         rm sendgrid_key_temp.txt
 
-  # 3. Build and deploy Firebase functions
+  # 3. Build and prepare Firebase functions
   - name: 'node:20'
     id: 'install-functions-dependencies'
     entrypoint: 'npm'
@@ -37,6 +37,14 @@ steps:
     entrypoint: 'npm'
     args: ['run', 'lint']
     dir: 'functions'
+    
+  # Run build step if your functions use TypeScript
+  - name: 'node:20'
+    id: 'build-functions'
+    entrypoint: 'npm'
+    args: ['run', 'build']
+    dir: 'functions'
+    allowFailure: true # In case there's no build script
 
   # 4. Deploy Firebase Functions
   - name: 'node:20'
@@ -46,11 +54,17 @@ steps:
       - '-c'
       - |
         # Install Firebase CLI globally
-        npm install -g firebase-tools
-        # Deploy Firebase functions using the service account
+        npm install -g firebase-tools@latest
+        # Print Firebase CLI version for debugging
+        firebase --version
+        # Set up authentication with service account
+        echo "Setting up authentication for Firebase deployment..."
+        # Deploy Firebase functions with token or using CI authentication
+        # Using the default application credentials that Cloud Build has
         firebase deploy --only functions \
           --project "$PROJECT_ID" \
-          --non-interactive
+          --non-interactive \
+          --debug # Add debug flag to get more information if deployment fails
 
   # 5. Build and push backend container
   - name: 'gcr.io/cloud-builders/docker'
