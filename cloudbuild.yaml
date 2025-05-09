@@ -16,7 +16,6 @@ steps:
   #   entrypoint: 'npm'
   #   args: ['test']
   #   waitFor: ['install-root-dependencies'] # Good practice to wait for dependency installation
-
   # Step to fetch the SendGrid API key and create the .env file for functions
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'create-functions-env'
@@ -40,8 +39,8 @@ steps:
     entrypoint: 'npm'
     args: ['install']
     dir: 'functions' # Run in functions directory
-    # waitFor: ['create-functions-env'] # Ensure .env is ready if it affects install scripts
 
+  # 3. Lint Firebase functions
   - name: 'node:20'
     id: 'lint-functions'
     entrypoint: 'npm'
@@ -49,9 +48,7 @@ steps:
     dir: 'functions'
     waitFor: ['install-functions-dependencies']
 
-  # REMOVED "build-functions" STEP - as 'npm run build' is not defined in functions/package.json
-
-  # Deploy Firebase Functions (This was step #5 in your log, now #4 in this sequence)
+  # 4. Deploy Firebase Functions (Adjust step numbering if needed)
   - name: 'node:20'
     id: 'deploy-firebase-functions'
     entrypoint: 'bash'
@@ -61,12 +58,11 @@ steps:
         echo "Installing Firebase CLI..."
         npm install -g firebase-tools
         echo "Deploying Firebase functions with debug output..."
-        # The --debug flag is very helpful, as you've seen!
         firebase deploy --only functions \
           --project "$PROJECT_ID" \
           --non-interactive \
-          --debug
-    waitFor: ['lint-functions'] # Deploy after linting
+          --debug # Keep debug for now, you can remove it once deployments are stable
+    waitFor: ['lint-functions'] # This step now waits for lint-functions
 
   # 3. Build and push backend container
   - name: 'gcr.io/cloud-builders/docker'
@@ -76,9 +72,9 @@ steps:
       - '-t'
       - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
       - '-f'
-      - 'Dockerfile.prod'  # Assumes Dockerfile.prod is at the repository root
-      - '.'                 # CORRECTED: Build context is the repository root.
-                            # Your Dockerfile.prod should then handle paths like `COPY ./backend /app/`
+      - 'Dockerfile.prod' # Assumes Dockerfile.prod is at the repository root
+      - '.' # CORRECTED: Build context is the repository root.
+        # Your Dockerfile.prod should then handle paths like `COPY ./backend /app/`
     # waitFor: ['install-root-dependencies'] # If any root scripts affect the backend build
 
   - name: 'gcr.io/cloud-builders/docker'
@@ -130,7 +126,7 @@ steps:
       - 'gcr.io/$PROJECT_ID/react-native-builder:latest'
       - '-f'
       - 'android/Dockerfile.builder' # Path to your builder Dockerfile
-      - './android'                  # Context for the builder Dockerfile
+      - './android' # Context for the builder Dockerfile
     # waitFor: ['install-root-dependencies']
 
   # Use the custom builder image to build the Android app
@@ -200,7 +196,6 @@ artifacts:
     paths:
       - 'android/app/build/outputs/apk/release/app-release.apk'
       # - 'another/output/file.txt' # Example of other artifacts
-
 # Optional: Define substitutions that can be set in the trigger
 # substitutions:
 #  _FIREBASE_TOKEN: 'your-default-token-here-or-set-in-trigger' # Example for Step 7
