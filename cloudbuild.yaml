@@ -25,28 +25,36 @@ steps:
         # Clean up temporary file
         rm sendgrid_key_temp.txt
 
-  # 3. Build and prepare Firebase functions
+  # 3. Fix module resolution issue in functions code
   - name: 'node:20'
-    id: 'install-functions-dependencies'
-    entrypoint: 'npm'
-    args: ['install']
-    dir: 'functions'
+    id: 'fix-module-issue'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Fixing module resolution issue in config.js..."
+        # Check if the file exists and fix the import
+        if [ -f "backend/config/config.js" ]; then
+          # Replace the import from 'firebase-functions/logger' to the correct path
+          sed -i 's/require("firebase-functions\/logger")/require("firebase-functions").logger/g' backend/config/config.js
+          echo "Fixed import in backend/config/config.js"
+        fi
+        
+        # Install dependencies in functions directory
+        cd functions
+        npm install
+        # List files to debug
+        echo "Listing files in functions directory:"
+        find . -type f -name "*.js" | sort
 
+  # 4. Lint functions code
   - name: 'node:20'
     id: 'lint-functions'
     entrypoint: 'npm'
     args: ['run', 'lint']
     dir: 'functions'
-    
-  # Run build step if your functions use TypeScript
-  - name: 'node:20'
-    id: 'build-functions'
-    entrypoint: 'npm'
-    args: ['run', 'build']
-    dir: 'functions'
-    allowFailure: true # In case there's no build script
 
-  # 4. Deploy Firebase Functions
+  # 5. Deploy Firebase Functions
   - name: 'node:20'
     id: 'deploy-firebase-functions'
     entrypoint: 'bash'
@@ -57,16 +65,28 @@ steps:
         npm install -g firebase-tools@latest
         # Print Firebase CLI version for debugging
         firebase --version
-        # Set up authentication with service account
-        echo "Setting up authentication for Firebase deployment..."
-        # Deploy Firebase functions with token or using CI authentication
-        # Using the default application credentials that Cloud Build has
+        
+        # Create a simple functions file for testing if deployment fails
+        echo "Checking for errors in functions code..."
+        
+        # Check for firebase-functions/logger import issue
+        grep -r "firebase-functions/logger" functions/ || echo "No firebase-functions/logger imports found"
+        grep -r "firebase-functions/logger" backend/ || echo "No firebase-functions/logger imports in backend"
+        
+        # Fix potential path issues
+        if [ -f "functions/index.js" ]; then
+          echo "functions/index.js exists"
+          # Look for paths that might be causing issues
+          grep -r "require\\(.*backend" functions/ || echo "No backend imports in functions"
+        fi
+        
+        # Deploy Firebase functions
         firebase deploy --only functions \
           --project "$PROJECT_ID" \
           --non-interactive \
-          --debug # Add debug flag to get more information if deployment fails
+          --debug
 
-  # 5. Build and push backend container
+  # 6. Build and push backend container
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-backend'
     args:
@@ -74,7 +94,7 @@ steps:
       - '-t'
       - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
       - '-f'
-      - 'backend/Dockerfile.prod'  # Fixed path to Dockerfile
+      - 'backend/Dockerfile.prod'
       - './backend'
 
   - name: 'gcr.io/cloud-builders/docker'
@@ -83,7 +103,7 @@ steps:
       - 'push'
       - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
 
-  # 6. Deploy backend to Cloud Run
+  # 7. Deploy backend to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-backend'
     entrypoint: 'gcloud'
@@ -108,7 +128,7 @@ steps:
       - '--memory=512Mi'
       - '--port=8080'
 
-  # 7. Build React Native app for Android
+  # 8. Build React Native app for Android
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-android-builder-image'
     args:
@@ -133,7 +153,7 @@ steps:
           exit 1
         fi
 
-  # 8. Upload APK to Google Cloud Storage
+  # 9. Upload APK to Google Cloud Storage
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'upload-apk'
     entrypoint: 'gsutil'
