@@ -1,7 +1,7 @@
 /* eslint-disable linebreak-style */
 // functions/config.js
 const admin = require("firebase-admin");
-const logger = require("firebase-functions/logger");
+const {logger} = require("firebase-functions");
 const {defineString} = require("firebase-functions/params");
 
 // Initialize Firebase Admin SDK
