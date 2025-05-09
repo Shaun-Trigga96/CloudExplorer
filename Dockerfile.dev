@@ -1,52 +1,38 @@
-# Dockerfile.dev
-FROM node:24-slim
+# Use Node.js with proper system dependencies for React Native
+FROM node:20
 
-# Install essential tools
+# Install system dependencies needed for React Native
 RUN apt-get update && apt-get install -y \
     git \
     curl \
+    wget \
+    unzip \
     python3 \
     make \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN useradd -m appuser
-
 # Set the working directory
 WORKDIR /app
 
-# Copy dependency files only
+# Copy package files first for better caching
 COPY package*.json ./
 
-# Change ownership of these files to appuser
-RUN chown -R appuser:appuser /app
+# Install dependencies
+RUN npm install
 
-# Switch to the non-root user for installing dependencies
-USER appuser
+# Install global CLI tools AFTER npm install to ensure paths are correct
+RUN npm install -g react-native-cli
 
-# Install dependencies using npm
-RUN npm install --no-bin-links --cache /tmp/.npm
-
-# --- Stage 2: Copy Application Code ---
-
-# Switch back to root to copy the rest of the files
-USER root
-
-# Copy the remaining application source code
+# Copy the rest of the application code
 COPY . .
 
-# Ensure all files are owned by appuser
-RUN chown -R appuser:appuser /app
+# Expose ports needed for React Native
+EXPOSE 8081 19000 19001 19002 8097
 
-# Switch back to the non-root user for running the app
-USER appuser
+# Set environment variables
+ENV NODE_ENV=development
+ENV REACT_NATIVE_PACKAGER_HOSTNAME=0.0.0.0
 
-# Make sure the app listens on the PORT environment variable
-ENV PORT=5000
-
-# Expose the necessary ports
-EXPOSE ${PORT}
-
-# Start the application
-CMD ["npm", "run", "start"]
+# Start the Metro bundler with explicit host binding
+CMD ["npx", "react-native", "start", "--host", "0.0.0.0"]

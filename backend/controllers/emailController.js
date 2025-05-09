@@ -1,7 +1,7 @@
 // backend/controllers/emailController.js
 const AppError = require('../utils/appError');
 const sgMail = require('@sendgrid/mail'); // Import SendGrid
-const {db, logger, sendgridApiKey} = require('../../functions/src/config/config'); // Import SendGrid API key from config
+const {db, logger, sendgridApiKey} = require('../config/config'); // Import SendGrid API key from config
 
 
 // POST /update-subscription

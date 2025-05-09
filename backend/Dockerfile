@@ -1,20 +1,24 @@
 # backend/Dockerfile
-FROM node:23-slim
+FROM node:20-alpine
 
 # Set the working directory
+# In backend/Dockerfile
 WORKDIR /app
+# Set the working directory in the container
+WORKDIR /app 
 
-# Copy dependency files
+# Copy package.json and package-lock.json (or yarn.lock)
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install --production
+# Use --production if you dont need devDependencies
+RUN npm install --production 
+# If you need devDependencies (e.g., for a build step within Docker), just use `RUN npm install`
 
-# Copy the rest of the application code
+# Copy the rest of your applications source code'
 COPY . .
-
-# Expose the port the app runs on
+# Expose the port your application runs on
 EXPOSE 5000
 
-# Define the command to run the app
-CMD ["node", "server.js"]
+# Command to run your application (e.g., node server.js or npm start)
+CMD [ "node", "server.js" ]

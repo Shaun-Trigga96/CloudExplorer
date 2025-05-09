@@ -19,7 +19,7 @@ services:
     environment:
       - NODE_ENV=development
       - REACT_NATIVE_PACKAGER_HOSTNAME=0.0.0.0
-    command: npm start -- --host 0.0.0.0
+    command: npx react-native start --host 0.0.0.0
 
   # Backend Service
   backend:

@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
+    "@sendgrid/mail": "^8.1.5",
     "@types/express": "^5.0.0",
     "axios": "^1.8.4",
     "cors": "^2.8.5",

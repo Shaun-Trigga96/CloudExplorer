@@ -5,7 +5,7 @@
 /* eslint-disable max-len */
 // functions/src/email/index.js
 const sgMail = require("@sendgrid/mail");
-const {logger, sendgridApiKey} = require("../config/config"); // Import logger and SendGrid API key from config
+const {logger, sendgridApiKey} = require("../../../backend/config/config"); // Import logger and SendGrid API key from config
 
 // Initialize SendGrid
 if (sendgridApiKey) {

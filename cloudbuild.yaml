@@ -69,28 +69,32 @@ steps:
       - 'push'
       - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
 
-  # 4. Deploy backend to Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'deploy-backend'
-    entrypoint: 'gcloud'
-    args:
-      - 'run'
-      - 'deploy'
-      - 'cloud-explorer-backend'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
-      - '--region'
-      - 'us-central1'
-      - '--platform'
-      - 'managed'
-      - '--port'
-      - '5000'
-      - '--allow-unauthenticated'
-      - '--timeout'
-      - '600s'
-      # - '--set-env-vars'
-      # - 'NODE_ENV=production'
-      # - '--health-check-path=/health'  # Add health check
+# 4. Deploy backend to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  id: 'deploy-backend'
+  entrypoint: 'gcloud'
+  args:
+    - 'run'
+    - 'deploy'
+    - 'cloud-explorer-backend'
+    - '--image'
+    - 'gcr.io/$PROJECT_ID/cloud-explorer-backend:$COMMIT_SHA'
+    - '--region'
+    - 'us-central1'
+    - '--platform'
+    - 'managed'
+    # Let Cloud Run use the PORT env var instead of explicitly setting it
+    - '--allow-unauthenticated'
+    - '--timeout'
+    - '600s'
+    - '--set-env-vars'
+    - 'NODE_ENV=production'
+    # Add a startup probe to give your app time to initialize
+    - '--min-instances=0'
+    - '--max-instances=10'
+    - '--cpu=1'
+    - '--memory=512Mi'
+    - '--port=8080'  # Changed from 5000 to the Cloud Run default
 
   # 5. Build React Native app for Android
   - name: 'gcr.io/cloud-builders/docker'

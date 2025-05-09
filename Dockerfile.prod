@@ -1,30 +1,27 @@
-# Use an official Node.js runtime as a parent image (use the version your backend needs)
-FROM node:24-slim
+# Use an official Node.js runtime as a parent image
+FROM node:20-alpine
 
 # Set the working directory in the container
 WORKDIR /usr/src/app
 
 # --- Dependency Installation ---
-# Copy package.json and package-lock.json (or yarn.lock) first
-# This leverages Docker layer caching. Dependencies are only re-installed if these files change.
+# Copy package.json and package-lock.json first to leverage caching
 COPY package*.json ./
-# If using yarn, copy yarn.lock and use 'RUN yarn install --production --frozen-lockfile'
 RUN npm ci --only=production
 
 # --- Application Code ---
 # Bundle app source code inside the Docker image
-# Copy remaining backend code (server.js, routes, controllers, etc.)
 COPY . .
 
 # --- Runtime ---
-# Make port 8080 available to the world outside this container
-# Cloud Run expects containers to listen on port 8080 by default (or the PORT env var)
-EXPOSE 5000
+# Cloud Run automatically sets PORT env var, which we will use in our application
+# It's good practice to expose the port, but it's not enforced by Cloud Run
+EXPOSE 8080
 
-# Define the command to run your app using node
-# Assumes your entry point script is named 'server.js'
+# Define the command to run your app
+# Make sure server.js is in the correct location relative to WORKDIR
 CMD [ "node", "server.js" ]
 
-# Optional: Add a basic health check if your app has a health endpoint (e.g., /healthz)
-# HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-#   CMD curl -f http://localhost:5000/health || exit 1
+# Add a health check for container diagnostics
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
