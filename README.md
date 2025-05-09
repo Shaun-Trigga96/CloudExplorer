@@ -58,8 +58,6 @@ The cloud architecture for the Cloud Explorer application offers several advanta
 7. **Integration with AI and Machine Learning**:
    - The architecture supports integration with AI frameworks and tools like TensorFlow, Hugging Face Transformers, and OpenAI GPT-3, enabling advanced features such as interactive informatics, quizzes, and exams.
 
-Overall, this architecture leverages the strengths of Google Cloud Platform to provide a scalable, secure, and efficient solution for the Cloud Explorer application. If you have any specific questions or need further details, feel free to ask!
-
 ## Functional Requirements
 
 1. **User Authentication**: Users should be able to register, log in, and log out.
@@ -142,18 +140,68 @@ To develop the interactive informatics, quizzes, and exams, the following AI fra
    - Download the `google-services.json` file and place it in the `android/app` directory.
    - Download the `GoogleService-Info.plist` file and place it in the `ios` directory.
 
-4. Start the development server:
+# Running the Application
+
+## Option 1: Using Separate Terminals
+
+1. Start the React Native development server:
 
    ```bash
    npx react-native start
    ```
 
-5. Run the app on an emulator or physical device:
+2. In a separate terminal, run the backend server:
+
+   ```bash
+   cd backend
+   node server.js
+   ```
+
+3. In a third terminal, run the app on an emulator or physical device:
 
    ```bash
    npx react-native run-android
+   # or
    npx react-native run-ios
    ```
+
+## Option 2: Using the Combined Script (Recommended)
+
+We've added a convenient script to run both servers and the emulator in a single command:
+
+### For Android
+
+```bash
+npm run dev:android
+```
+
+### For iOS
+
+```bash
+npm run dev:ios
+```
+
+### For backend and Metro server only (without emulator)
+
+```bash
+npm run dev
+```
+
+The script will:
+
+1. Start the backend server
+2. Start the Metro bundler for React Native
+3. If specified, launch the Android/iOS emulator after a short delay
+
+To stop all processes, press `Ctrl+C` in the terminal.
+
+## Interactive Commands
+
+While the combined script is running, you can use these commands:
+
+- `help` - Show available commands
+- `status` - Check the status of running processes
+- `exit` or `quit` - Stop all processes and exit
 
 ## Contributing
 
@@ -165,4 +213,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-Feel free to customize this README.md file to better suit your project's needs. If you have any specific questions or need further assistance, let me know!
+Feel free to customize this README.md file to better suit your project's needs. If you have any specific questions or need further assistance, let us know!

@@ -5,7 +5,7 @@ const admin = require('firebase-admin');
 const dotenv = require('dotenv');
 const path = require('path');
 const morgan = require('morgan');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const {GoogleGenerativeAI} = require('@google/generative-ai');
 
 // --- Load Environment Variables ---
 dotenv.config({path: path.resolve(__dirname, '..', '.env')});
@@ -67,14 +67,18 @@ if (!process.env.GEMINI_API_KEY) {
     'CRITICAL: GEMINI_API_KEY environment variable is not set. AI features will fail.',
   );
 } else {
-    console.log("GEMINI_API_KEY found, initializing Google AI client...");
+  console.log('GEMINI_API_KEY found, initializing Google AI client...');
 }
 
 // Initialize Google AI client
-const googleAiClient = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+const googleAiClient = process.env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  : null;
 
 if (!googleAiClient) {
-    console.warn("Google AI client not initialized due to missing GEMINI_API_KEY.");
+  console.warn(
+    'Google AI client not initialized due to missing GEMINI_API_KEY.',
+  );
 }
 module.exports.googleAiClient = googleAiClient;
 
@@ -201,7 +205,7 @@ app.use(globalErrorHandler);
 // --- Start Server ---
 // Cloud Run sets the PORT environment variable.
 // Use it, or a default like 5000 or 8080 for local development.
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 app.get('/', (req, res) => {
   res.send('Hello from the backend!');
@@ -229,4 +233,3 @@ const shutdown = signal => {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT')); // Handle Ctrl+C
-

@@ -1,4 +1,3 @@
-// src/components/quizzesDetail/QuestionCard.tsx
 import React from 'react';
 import { View, Animated } from 'react-native';
 import { Card, Paragraph } from 'react-native-paper';
@@ -34,7 +33,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             {question.answers.length > 0 ? (
               question.answers.map(answer => (
                 <AnswerButton
-                  key={answer.uniqueKey}
+                  key={`${question.id}-${answer.letter}`}
                   answer={answer.answer}
                   letter={answer.letter}
                   isSelected={userAnswer === answer.letter}
@@ -42,13 +41,11 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
                 />
               ))
             ) : (
-              ['True', 'False'].map(option => (
-                // Use the option ('True' or 'False') itself as part of the key for uniqueness
-                // Pass the option as the answer text and handle selection/press
+              ['True', 'False'].map((option, index) => (
                 <AnswerButton
-                  key={`${question.id}-${option}`} // Combine question ID and option for a unique key
+                  key={`${question.id}-${option}`}
                   answer={option}
-                  letter=""
+                  letter={option.substring(0, 1)}
                   isSelected={userAnswer === option}
                   onPress={() => handleAnswer(question.id, option)}
                 />

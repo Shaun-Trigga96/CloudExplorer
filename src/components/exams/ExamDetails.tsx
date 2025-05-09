@@ -7,8 +7,8 @@ import strings from '../../localization/strings';
 
 interface ExamDetailsProps {
   duration: number | null;
-  passingRate: number;
-  questionCount: number; // Add questionCount prop
+  passingRate: number | null; // Also updated passingRate to allow null
+  questionCount: number | null; // Changed to allow null
 }
 
 const ExamDetails: React.FC<ExamDetailsProps> = ({ duration, passingRate, questionCount }) => { // Destructure questionCount

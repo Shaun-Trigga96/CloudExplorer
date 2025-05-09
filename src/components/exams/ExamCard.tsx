@@ -1,6 +1,5 @@
-// src/components/exams/ExamCard.tsx
 import React from 'react';
-import { View, Image } from 'react-native';
+import { View, Image, Text } from 'react-native';
 import { Card, Title, Paragraph, Button } from 'react-native-paper';
 import { useCustomTheme } from '../../context/ThemeContext';
 import { darkColors, lightColors } from '../../styles/colors';
@@ -41,8 +40,8 @@ const ExamCard: React.FC<ExamCardProps> = ({ exam, attempts, score, onStart }) =
         <Paragraph style={{ color: colors.textSecondary }}>{exam.description}</Paragraph>
         <ExamDetails
           duration={exam.duration}
-          passingRate={exam.passingRate}
-          questionCount={exam.numberOfQuestions ?? 0} // Provide 0 as default if undefined
+          passingRate={exam.passingRate || null}
+          questionCount={exam.numberOfQuestions || null}
         />
         {attempts > 0 && <ProgressSection attempts={attempts} score={score} />}
       </Card.Content>
@@ -53,7 +52,7 @@ const ExamCard: React.FC<ExamCardProps> = ({ exam, attempts, score, onStart }) =
           style={{ flex: 1, backgroundColor: colors.primary }}
           labelStyle={{ color: colors.buttonText }}
         >
-          {strings.startPracticeExam}
+          <Text style={{ color: colors.buttonText }}>{strings.startPracticeExam}</Text>
         </Button>
       </Card.Actions>
     </Card>
