@@ -3,7 +3,7 @@
 /* eslint-disable linebreak-style */
 // functions/src/learningPaths.js
 const functions = require("firebase-functions");
-const {db, logger} = require("../../../backend/config/config");
+const {db, logger} = require("../config/config");
 const admin = require("firebase-admin");
 
 /**

@@ -7,7 +7,7 @@
 // functions/auth.js
 
 const {user} = require("firebase-functions/v1/auth"); // v1 Auth trigger
-const {db, logger, sendgridApiKey} = require("../../../backend/config/config"); // Import from config
+const {db, logger, sendgridApiKey} = require("../config/config"); // Import from config
 const admin = require("firebase-admin"); // Still need admin for FieldValue
 const sgMail = require("@sendgrid/mail"); // SendGrid require
 
