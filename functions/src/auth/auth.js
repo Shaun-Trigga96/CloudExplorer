@@ -5,13 +5,45 @@
 /* eslint-disable max-len */
 /* eslint-disable linebreak-style */
 // functions/auth.js
+/**
+ * @file auth.js
+ * @description This file contains Firebase Cloud Functions related to user authentication events.
+ * Specifically, it handles the creation of new users, initializing their profiles,
+ * sending welcome notifications, and dispatching welcome emails via SendGrid.
+ */
 
-const {user} = require("firebase-functions/v1/auth"); // v1 Auth trigger
-const {db, logger, sendgridApiKey} = require("../config/config"); // Import from config
-const admin = require("firebase-admin"); // Still need admin for FieldValue
-const sgMail = require("@sendgrid/mail"); // SendGrid require
+// --- Imports ---
+
+/**
+ * @name user (from firebase-functions/v1/auth)
+ * @description Firebase Functions v1 Authentication trigger. Used to listen for user creation events.
+ */
+const {user} = require("firebase-functions/v1/auth");
+
+/**
+ * @name db, logger, sendgridApiKey (from ../config/config)
+ * @description Shared application configurations:
+ * - `db`: Firestore database instance.
+ * - `logger`: Firebase Functions logger instance.
+ * - `sendgridApiKey`: Firebase Functions secret parameter for the SendGrid API key.
+ */
+const {db, logger, sendgridApiKey} = require("../config/config");
+const admin = require("firebase-admin"); // Firebase Admin SDK, used here for FieldValue.serverTimestamp().
+const sgMail = require("@sendgrid/mail"); // SendGrid Mail SDK for sending emails.
 
 // --- Auth Trigger Function ---
+
+/**
+ * @name initializeNewUser
+ * @description Firebase Cloud Function triggered when a new Firebase Authentication user is created.
+ * @purpose This function performs several initialization tasks for a new user:
+ * 1. Creates a user profile document in the Firestore 'users' collection.
+ * 2. Creates a welcome notification for the user in the 'notifications' collection.
+ * 3. Sends a welcome email to the user via SendGrid (if an email address is provided).
+ *
+ * @param {functions.auth.UserRecord} userRecord - The Firebase Auth UserRecord object for the newly created user.
+ * @returns {Promise<{success: boolean, message: string}>} A promise that resolves with a success object or throws an error.
+ */
 exports.initializeNewUser = user().onCreate(async (userRecord) => {
   // Use logger and db from config.js
   logger.info(`[auth.js] Auth onCreate triggered for new user: ${userRecord.uid}, Email: ${userRecord.email}`);
@@ -24,6 +56,11 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
 
   const userRef = db.collection("users").doc(userRecord.uid);
 
+  /**
+   * @name newUserProfile
+   * @description An object representing the structure and initial data for a new user's profile
+   *              to be stored in the Firestore 'users' collection.
+   */
   const newUserProfile = {
     uid: userRecord.uid,
     email: userRecord.email || null,
@@ -33,7 +70,7 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
     bio: "",
     lastLogin: admin.firestore.FieldValue.serverTimestamp(),
     learningPathsCount: 0,
-    hasActivePath: false,
+    hasActivePath: false, // Indicates if the user has an active learning path
     activePath: null,
     settings: {
       notificationsEnabled: false,
@@ -45,11 +82,12 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
   };
 
   try {
-    // Create user profile in Firestore
+    // Step 1: Create user profile document in Firestore
     await userRef.set(newUserProfile);
     logger.info(`[auth.js] Successfully created Firestore user document for ${userRecord.uid}`);
 
-    // Create welcome notification
+    // Step 2: Create a welcome notification for the user
+    // This notification will appear in-app.
     const notificationRef = db.collection("notifications").doc();
     await notificationRef.set({
       notificationId: notificationRef.id,
@@ -62,10 +100,11 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
     });
     logger.info(`[auth.js] Welcome notification created for user ${userRecord.uid}`);
 
-    // Send Welcome Email via SendGrid
+    // Step 3: Send Welcome Email via SendGrid, if the user has an email address.
     if (userRecord.email) {
       try {
-        // Get API key value using the params approach
+        // Retrieve the SendGrid API key from Firebase Functions secrets.
+        // The `sendgridApiKey` is a SecretParam defined in config.js.
         const apiKey = sendgridApiKey.value();
         logger.info(`[auth.js] SendGrid API key retrieved: ${apiKey ? "Yes" : "No"}`);
 
@@ -74,14 +113,20 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
           throw new Error("SendGrid API Key not configured.");
         }
 
-        // Set the API key for this request
+        // Set the API key for the SendGrid mail client for this specific operation.
         sgMail.setApiKey(apiKey);
 
+        /**
+         * @name msg
+         * @description The email message object configured for SendGrid.
+         *              Includes recipient, sender, subject, plain text content, and HTML content.
+         */
         const msg = {
           to: userRecord.email,
-          from: "cloudexplorer1996@gmail.com", // Your verified sender
+          from: "cloudexplorer1996@gmail.com", // IMPORTANT: This email address must be a verified sender in SendGrid.
           subject: "Welcome to Cloud Explorer!",
           text: `Welcome aboard, ${newUserProfile.displayName}!\n\nWe're excited to have you join Cloud Explorer. Start exploring cloud concepts today!\n\nHappy Learning,\nThe Cloud Explorer Team`,
+          // HTML content for a richer email experience.
           html: `
           <!DOCTYPE html>
           <html lang="en">
@@ -150,11 +195,11 @@ exports.initializeNewUser = user().onCreate(async (userRecord) => {
 
         logger.info(`[auth.js] Attempting to send welcome email to ${userRecord.email}...`);
 
-        // Add detailed error capture
+        // Send the email using SendGrid.
         try {
           const [response] = await sgMail.send(msg);
           logger.info(`[auth.js] Welcome email successfully sent to ${userRecord.email}. Status: ${response.statusCode || "Unknown"}`);
-        } catch (sendError) {
+        } catch (sendError) { // Catch errors specifically from sgMail.send()
           // Log detailed error information
           logger.error(`[auth.js] SendGrid send error:`, {
             message: sendError.message,

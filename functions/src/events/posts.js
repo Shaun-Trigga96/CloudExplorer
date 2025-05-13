@@ -5,25 +5,54 @@
 /* eslint-disable max-len */
 /* eslint-disable linebreak-style */
 // functions/src/community/posts.js
+/**
+ * @file posts.js
+ * @description This file contains Firebase Cloud Functions triggered by Firestore events
+ *              related to community posts, specifically for managing like counts.
+ */
+
+// --- Imports ---
+/**
+ * @name onDocumentWritten (from firebase-functions/v2/firestore)
+ * @description Firebase Functions v2 Firestore trigger that fires when a document is created, updated, or deleted.
+ */
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
+/**
+ * @name logger (from firebase-functions)
+ * @description Firebase Functions logger instance.
+ */
 const {logger} = require("firebase-functions");
-const admin = require("firebase-admin");
+const admin = require("firebase-admin"); // Firebase Admin SDK for server-side operations.
+/**
+ * @name getFirestore, FieldValue (from firebase-admin/firestore)
+ * @description Firestore specific utilities from the Firebase Admin SDK.
+ * - `getFirestore`: Gets the Firestore service.
+ * - `FieldValue`: Provides special values for database operations (e.g., serverTimestamp, increment).
+ */
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 
-// Initialize Admin SDK if not already done (usually in index.js or a config file)
+// --- Firebase Admin SDK Initialization ---
+// Ensures the Admin SDK is initialized once.
 try {
   if (!admin.apps.length) {
     admin.initializeApp();
   }
 } catch (e) {
-  logger.error("Admin SDK initialization error in posts.js:", e);
+  logger.error("[posts.js] Admin SDK initialization error:", e);
 }
 
+// --- Firestore Database Instance ---
 const db = getFirestore();
 
 /**
- * Triggered when a document in the 'likes' subcollection of any post is written (created, updated, deleted).
- * Updates the 'likes' count on the parent post document.
+ * @name updatePostLikesCount
+ * @description Firebase Firestore Trigger (v2) that listens for write events (create, delete, update)
+ *              on documents within the `likes` subcollection of any post (`posts/{postId}/likes/{userId}`).
+ * @purpose Automatically updates the `likes` count field on the parent post document
+ *          whenever a like is added or removed.
+ * @param {functions.Event<functions.Change<functions.firestore.DocumentSnapshot>>} event - The event object containing
+ *        data about the Firestore document change, including `params` for wildcards and `data` for before/after snapshots.
+ * @returns {Promise<null>|null} A promise that resolves to null, or null directly, to indicate successful execution or no action needed.
  */
 exports.updatePostLikesCount = onDocumentWritten("posts/{postId}/likes/{userId}", async (event) => {
   // event.params contains the wildcard values from the path

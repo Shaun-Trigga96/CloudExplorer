@@ -1,21 +1,45 @@
 /* eslint-disable linebreak-style */
 // functions/src/admin/populateData.js
 /* eslint-disable max-len */
+/**
+ * @file populateLearningOptions.js
+ * @description This file contains an HTTP-triggered Firebase Cloud Function
+ *              used to populate or overwrite the 'providers' and 'paths' collections
+ *              in Firestore with predefined data. This is typically used for initial
+ *              data setup or for development/testing purposes.
+ */
+
+// --- Imports ---
+/**
+ * @name onRequest (from firebase-functions/v2/https)
+ * @description Firebase Functions v2 HTTP trigger for creating HTTPS-callable functions.
+ */
 const {onRequest} = require("firebase-functions/v2/https");
+/**
+ * @name getFirestore (from firebase-admin/firestore)
+ * @description Firestore specific utility from the Firebase Admin SDK to get the Firestore service.
+ */
 const {getFirestore} = require("firebase-admin/firestore");
-const admin = require("firebase-admin");
+const admin = require("firebase-admin"); // Firebase Admin SDK for privileged server-side operations.
 
 if (!admin.apps.length) {
   try {
     admin.initializeApp();
-    console.log("Firebase Admin SDK initialized in populateData.");
+    console.log("[populateLearningOptions] Firebase Admin SDK initialized.");
   } catch (e) {
-    console.error("Firebase Admin SDK initialization error in populateData:", e);
+    console.error("[populateLearningOptions] Firebase Admin SDK initialization error:", e);
   }
 }
+
+// --- Firestore Database Instance ---
 const db = getFirestore();
 
 // --- Define the Data to Populate ---
+/**
+ * @name providersData
+ * @description An array of objects representing cloud providers to be added to the 'providers' collection.
+ *              Each object defines a provider's ID, name, and logo URL.
+ */
 const providersData = [
   {
     id: "gcp",
@@ -34,6 +58,12 @@ const providersData = [
   },
 ];
 
+/**
+ * @name pathsData
+ * @description An array of objects representing learning paths to be added to the 'paths' collection.
+ *              Each object defines a path's ID, name, associated providerId, logo URL, description,
+ *              and counts for total modules, quizzes, and exams.
+ */
 const pathsData = [
   // GCP Paths
   {
@@ -70,47 +100,61 @@ const pathsData = [
   },
 ];
 
+/**
+ * @name populateLearningOptions
+ * @description An HTTP-triggered Firebase Function (v2) that populates the 'providers'
+ *              and 'paths' collections in Firestore with the data defined in
+ *              `providersData` and `pathsData`. This function will overwrite existing
+ *              documents if they have the same ID.
+ * @param {object} req - The HTTP request object (not used in this function but required by the trigger).
+ * @param {object} res - The HTTP response object used to send back the status of the operation.
+ */
 exports.populateLearningOptions = onRequest({
-  region: "us-central1",
-  minInstances: 0,
-  maxInstances: 1,
+  region: "us-central1", // Specifies the region for the function.
+  minInstances: 0, // Allows the function to scale down to zero instances when not in use.
+  maxInstances: 1, // Limits the function t
 }, async (req, res) => {
-  console.log("Starting population of 'providers' and 'paths' collections...");
+  console.log("[populateLearningOptions] Starting population of 'providers' and 'paths' collections...");
 
   const batch = db.batch();
 
-  // Populate Providers
-  console.log(`Preparing to set ${providersData.length} providers...`);
+  // --- Populate Providers Collection ---
+  console.log(`[populateLearningOptions] Preparing to set ${providersData.length} providers...`);
   providersData.forEach((provider) => {
-    const {id, ...data} = provider;
+    const {id, ...data} = provider; // Destructure to separate the document ID from the rest of the data.
     if (!id) {
-      console.warn("Skipping provider with missing ID:", provider);
+      console.warn("[populateLearningOptions] Skipping provider with missing ID:", provider);
       return;
     }
     const providerRef = db.collection("providers").doc(id);
     batch.set(providerRef, data, {merge: false});
   });
 
-  // Populate Paths
-  console.log(`Preparing to set ${pathsData.length} paths...`);
+  // --- Populate Paths Collection ---
+  console.log(`[populateLearningOptions] Preparing to set ${pathsData.length} paths...`);
   pathsData.forEach((path) => {
-    const {id, ...data} = path;
+    const {id, ...data} = path; // Destructure to separate the document ID.
     if (!id) {
-      console.warn("Skipping path with missing ID:", path);
+      console.warn("[populateLearningOptions] Skipping path with missing ID:", path);
       return;
     }
     if (!data.providerId) {
-      console.warn(`Skipping path '${id}' because it's missing providerId.`);
+      // Essential for linking paths to providers.
+      console.warn(`[populateLearningOptions] Skipping path '${id}' because it's missing providerId.`);
       return;
     }
     const pathRef = db.collection("paths").doc(id);
-    batch.set(pathRef, data, {merge: false});
+    // Add a 'set' operation to the batch. `merge: false` ensures a complete overwrite.
+    batch.set(pathRef, data, {merge: false}); // Using merge:false for a clean overwrite.
   });
 
+  // --- Commit Batch and Send Response ---
   try {
+  // Atomically commit all the 'set' operations i
     await batch.commit();
-    const successMsg = `Successfully populated/overwritten ${providersData.length} providers and ${pathsData.length} paths.`;
-    console.log(successMsg);
+    const successMsg = `[populateLearningOptions] Successfully populated/overwritten ${providersData.length} providers and ${pathsData.length} paths.`;
+    console.log(successMsg); // Log success to Firebase console.
+    // Send a success response to the HTTP caller.
     res.status(200).send({
       status: "success",
       message: successMsg,
@@ -120,8 +164,9 @@ exports.populateLearningOptions = onRequest({
       },
     });
   } catch (error) {
-    console.error("Error committing population batch:", error);
+    console.error("[populateLearningOptions] Error committing population batch:", error);
     res.status(500).send({
+      // Send an error response if the batch commit fails.
       status: "error",
       message: `Error populating data: ${error.message}`,
     });
