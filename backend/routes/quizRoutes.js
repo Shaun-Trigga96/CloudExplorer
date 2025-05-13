@@ -1,25 +1,51 @@
 const express = require('express');
 const quizController = require('../controllers/quizController');
 // const { protect } = require('../middleware/authMiddleware'); // Authentication middleware
+/**
+ * @file quizRoutes.js
+ * @description This file defines routes for quiz-related functionalities,
+ * such as saving quiz results, listing quizzes, and retrieving quiz history.
+ * All routes defined here are prefixed with `/api/v1/quizzes`.
+ */
 
 const router = express.Router();
 
 // --- Routes ---
-// Save a user's quiz result (apply protection)
-// POST /api/v1/quizzes/save-result
+/**
+ * @route   POST /save-result
+ * @desc    Saves a user's quiz result.
+ * @access  Private (Requires user authentication)
+ */
 router.post('/save-result', /* protect, */ quizController.saveQuizResult);
 
-// Get quiz history for a specific user (apply protection, user must match or be admin)
-// GET /api/v1/quizzes/history/:userId
-// This might be better under userRoutes: GET /api/v1/users/:userId/quiz-history
-// Let's keep it here for now, assuming :userId is validated against authenticated user
+/**
+ * @route   GET /history/:userId
+ * @desc    Get quiz history for a specific user.
+ *          Optionally filters by moduleId, providerId, and pathId via query parameters.
+ * @access  Private (Requires user authentication; user must match `:userId` or be an admin)
+ * @param   {string} req.params.userId - The ID of the user whose quiz history is to be retrieved.
+ * @note    The controller `getQuizHistory` supports filtering by `moduleId`, `providerId`, and `pathId`
+ *          passed as query parameters.
+ */
 router.get('/history/:userId', /* protect, */ quizController.getQuizHistory);
 
-// --- NEW: Get All Quizzes ---
-// GET /api/v1/quizzes/list
+/**
+ * @route   GET /list-quizzes
+ * @desc    Lists available quizzes, typically filtered by providerId and pathId.
+ *          Supports optional filtering by moduleId and pagination.
+ * @access  Public (or Private, depending on application access rules for quiz content)
+ * @query   {string} [providerId] - Filter by provider ID.
+ * @query   {string} [pathId] - Filter by path ID.
+ * @query   {string} [moduleId] - Optional: Filter by module ID.
+ */
 router.get('/list-quizzes', quizController.listQuizzes);
-// --- NEW: Get Quiz by ID ---
-// GET /api/v1/quizzes/:id
+
+/**
+ * @route   GET /:id
+ * @desc    Retrieves a specific quiz definition by its ID.
+ * @access  Public (or Private, depending on application access rules for quiz content)
+ * @param   {string} req.params.id - The ID of the quiz to retrieve.
+ */
 router.get('/:id', quizController.getQuizById);
 
 

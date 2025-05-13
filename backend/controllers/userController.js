@@ -8,7 +8,17 @@ const { FieldValue } = require('firebase-admin/firestore');
 const {serverTimestamp,} = require('../utils/firestoreHelpers');
 const db = admin.firestore();
 const storage = admin.storage(); // Initialize storage
+/**
+ * @file userController.js
+ * @description This file contains controller functions for managing user-specific data,
+ * including settings, certifications, profile information, and learning progress.
+ */
 
+/**
+ * @desc    Get user-specific settings.
+ * @route   GET /api/v1/users/:userId/settings
+ * @access  Private (requires valid userId)
+ */
 // GET /users/:userId/settings
 exports.getUserSettings = async (req, res, next) => {
   try {
@@ -51,6 +61,11 @@ exports.getUserSettings = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Update user-specific settings.
+ * @route   PUT /api/v1/users/:userId/settings
+ * @access  Private (requires valid userId)
+ */
 // PUT /users/:userId/settings
 exports.updateUserSettings = async (req, res, next) => {
   try {
@@ -141,6 +156,11 @@ exports.updateUserSettings = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get all certifications for a specific user.
+ * @route   GET /api/v1/users/:userId/certifications
+ * @access  Private (requires valid userId)
+ */
 // GET /user/:userId/certifications
 exports.getUserCertifications = async (req, res, next) => {
   try {
@@ -189,6 +209,12 @@ exports.getUserCertifications = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get the profile image for a specific user.
+ * @route   GET /api/v1/users/:userId/profile-image
+ * @access  Public (redirects to default if not found or on error)
+ * @note    Streams the image or redirects to a default image URL.
+ */
 // GET /users/:userId/profile-image
 exports.getUserProfileImage = async (req, res, next) => {
   // Use environment variable for default or fallback
@@ -299,6 +325,11 @@ exports.getUserProfileImage = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Update user profile information (displayName, bio, photoURL).
+ * @route   PUT /api/v1/users/:userId/profile
+ * @access  Private (requires valid userId)
+ */
 // PUT /users/:userId/profile
 exports.updateUserProfile = async (req, res, next) => {
   try {
@@ -403,13 +434,16 @@ exports.updateUserProfile = async (req, res, next) => {
   }
 };
 
-// Utility to check if a learning path is complete (stubbed for now)
+// Utility to check if a learning path is complete (placeholder, not currently used in this file)
 const checkIfPathComplete = (learningProgress, pathDefinition) => {
   return false; // Placeholder
 };
 
 /**
- * Tracks user progress for a resource within a specific learning path.
+ * @desc    Tracks user progress (start or complete) for a resource (module, quiz, exam)
+ *          within a specific learning path. Updates the learning path document in Firestore.
+ * @route   POST /api/v1/users/:userId/track-progress
+ * @access  Private (requires valid userId)
  * Updates the corresponding document in the user's 'learningPaths' subcollection.
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -601,8 +635,11 @@ exports.trackProgress = async (req, res, next) => {
 
 
 /**
- * Retrieves comprehensive user progress, including learning paths, quiz/exam results, and available content.
- * Uses a subcollection for learningPaths.
+ * @desc    Retrieves comprehensive user progress, including all learning paths with their details,
+ *          and overall progress metrics. This function is similar to one in providerPathController
+ *          but is scoped under the user resource.
+ * @route   GET /api/v1/users/:userId/progress
+ * @access  Private (requires valid userId)
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next middleware function

@@ -7,6 +7,12 @@ const { FieldValue } = require('firebase-admin/firestore');
 const db = admin.firestore();
 
 /**
+ * @file providerPathController.js
+ * @description This file contains controller functions for managing cloud providers,
+ * learning paths, and user progress related to these paths.
+ */
+
+/**
  * @desc    Get all available cloud providers
  * @route   GET /api/v1/providers
  * @access  Public
@@ -104,7 +110,7 @@ exports.getAllPaths = async (req, res, next) => {
 /**
  * @desc    Start a new learning path for a user or set existing as active
  * @route   POST /api/v1/user/:userId/paths
- * @access  Public (Relies on userId from URL parameter)
+ * @access  Private (Requires `userId` from URL parameter and implies user context or authentication)
  */
 exports.startLearningPath = async (req, res, next) => {
   let userIdFromParams; // Define outside try block for logging in catch
@@ -285,7 +291,9 @@ exports.startLearningPath = async (req, res, next) => {
 /**
  * @desc    Set a specific learning path as active for a user
  * @route   POST /api/v1/user/:userId/paths/:learningPathId/activate
- * @access  Private (Requires Authentication Middleware setting req.user)
+ * @access  Private (Requires authenticated user. The `:userId` in the URL specifies the target user,
+ *          and `:learningPathId` specifies the path to activate for that user.
+ *          The acting user is determined by authentication middleware, e.g., `req.user`).
  */
 exports.setActiveLearningPath = async (req, res, next) => {
   try {
@@ -350,7 +358,8 @@ exports.setActiveLearningPath = async (req, res, next) => {
 /**
  * @desc    Update learning progress for a specific path (module, quiz, exam completion, score)
  * @route   POST /api/v1/user/:userId/paths/:learningPathId/progress
- * @access  Private (Requires Authentication Middleware setting req.user)
+ * @access  Private (Requires authenticated user, typically `req.user.uid`. The `:userId` in the URL
+ *          should match the authenticated user or be subject to admin privileges).
  */
 exports.updateLearningProgress = async (req, res, next) => {
   try {
@@ -491,7 +500,7 @@ exports.updateLearningProgress = async (req, res, next) => {
 /**
  * @desc    Get user's learning paths with progress details
  * @route   GET /api/v1/user/:userId/progress
- * @access  Private (Requires Authentication or uses userId from param)
+ * @access  Private (Requires authentication. Fetches progress for the user specified by `:userId` in the URL parameter.)
  */
 exports.getUserProgress = async (req, res, next) => {
   try {

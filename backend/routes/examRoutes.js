@@ -1,29 +1,50 @@
 const express = require('express');
 const examController = require('../controllers/examController');
 // const { protect, adminOnly } = require('../middleware/authMiddleware'); // Auth/Admin checks
+/**
+ * @file examRoutes.js
+ * @description This file defines routes for exam-related functionalities,
+ * such as saving exam results, listing exams, and retrieving exam history.
+ * All routes defined here are prefixed with `/api/v1/exams`.
+ */
 
 const router = express.Router();
 
 //console.log('DEBUG: Imported examController:', examController);
 
 // --- Static routes first ---
-
-// Save a user's exam result - Protected
-// POST /api/v1/exams/save-result
+/**
+ * @route   POST /save-result
+ * @desc    Saves a user's exam result.
+ * @access  Private (Requires user authentication)
+ */
 router.post('/save-result', /* protect, */ examController.saveExamResult);
 
-// List exams (optional, depends on requirements) - Protected? Public?
+/**
+ * @route   GET /list-exams
+ * @desc    Lists available exams, potentially filtered by providerId and pathId.
+ * @access  Public (or Private, depending on application access rules for exam content)
+ */
 router.get('/list-exams', /* protect, */ examController.listExams);
 
 
 // --- Dynamic routes ---
-
-// Get exam history for a user - Protected, user must match or be admin
-// GET /api/v1/exams/user/:userId/exam-history (Changed route)
+/**
+ * @route   GET /user/:userId/exam-history
+ * @desc    Retrieves the exam attempt history for a specific user.
+ *          Optionally filters by examId, providerId, and pathId via query parameters.
+ * @access  Private (Requires user authentication; user must match `:userId` or be an admin)
+ * @param   {string} req.params.userId - The ID of the user whose exam history is to be retrieved.
+ */
 router.get('/user/:userId/exam-history', /* protect, */ examController.getExamHistory); // Changed route and controller
 
-
-// Get a specific exam definition by ID (protect based on user role/enrollment?)
+/**
+ * @route   GET /:id
+ * @desc    Retrieves a specific exam definition by its ID.
+ * @access  Public (or Private, depending on application access rules for exam content,
+ *          e.g., based on user role or enrollment)
+ * @param   {string} req.params.id - The ID of the exam to retrieve.
+ */
 router.get('/:id', /* protect, */ examController.getExamById);
 
 module.exports = router;

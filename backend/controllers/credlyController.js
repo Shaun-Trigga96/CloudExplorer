@@ -3,10 +3,21 @@ const appError = require('../utils/appError');
 const { db } = require('../utils/firestoreHelpers');
 
 // Credly API base URL
-const CREDLY_OAUTH_API_BASE_URL = 'https://api.credly.com/v1'; // For OAuth and /me endpoints
+const CREDLY_OAUTH_API_BASE_URL = 'https://api.credly.com/v1'; // For OAuth and /me endpoints that require user-specific tokens
 const CREDLY_PUBLIC_API_BASE_URL = 'https://api.credly.com/v1';
-// Get user badges from Credly
-// This function is now designed to fetch PUBLIC badges by username/vanity alias
+
+/**
+ * @file credlyController.js
+ * @description This file contains controller functions for interacting with the Credly API,
+ * including fetching public user badges, importing badges to a user's profile,
+ * and handling OAuth token exchange for accessing user-specific Credly data.
+ */
+
+/**
+ * @desc    Fetches public badges for a given Credly username/vanity alias.
+ * @route   GET /api/v1/credly/users/:credlyUsername/badges
+ * @access  Public (uses a server-side API key for Credly authentication)
+ */
 exports.getUserBadges = async (req, res, next) => {
   try {
     const { credlyUsername } = req.params;
@@ -47,7 +58,11 @@ exports.getUserBadges = async (req, res, next) => {
   }
 };
 
-// Import badges to user profile
+/**
+ * @desc    Imports a list of badges (presumably fetched from Credly) into a user's profile within the application.
+ * @route   POST /api/v1/credly/import-badges
+ * @access  Private (requires `userId` and implies user authentication)
+ */
 exports.importBadges = async (req, res, next) => {
   try {
     const { userId, badges } = req.body;
@@ -90,7 +105,11 @@ exports.importBadges = async (req, res, next) => {
   }
 };
 
-// Exchange authorization code for access token
+/**
+ * @desc    Exchanges a Credly OAuth authorization code for an access token.
+ * @route   GET /api/v1/credly/oauth/token (or POST, depending on OAuth flow implementation)
+ * @access  Public (part of the OAuth 2.0 authorization code grant flow)
+ */
 exports.getAccessToken = async (req, res, next) => {
   try {
     const { code } = req.query;
@@ -117,6 +136,11 @@ exports.getAccessToken = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Fetches badges for the authenticated Credly user using an OAuth access token.
+ * @route   GET /api/v1/credly/me/badges
+ * @access  Private (requires a valid Credly OAuth `access_token` for the user)
+ */
 exports.getUserBadgesWithToken = async (req, res, next) => {
   try {
     const { access_token } = req.query;

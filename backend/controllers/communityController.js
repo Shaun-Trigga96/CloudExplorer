@@ -8,9 +8,18 @@ const usersCollection = db.collection('users');
 const postsCollection = db.collection('posts'); // Let's assume a 'posts' collection
 const topicsCollection = db.collection('topics');
 const eventsCollection = db.collection('events');
+const communityEventsCollection = db.collection('communityEvents');
+
 /**
- * Fetches user details needed for embedding in posts or member lists.
- * Avoids fetching sensitive data.
+ * @file communityController.js
+ * @description This file contains controller functions for managing community interactions,
+ * including posts, members, topics, and events.
+ */
+
+/**
+ * @private
+ * @desc    Fetches minimal user details (displayName, photoURL, level) for embedding in posts or member lists.
+ *          Avoids fetching sensitive user data.
  * @param {string[]} userIds - Array of user IDs to fetch.
  * @returns {Promise<Map<string, object>>} - Map of userId -> user details.
  */
@@ -51,7 +60,15 @@ const getUsersDetails = async (userIds) => {
 };
 
 
-// GET /api/v1/community/posts
+/**
+ * @desc    Get community posts with pagination and sorting.
+ * @route   GET /api/v1/community/posts
+ * @access  Public (or Private if authentication is needed to view posts)
+ * @query   {number} [limit=10] - Number of posts to return (1-50).
+ * @query   {string} [lastId] - ID of the last post from the previous page for pagination.
+ * @query   {string} [orderBy='timestamp'] - Field to order by (e.g., 'timestamp', 'likes', 'comments').
+ * @query   {string} [orderDir='desc'] - Order direction ('asc' or 'desc').
+ */
 exports.getCommunityPosts = async (req, res, next) => {
     try {
         const {
@@ -149,7 +166,15 @@ exports.getCommunityPosts = async (req, res, next) => {
     }
 };
 
-// GET /api/v1/community/members
+/**
+ * @desc    Get community members with pagination and sorting.
+ * @route   GET /api/v1/community/members
+ * @access  Public (or Private if authentication is needed to view members)
+ * @query   {number} [limit=15] - Number of members to return (1-50).
+ * @query   {string} [lastId] - ID of the last member (user ID) from the previous page for pagination.
+ * @query   {string} [orderBy='lastActivity'] - Field to order by (e.g., 'lastActivity', 'displayName', 'createdAt').
+ * @query   {string} [orderDir='desc'] - Order direction ('asc' or 'desc').
+ */
 exports.getCommunityMembers = async (req, res, next) => {
     try {
         const {
@@ -214,7 +239,14 @@ exports.getCommunityMembers = async (req, res, next) => {
 };
 
 
-// POST /api/v1/community/posts (Example - Needs Authentication)
+/**
+ * @desc    Create a new community post.
+ * @route   POST /api/v1/community/posts
+ * @access  Private (Requires user authentication. `userId` should ideally come from `req.user`).
+ * @body    {string} userId - The ID of the user creating the post.
+ * @body    {string} content - The content of the post.
+ * @body    {string} topic - The topic of the post.
+ */
 exports.createCommunityPost = async (req, res, next) => {
     try {
         // IMPORTANT: Replace with actual authenticated user ID
@@ -279,7 +311,13 @@ exports.createCommunityPost = async (req, res, next) => {
     }
 };
 
-// POST /api/v1/community/posts/:postId/like (Example - Needs Authentication)
+/**
+ * @desc    Like a community post.
+ * @route   POST /api/v1/community/posts/:postId/like
+ * @access  Private (Requires user authentication. `userId` should ideally come from `req.user`).
+ * @param   {string} req.params.postId - The ID of the post to like.
+ * @body    {string} userId - The ID of the user liking the post.
+ */
 exports.likePost = async (req, res, next) => {
     try {
         const { postId } = req.params;
@@ -326,7 +364,13 @@ exports.likePost = async (req, res, next) => {
     }
 };
 
-// DELETE /api/v1/community/posts/:postId/like (Example - Needs Authentication)
+/**
+ * @desc    Unlike a community post.
+ * @route   DELETE /api/v1/community/posts/:postId/like (or POST, depending on API design preference)
+ * @access  Private (Requires user authentication. `userId` should ideally come from `req.user`).
+ * @param   {string} req.params.postId - The ID of the post to unlike.
+ * @body    {string} userId - The ID of the user unliking the post.
+ */
 exports.unlikePost = async (req, res, next) => {
     try {
         const { postId } = req.params;
@@ -372,7 +416,15 @@ exports.unlikePost = async (req, res, next) => {
     }
 };
 
-// GET /api/v1/community/topics
+/**
+ * @desc    Get community topics with pagination and sorting.
+ * @route   GET /api/v1/community/topics
+ * @access  Public
+ * @query   {number} [limit=20] - Number of topics to return (1-50).
+ * @query   {string} [lastId] - ID of the last topic from the previous page for pagination.
+ * @query   {string} [orderBy='count'] - Field to order by (e.g., 'count', 'name').
+ * @query   {string} [orderDir='desc'] - Order direction ('asc' or 'desc').
+ */
 exports.getCommunityTopics = async (req, res, next) => {
     try {
       const { limit = 20, lastId, orderBy = 'count', orderDir = 'desc' } = req.query;
@@ -422,9 +474,17 @@ exports.getCommunityTopics = async (req, res, next) => {
       next(error);
     }
   };
-  const communityEventsCollection = db.collection('communityEvents'); // <-- Add this line
 
-  // GET /api/v1/community/events
+  /**
+   * @desc    Get community events with pagination and sorting.
+   * @route   GET /api/v1/community/events
+   * @access  Public
+   * @query   {number} [limit=10] - Number of events to return (1-50).
+   * @query   {string} [lastId] - ID of the last event from the previous page for pagination.
+   * @query   {string} [orderBy='date'] - Field to order by (e.g., 'date', 'title').
+   * @query   {string} [orderDir='desc'] - Order direction ('asc' or 'desc').
+   * @note    Uses the `communityEvents` collection.
+   */
   exports.getCommunityEvents = async (req, res, next) => {
     try {
       const { limit = 10, lastId, orderBy = 'date', orderDir = 'desc' } = req.query;

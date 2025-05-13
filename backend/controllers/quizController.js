@@ -3,10 +3,18 @@ const AppError = require('../utils/appError');
 const {serverTimestamp} = require('../utils/firestoreHelpers');
 
 const db = admin.firestore();
+/**
+ * @file quizController.js
+ * @description This file contains controller functions for managing quizzes,
+ * including saving quiz results, retrieving quiz history, and fetching quiz details.
+ */
 
-// POST /save-quiz-result
-// RESPONSIBILITY: Saves the details of a specific quiz attempt to the 'quizResults' collection.
-// Does NOT update the user's overall learning path progress directly anymore.
+/**
+ * @desc    Saves the details of a specific quiz attempt to the 'quizResults' collection.
+ *          This function does NOT directly update the user's overall learning path progress.
+ * @route   POST /api/v1/quizzes/save-result
+ * @access  Private (requires valid userId and other contextual IDs)
+ */
 exports.saveQuizResult = async (req, res, next) => {
   try {
     const {
@@ -94,8 +102,12 @@ exports.saveQuizResult = async (req, res, next) => {
   }
 };
 
-// GET /user/:userId/quiz-history
-// Optionally filter by providerId and pathId
+/**
+ * @desc    Retrieves the quiz attempt history for a specific user.
+ *          Optionally filters by moduleId, providerId, and pathId.
+ * @route   GET /api/v1/quizzes/user/:userId/quiz-history
+ * @access  Private (requires valid userId)
+ */
 exports.getQuizHistory = async (req, res, next) => {
   try {
     const {userId} = req.params;
@@ -161,8 +173,11 @@ exports.getQuizHistory = async (req, res, next) => {
   }
 };
 
-// --- Get Quiz by ID ---
-// GET /:id (Changed route param name for consistency)
+/**
+ * @desc    Retrieves a specific quiz definition by its ID.
+ * @route   GET /api/v1/quizzes/:id
+ * @access  Public (or Private, depending on application access rules for quiz content)
+ */
 exports.getQuizById = async (req, res, next) => {
   try {
     const { id } = req.params; // Use 'id' from the route
@@ -204,9 +219,12 @@ exports.getQuizById = async (req, res, next) => {
 };
 
 
-// --- UPDATED: List Quizzes (replaces getAllQuizzes) ---
-// GET /list (or just / if base route is /api/v1/quizzes)
-// Requires providerId and pathId query parameters
+/**
+ * @desc    Lists quizzes, typically filtered by providerId and pathId.
+ *          Supports optional filtering by moduleId and pagination.
+ * @route   GET /api/v1/quizzes/list
+ * @access  Public (or Private, depending on application access rules for quiz content)
+ */
 exports.listQuizzes = async (req, res, next) => {
   console.log('[quizController.listQuizzes] Received req.query:', JSON.stringify(req.query));
   try {

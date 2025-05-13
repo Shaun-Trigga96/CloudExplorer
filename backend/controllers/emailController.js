@@ -2,7 +2,17 @@
 const AppError = require('../utils/appError');
 const sgMail = require('@sendgrid/mail'); // Import SendGrid
 const {db, logger, sendgridApiKey} = require('../config/config'); // Import SendGrid API key from config
+/**
+ * @file emailController.js
+ * @description This file contains controller functions for managing email-related functionalities,
+ * such as updating user email subscription preferences.
+ */
 
+/**
+ * @desc    Updates a user's email subscription status (enable/disable email updates).
+ * @route   POST /api/v1/users/update-subscription (or a more specific route like /api/v1/users/:userId/subscription)
+ * @access  Private (requires valid userId, typically from authenticated user)
+ */
 
 // POST /update-subscription
 exports.updateEmailSubscription = async (req, res, next) => {

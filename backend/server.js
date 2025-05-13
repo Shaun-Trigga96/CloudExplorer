@@ -6,11 +6,22 @@ const dotenv = require('dotenv');
 const path = require('path');
 const morgan = require('morgan');
 const {GoogleGenerativeAI} = require('@google/generative-ai');
+/**
+ * @file server.js
+ * @description Main entry point for the Cloud Explorer backend application.
+ * This file initializes the Express server, Firebase Admin SDK, Google AI client,
+ * sets up middleware, defines routes, and handles global error management.
+ */
+/**
+ * -----------------------------------------------------------------------------
+ * Environment Variable Loading
+ * -----------------------------------------------------------------------------
+ * Loads environment variables from a .env file located at the project root.
+ */dotenv.config({path: path.resolve(__dirname, '..', '.env')});
 
-// --- Load Environment Variables ---
-dotenv.config({path: path.resolve(__dirname, '..', '.env')});
-
-// --- Firebase Initialization ---
+// --- Firebase Admin SDK Initialization ---
+// Attempts to initialize the Firebase Admin SDK using credentials and storage bucket
+// specified in environment variables. Exits the process on critical failure.
 try {
   if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
     throw new Error(
@@ -61,7 +72,8 @@ try {
   }
   process.exit(1); // Exit if Firebase initialization fails
 }
-// Initialize GEMINI_API_KEY  client with custom base URL and API key
+// --- Google AI Client (Gemini) Initialization ---
+// Initializes the Google Generative AI client if the GEMINI_API_KEY is set.
 if (!process.env.GEMINI_API_KEY) {
   console.error(
     'CRITICAL: GEMINI_API_KEY environment variable is not set. AI features will fail.',
@@ -70,7 +82,6 @@ if (!process.env.GEMINI_API_KEY) {
   console.log('GEMINI_API_KEY found, initializing Google AI client...');
 }
 
-// Initialize Google AI client
 const googleAiClient = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
   : null;
@@ -80,9 +91,17 @@ if (!googleAiClient) {
     'Google AI client not initialized due to missing GEMINI_API_KEY.',
   );
 }
+/**
+ * @global
+ * @type {GoogleGenerativeAI | null} googleAiClient - Initialized Google AI client instance, or null if API key is missing.
+ */
 module.exports.googleAiClient = googleAiClient;
 
-// --- Utils and Middleware ---
+/**
+ * -----------------------------------------------------------------------------
+ * Utility and Middleware Imports
+ * -----------------------------------------------------------------------------
+ */
 const AppError = require('./utils/appError');
 
 // --- Route Imports ---
@@ -96,10 +115,19 @@ const credlyRoutes = require('./routes/credlyRoutes');
 const communityRoutes = require('./routes/communityRoutes'); // <-- Import new routes
 const providerPathRoutes = require('./routes/providerPathRoutes'); // Import the new routes
 
-// --- Express App Setup ---
+/**
+ * -----------------------------------------------------------------------------
+ * Express Application Setup
+ * ----
+ * */
 const app = express();
 
-// --- Global Middleware ---
+/**
+ * -----------------------------------------------------------------------------
+ * Global Middleware
+ * -----------------------------------------------------------------------------
+ * Configures CORS, body parsing (JSON and URL-encoded), and HTTP request logging.
+ */
 app.use(cors({origin: process.env.CORS_ORIGIN || '*'}));
 
 // Body Parsing
@@ -112,7 +140,12 @@ app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
 app.use(express.json({limit: '50kb'})); // Increased limit slightly if quiz/exam answers are large
 app.use(express.urlencoded({extended: true, limit: '50kb'}));
 
-// --- API Routes --- (Add new routers)
+/**
+ * -----------------------------------------------------------------------------
+ * API Routes
+ * -----------------------------------------------------------------------------
+ * Mounts various route handlers for different API resources.
+ */
 app.use('/api/v1', appRoutes); // General: /api/v1/health
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/modules', moduleRoutes);
@@ -123,12 +156,22 @@ app.use('/api/v1/credly', credlyRoutes);
 app.use('/api/v1/community', communityRoutes); // <-- Add community routes
 app.use('/api/v1', providerPathRoutes);
 
-// --- Health Check Route ---
+/**
+ * @route GET /health
+ * @group Application - Operations related to application status
+ * @returns {object} 200 - An object indicating the server status and timestamp.
+ * @description Basic health check endpoint to verify the server is running.
+ */
 app.get('/health', (req, res) => {
   res.status(200).json({status: 'ok', timestamp: new Date()});
 });
 
-// --- Root Route ---
+/**
+ * @route GET /
+ * @group Application - Operations related to application status
+ * @returns {object} 200 - A welcome message with application status and version.
+ * @description Root endpoint providing basic information about the API.
+ */
 app.get('/', (req, res) => {
   res.status(200).json({
     status: 'success',
@@ -148,7 +191,15 @@ app.all('*', (req, res, next) => {
   );
 });
 
-// --- Global Error Handling Middleware --- (Update to handle AI errors better)
+/**
+ * -----------------------------------------------------------------------------
+ * Global Error Handling Middleware
+ * -----------------------------------------------------------------------------
+ * Centralized error handler for all Express errors.
+ * It logs errors and sends appropriate JSON responses to the client.
+ * Differentiates between operational errors (expected) and programming/unknown errors.
+ * Provides more detailed error information in development environments.
+ */
 const globalErrorHandler = (err, req, res, next) => {
   console.error('GLOBAL ERROR:', err.name, '-', err.message);
 
@@ -202,9 +253,14 @@ const globalErrorHandler = (err, req, res, next) => {
 };
 app.use(globalErrorHandler);
 
-// --- Start Server ---
-// Cloud Run sets the PORT environment variable.
-// Use it, or a default like 5000 or 8080 for local development.
+/**
+ * -----------------------------------------------------------------------------
+ * Server Initialization
+ * -----------------------------------------------------------------------------
+ * Starts the HTTP server, listening on the port defined by the environment
+ * (e.g., for Cloud Run) or a default port for local development.
+ * Listens on '0.0.0.0' to accept connections from any IP address.
+ */
 const port = process.env.PORT || 5001;
 
 app.get('/', (req, res) => {
@@ -217,7 +273,15 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`Server listening on port ${port} and host 0.0.0.0`);
 });
 
-// --- Graceful Shutdown --- (Good practice)
+/**
+ * -----------------------------------------------------------------------------
+ * Graceful Shutdown Handling
+ * -----------------------------------------------------------------------------
+ * Implements graceful shutdown for SIGTERM (e.g., from Cloud Run, Docker)
+ * and SIGINT (Ctrl+C) signals. This allows the server to finish processing
+ * current requests before exiting.
+ * @param {string} signal - The signal received (e.g., 'SIGTERM', 'SIGINT').
+ */
 const shutdown = signal => {
   console.log(`${signal} signal received: closing HTTP server.`);
   server.close(() => {

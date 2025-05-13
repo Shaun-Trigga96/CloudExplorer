@@ -4,6 +4,24 @@ const AppError = require('../utils/appError');
 
 const db = admin.firestore();
 
+/**
+ * @file moduleController.js
+ * @description This file contains controller functions for managing learning modules,
+ * including listing modules, fetching module details, and retrieving module sections.
+ */
+
+/**
+ * @desc    List modules with filtering, pagination, and sorting.
+ * @route   GET /api/v1/modules
+ * @access  Public (or Private, depending on application access rules for module content)
+ * @query   {number} [limit=20] - Number of modules to return (1-50).
+ * @query   {string} [lastId] - ID of the last module from the previous page for pagination.
+ * @query   {string} [orderBy='order'] - Field to order by (e.g., 'title', 'createdAt', 'order').
+ * @query   {string} [orderDir='asc'] - Order direction ('asc' or 'desc').
+ * @query   {string} [providerId] - Filter modules by provider ID.
+ * @query   {string} [pathId] - Filter modules by path ID.
+ */
+
 exports.listModules = async (req, res, next) => {
   console.log('Fetching modules with query params:', req.query); // Log incoming query params
   try {
@@ -119,6 +137,12 @@ exports.listModules = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get a specific module by its ID.
+ * @route   GET /api/v1/modules/:moduleId
+ * @access  Public (or Private, depending on application access rules for module content)
+ * @param   {string} req.params.moduleId - The ID of the module to retrieve.
+ */
 // --- getModuleById remains unchanged ---
 exports.getModuleById = async (req, res, next) => {
  try {
@@ -159,6 +183,12 @@ exports.getModuleById = async (req, res, next) => {
  }
 };
 
+/**
+ * @desc    Get all sections for a specific module, ordered by their 'order' field.
+ * @route   GET /api/v1/modules/:moduleId/sections
+ * @access  Public (or Private, depending on application access rules for module content)
+ * @param   {string} req.params.moduleId - The ID of the module whose sections are to be retrieved.
+ */
 // --- getModuleSections remains unchanged ---
 exports.getModuleSections = async (req, res, next) => {
   try {

@@ -5,9 +5,18 @@ const { serverTimestamp, isValidFirebaseStorageUrl } = require('../utils/firesto
 
 const db = admin.firestore();
 
-// POST /api/v1/exams/save-result
-// RESPONSIBILITY: Saves the details of a specific exam attempt to the 'examResults' collection.
-// Does NOT update the user's overall learning path progress directly anymore.
+/**
+ * @file examController.js
+ * @description This file contains controller functions for managing exams,
+ * including saving exam results, retrieving exam history, listing exams, and fetching exam details.
+ */
+
+/**
+ * @desc    Saves the details of a specific exam attempt to the 'examResults' collection.
+ *          This function does NOT directly update the user's overall learning path progress.
+ * @route   POST /api/v1/exams/save-result
+ * @access  Private (requires valid userId and other contextual IDs)
+ */
 exports.saveExamResult = async (req, res, next) => {
   console.log('saveExamResult: Received request body:', req.body);
   try {
@@ -116,8 +125,12 @@ exports.saveExamResult = async (req, res, next) => {
   }
 };
 
-// GET /api/v1/exams/user/:userId/exam-history (Renamed from getExamProgress)
-// Optionally filter by providerId and pathId
+/**
+ * @desc    Retrieves the exam attempt history for a specific user.
+ *          Optionally filters by examId, providerId, and pathId.
+ * @route   GET /api/v1/exams/user/:userId/exam-history
+ * @access  Private (requires valid userId)
+ */
 exports.getExamHistory = async (req, res, next) => { // Renamed function
   try {
     const {userId} = req.params;
@@ -178,8 +191,18 @@ exports.getExamHistory = async (req, res, next) => { // Renamed function
   }
 }; // End getExamHistory
 
-// GET /list
-// Requires providerId and pathId query parameters
+/**
+ * @desc    Lists exams, filtered by providerId and pathId.
+ *          Supports pagination and sorting.
+ * @route   GET /api/v1/exams/list
+ * @access  Public (or Private, depending on application access rules for exam content)
+ * @query   {string} providerId - REQUIRED: Filter exams by provider ID.
+ * @query   {string} pathId - REQUIRED: Filter exams by path ID.
+ * @query   {number} [limit=10] - Number of exams to return (1-50).
+ * @query   {string} [lastId] - ID of the last exam from the previous page for pagination.
+ * @query   {string} [orderBy='title'] - Field to order by (e.g., 'title', 'createdAt', 'duration').
+ * @query   {string} [orderDir='asc'] - Order direction ('asc' or 'desc').
+ */
 exports.listExams = async (req, res, next) => {
   try {
     const {
@@ -261,8 +284,12 @@ exports.listExams = async (req, res, next) => {
   }
 };
 
-// GET /:id (Changed route param name for consistency)
-exports.getExamById = async (req, res, next) => {
+/**
+ * @desc    Retrieves a specific exam definition by its ID.
+ * @route   GET /api/v1/exams/:id
+ * @access  Public (or Private, depending on application access rules for exam content)
+ * @param   {string} req.params.id - The ID of the exam to retrieve.
+ */exports.getExamById = async (req, res, next) => {
   try {
     const { id } = req.params; // Use 'id' from the route
     console.log(`Fetching exam by ID: ${id}`);
