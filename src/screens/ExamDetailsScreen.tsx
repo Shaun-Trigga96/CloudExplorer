@@ -58,7 +58,7 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
   } = useExamDetail(examId, providerId, pathId, navigation); // Pass all params correctly
 
   // --- FIX 3: Timer Hook (Pass duration from meta) ---
-  const { timeLeft, formatTime, timerColor  } = useTimer( // setTimeLeft likely not needed here
+  const { timeLeft, formatTime, timerColor } = useTimer( // setTimeLeft likely not needed here
     examStarted,
     examCompleted,
     examTiming,
@@ -76,7 +76,7 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
     return (
       <ErrorView
         message={userIdError}
-        // No retry needed for userIdError, usually requires re-login/app restart
+      // No retry needed for userIdError, usually requires re-login/app restart
       />
     );
   }
@@ -87,7 +87,7 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
       <ErrorView
         message={error}
         onRetry={refetchExamData} // Use the correct retry function
-        // Removed troubleshooting/retryCount logic
+      // Removed troubleshooting/retryCount logic
       />
     );
   }
@@ -156,7 +156,7 @@ const ExamDetailsScreen: React.FC<ExamDetailsScreenProps> = ({ route, navigation
 
   // Handle case where questions might still be empty briefly after loading=false
   if (!currentQuestion) {
-     return <LoadingView message="Preparing questions..." />;
+    return <LoadingView message="Preparing questions..." />;
   }
 
   return (

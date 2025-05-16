@@ -535,20 +535,15 @@ exports.getUserProgress = async (req, res, next) => {
     const userData = userDoc.data(); // Get user data for overall progress later if needed
 
     // Get user's learning paths subcollection
-    // Only fetch the active learning path or the most recently accessed one if none is active
+    // Removed limit to fetch all paths for the user
     const pathsSnapshot = await userRef.collection('learningPaths')
       .orderBy('lastAccessedAt', 'desc')
-      .limit(3).get(); // Limit to 1 path
+      .get(); 
 
     const learningPaths = [];
-    let overallModulesCompleted = 0;
-    let overallQuizzesCompleted = 0;
-    let overallExamsCompleted = 0; // Added
-    let overallScore = 0;
-
+    // We'll track stats per path now, not globally
+    
     // Process each learning path document
-    // Use Promise.all for potentially fetching path details concurrently if needed,
-    // but sequential might be okay for moderate number of paths.
     for (const doc of pathsSnapshot.docs) {
       const pathData = doc.data();
       const pathId = pathData.pathId; // The ID of the path definition in 'paths' collection
@@ -575,7 +570,6 @@ exports.getUserProgress = async (req, res, next) => {
       const totalExams = pathData.totalExams ?? pathDetails.totalExams;
       // --- End Fetch Path Definition ---
 
-
       const progress = pathData.learningProgress || {};
       const completedModules = progress.completedModules || [];
       const completedQuizzes = progress.completedQuizzes || [];
@@ -592,13 +586,6 @@ exports.getUserProgress = async (req, res, next) => {
         completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : (pathData.completed ? 100 : 0);
         completionPercentage = Math.min(completionPercentage, 100); // Ensure max 100
       }
-
-
-      // Aggregate overall progress
-      overallModulesCompleted += completedModules.length;
-      overallQuizzesCompleted += completedQuizzes.length;
-      overallExamsCompleted += completedExams.length; // Added
-      overallScore += score;
 
       learningPaths.push({
         id: doc.id, // ID of the user's specific learning path instance
@@ -625,21 +612,17 @@ exports.getUserProgress = async (req, res, next) => {
       });
     }
 
+    // Get active path ID from user document
+    const activePath = userData.activePath || null;
+    
     // Construct final response
     res.status(200).json({
       status: 'success',
       data: {
         userExists: true, // We confirmed user exists at the start
         learningPaths,
-        overallProgress: {
-          // Use aggregated counts
-          totalModulesCompleted: overallModulesCompleted,
-          totalQuizzesCompleted: overallQuizzesCompleted,
-          totalExamsCompleted: overallExamsCompleted, // Added
-          totalScore: overallScore,
-          // You might also get overall progress from the main user document if stored there
-          ... (userData.overallProgress || {})
-        }
+        activePath: activePath, // Include the active path identifier in the response
+        // No more global overallProgress - each path has its own progress stats
       }
     });
 

@@ -24,9 +24,7 @@ const ProgressItem: FC<ProgressItemProps> = ({ title, subtitle, status, percenta
       activeOpacity={0.7} // Add visual feedback on press
     >
       <View style={styles.header}>
-        <View style={[styles.iconCircle, { backgroundColor: color }]}>
-          <Image source={imageIcon} style={styles.imageIcon} resizeMode="contain" />
-        </View>
+        <Image source={imageIcon} style={styles.imageIcon} resizeMode="contain" />
         <View style={styles.textContainer}>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           {/* Conditionally render the subtitle if it exists */}
@@ -65,21 +63,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8, // Keep margin if percentage bar is shown
   },
-  iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16, // Make it a circle
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
   imageIcon: {
-    width: 50, // Adjust size as needed
-    height: 50, // Adjust size as needed
+    width: 36, // Adjusted size for direct display
+    height: 36, // Adjusted size for direct display
+    marginRight: 12, // Added margin for spacing, similar to what iconCircle had
   },
   textContainer: {
     flex: 1,
-    marginRight: 8, // Add margin to prevent text touching percentage
   },
   title: {
     fontSize: 15,

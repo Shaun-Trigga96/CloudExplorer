@@ -1,11 +1,10 @@
 // src/hooks/useExams.ts
 import { useState, useEffect, useCallback } from 'react';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { REACT_APP_BASE_URL } from '@env';
 import { Exam } from '../../types/exam';
 import { handleError } from '../../utils/handleError'; // Import error handler
-import { UserProgressData } from '../../types/modules';
 
 const BASE_URL = REACT_APP_BASE_URL;
 
@@ -51,6 +50,7 @@ export const useExams = (providerId: string | null, pathId: string | null): UseE
   const getIconForExam = useCallback((examId: string) => {
     const iconMap: { [key: string]: any } = {
       'cloud-digital-leader-exam': require('../../assets/images/cloud-digital-leader.png'),
+      'aws-certified-cloud-practitioner-exam': require('../../assets/images/cloud-practitioner.png'),
       // Add other mappings as needed
     };
     return iconMap[examId] || require('../../assets/images/cloud_generic.png');
@@ -136,7 +136,7 @@ export const useExams = (providerId: string | null, pathId: string | null): UseE
         associatedModules: exam.associatedModules,
         passingRate: exam.passingRate,
         icon: getIconForExam(exam.id),
-        numberOfQuestions: exam.numberOfQuestions || 0, // Ensure Exam type has this
+        questions: exam.questions?.length || 0, // Use the length of the questions array
       }));
       console.log(`[useExams] Fetched and formatted ${formattedExams.length} exams.`);
       setExams(formattedExams);

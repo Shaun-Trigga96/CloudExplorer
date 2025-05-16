@@ -25,7 +25,7 @@ const FeatureCard: React.FC = () => {
       >
         <Card.Content>
           <Text variant="titleLarge" style={[styles.cardTitle, { color: colors.text }]}>
-            Welcome to GCP Learning
+            Welcome to Cloud Explorer
           </Text>
           <Text variant="bodyLarge" style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
             Your journey to mastering Google Cloud Platform starts here

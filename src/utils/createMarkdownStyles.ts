@@ -53,4 +53,10 @@ export const createMarkdownStyles = (colors: typeof lightColors | typeof darkCol
     color: colors.error,
     fontStyle: 'italic',
   },
+  image: { // Styles for <Image> component or its container
+    width: '95%', // Overrides default in renderer
+    aspectRatio: 1.5, // Custom aspect ratio
+    // For icons, if you want to style them via the image rule:
+    // icon: { width: 60, height: 60, fill: themeColors.primary }
+  },
 });

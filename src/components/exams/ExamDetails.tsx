@@ -7,32 +7,38 @@ import strings from '../../localization/strings';
 
 interface ExamDetailsProps {
   duration: number | null;
-  passingRate: number | null; // Also updated passingRate to allow null
-  questionCount: number | null; // Changed to allow null
+  passingRate: number | null;
+  questions: number | null;
 }
 
-const ExamDetails: React.FC<ExamDetailsProps> = ({ duration, passingRate, questionCount }) => { // Destructure questionCount
+const ExamDetails: React.FC<ExamDetailsProps> = ({ duration, passingRate, questions }) => {
   const { isDarkMode } = useCustomTheme();
   const colors = isDarkMode ? darkColors : lightColors;
 
   return (
     <View style={[styles.examDetails, { backgroundColor: colors.examDetailBackground }]}>
       <View style={styles.examDetailItem}>
-        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{strings.durationLabel}</Text>
+        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+          {strings.durationLabel}
+        </Text>
         <Text style={[styles.detailValue, { color: colors.text }]}>
-          {duration ? `${duration} ${strings.minutesSuffix}` : 'N/A'}
+          {duration ? `${duration} ${strings.minutesSuffix}` : ''}
         </Text>
       </View>
       <View style={styles.examDetailItem}>
-        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{strings.passRateLabel}</Text>
+        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+          {strings.passRateLabel}
+        </Text>
         <Text style={[styles.detailValue, { color: colors.text }]}>
-          {passingRate ? `${passingRate}${strings.percentSuffix}` : 'N/A'}
+          {passingRate ? `${passingRate}${strings.percentSuffix}` : ''}
         </Text>
       </View>
       <View style={styles.examDetailItem}>
-        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{strings.questionsLabel || 'Questions'}</Text> {/* Add 'Questions' to strings.ts if needed */}
+        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+          {strings.questionsLabel || 'Questions'}
+        </Text>
         <Text style={[styles.detailValue, { color: colors.text }]}>
-          {questionCount ? `${questionCount}${strings.questionsSuffix}` : 'N/A'}
+          {questions ? `${questions}${strings.questionsSuffix || ''}` : '-'}
         </Text>
       </View>
     </View>

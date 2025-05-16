@@ -262,6 +262,7 @@ exports.listExams = async (req, res, next) => {
         prerequisites: data.prerequisites,
         associatedModules: data.associatedModules,
         passingRate: data.passingRate,
+        questions: data.questions, // Assuming questions are stored directly
         createdAt: data.createdAt?.toDate()?.toISOString() || null,
         updatedAt: data.updatedAt?.toDate()?.toISOString() || null,
       };

@@ -8,12 +8,13 @@ import {
   Alert,
   TouchableOpacity,
   NativeScrollEvent,
-  NativeSyntheticEvent
+  NativeSyntheticEvent, Image, Dimensions
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import iconMap from '../utils/iconMap';
+import { imageMap } from '../utils/imageMap'; // Import the imageMap
 import { REACT_APP_BASE_URL } from '@env';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -32,6 +33,7 @@ import { lightColors, darkColors } from '../styles/colors';
 import { useActiveLearningPath } from '../context/ActiveLearningPathContext'; // Import context hook
 
 const BASE_URL = REACT_APP_BASE_URL;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type ModuleDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ModuleDetail'>
 type ModuleDetailScreenRouteProp = RouteProp<RootStackParamList, 'ModuleDetail'>;
@@ -41,9 +43,8 @@ interface ModuleDetailScreenProps {
   navigation: ModuleDetailScreenNavigationProp;
 }
 
-// --- preprocessMarkdownWithIcons function (with logging) ---
-// Updated preprocessMarkdownWithIcons function
-const preprocessMarkdownWithIcons = (
+// --- preprocessMarkdownWithIconsAndImages function (with logging) ---
+const preprocessMarkdownWithIconsAndImages = (
   content: string,
   colors: typeof lightColors | typeof darkColors,
   onLinkPress?: (url: string) => boolean
@@ -62,43 +63,79 @@ const preprocessMarkdownWithIcons = (
     ];
   }
 
-  const iconRegex = /!\[icon:([a-zA-Z0-9-_]+)\]/g;
-  let modifiedContent = content;
-  const replacements: { placeholder: string; component: JSX.Element }[] = [];
   const themedMarkdownStyles = createMarkdownStyles(colors);
+  
   // --- Logging ---
   console.log('[preprocessMarkdown] Text color from styles:', themedMarkdownStyles?.text?.color);
 
-  let match;
-  let index = 0;
-  while ((match = iconRegex.exec(content)) !== null) {
-    const iconName = match[1];
-    const placeholder = `__ICON_${index}__`;
+  // Define regex patterns for both icons and images
+  const iconRegex = /!\[icon:([a-zA-Z0-9-_]+)\]/g;
+  const imageRegex = /!\[image:([a-zA-Z0-9-_]+)\]/g;
+
+  let modifiedContent = content;
+  const replacements: { placeholder: string; component: JSX.Element }[] = [];
+  
+  // Process icons
+  let iconMatch;
+  let iconIndex = 0;
+  while ((iconMatch = iconRegex.exec(content)) !== null) {
+    const iconName = iconMatch[1];
+    const placeholder = `__ICON_${iconIndex}__`;
     const IconComponent = iconMap[iconName] as React.FC<{ width: number; height: number; fill: string }> | undefined;
 
     replacements.push({
       placeholder,
       component: IconComponent ? (
-        <View key={`icon-${iconName}-${index}`} style={themedMarkdownStyles.iconContainer}>
+        <View key={`icon-${iconName}-${iconIndex}`} style={themedMarkdownStyles.iconContainer}>
           <IconComponent width={80} height={80} fill={colors.primary} />
         </View>
       ) : (
-        <Text key={`icon-fallback-${iconName}-${index}`} style={themedMarkdownStyles.iconFallback}>
+        <Text key={`icon-fallback-${iconName}-${iconIndex}`} style={themedMarkdownStyles.iconFallback}>
           [Icon not found: {iconName}]
         </Text>
       ),
     });
 
-    modifiedContent = modifiedContent.replace(match[0], placeholder);
-    index++;
+    modifiedContent = modifiedContent.replace(iconMatch[0], placeholder);
+    iconIndex++;
   }
 
-  const segments = modifiedContent.split(/(__ICON_\d+__)/g);
+  // Process images
+  let imageMatch;
+  let imageIndex = 0;
+  while ((imageMatch = imageRegex.exec(content)) !== null) {
+    const imageName = imageMatch[1];
+    const placeholder = `__IMAGE_${imageIndex}__`;
+    const imageSource = imageMap[imageName];
+
+    replacements.push({
+      placeholder,
+      component: imageSource ? (
+        <View key={`image-${imageName}-${imageIndex}`} style={styles.imageContainer}>
+          <Image 
+            source={imageSource} 
+            style={styles.contentImage} 
+            resizeMode="contain"
+          />
+        </View>
+      ) : (
+        <Text key={`image-fallback-${imageName}-${imageIndex}`} style={themedMarkdownStyles.iconFallback}>
+          [Image not found: {imageName}]
+        </Text>
+      ),
+    });
+
+    modifiedContent = modifiedContent.replace(imageMatch[0], placeholder);
+    imageIndex++;
+  }
+
+  // Split and render content with replacements
+  const segments = modifiedContent.split(/(__ICON_\d+__|__IMAGE_\d+__)/g);
   const renderedContent: JSX.Element[] = [];
   let replacementIndex = 0;
 
   segments.forEach((segment, i) => {
-    if (segment.match(/__ICON_\d+__/)) {
+    if (segment.match(/__ICON_\d+__|__IMAGE_\d+__/)) {
       if (replacementIndex < replacements.length && replacements[replacementIndex].placeholder === segment) {
         renderedContent.push(replacements[replacementIndex].component);
         replacementIndex++;
@@ -138,8 +175,7 @@ const preprocessMarkdownWithIcons = (
       </Text>,
     ];
 };
-// --- End of preprocessMarkdownWithIcons ---
-
+// --- End of preprocessMarkdownWithIconsAndImages ---
 
 const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) => {
   const { colors } = useCustomTheme().theme;
@@ -157,11 +193,8 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
 
   const { moduleId } = route.params; // Get IDs from route
 
-  // --- Use context hook (though values aren't directly used in fetch here, good to have) ---
   // --- Use context hook (get active path IDs) ---
   const { activeProviderId, activePathId } = useActiveLearningPath();
-
-  // ... rest of the ModuleDetailScreen code ...
 
   // --- Add navigation handler ---
   const handleNavigateToQuiz = useCallback(
@@ -299,8 +332,6 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
   useEffect(() => {
     console.log(`[ModuleDetailScreen] useEffect triggered by moduleId change. ModuleId: ${moduleId}. Fetching data...`);
     fetchData();
-    // }, [fetchData]); // OLD DEPENDENCY
-
   }, [moduleId]); // NEW DEPENDENCY - Directly depend on moduleId
 
   // Simple and reliable approach - mark sections read based on time and scroll position
@@ -432,8 +463,7 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
       await axios.post(`${BASE_URL}/api/v1/users/${userId}/progress`, payload);
 
       console.log('[ModuleDetailScreen] Module completed successfully.');
-      // Navigate back to the previous screen (likely ModulesScreen or DashboardScreen)
-      // navigation.goBack(); // --- REMOVE THIS ---
+
 
       // --- ADD NAVIGATION TO QUIZ ---
       // Assuming a quizId convention like 'moduleId-quiz-1'
@@ -521,8 +551,8 @@ const ModuleDetailScreen: FC<ModuleDetailScreenProps> = ({ route, navigation }) 
       return handleLinkPress(url);
     };
     
-    // Process content with the link handler
-    const processedContent = preprocessMarkdownWithIcons(
+    // Process content with the link handler - use updated function
+    const processedContent = preprocessMarkdownWithIconsAndImages(
       section.content || '', 
       colors,
       sectionLinkHandler
@@ -599,6 +629,19 @@ const styles = StyleSheet.create({
   debugButtonText: {
     color: 'white',
     fontSize: 14,
+  },
+  // New styles for image handling
+  imageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginVertical: 12,
+    backgroundColor: 'transparent',
+  },
+  contentImage: {
+    width: SCREEN_WIDTH - 64, // Screen width minus padding 
+    height: 200,
+    borderRadius: 8,
   }
 });
 

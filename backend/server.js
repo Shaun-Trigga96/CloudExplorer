@@ -17,7 +17,7 @@ const {GoogleGenerativeAI} = require('@google/generative-ai');
  * Environment Variable Loading
  * -----------------------------------------------------------------------------
  * Loads environment variables from a .env file located at the project root.
- */dotenv.config({path: path.resolve(__dirname, '..', '.env')});
+ */ dotenv.config({path: path.resolve(__dirname, '..', '.env')});
 
 // --- Firebase Admin SDK Initialization ---
 // Attempts to initialize the Firebase Admin SDK using credentials and storage bucket
@@ -286,11 +286,6 @@ const shutdown = signal => {
   console.log(`${signal} signal received: closing HTTP server.`);
   server.close(() => {
     console.log('HTTP server closed.');
-    // Close database connections if necessary
-    // admin.app().delete() // Optional: Cleanup Firebase connection
-    // .then(() => console.log('Firebase Admin SDK connection closed.'))
-    // .catch(err => console.error('Error closing Firebase connection:', err))
-    // .finally(() => process.exit(0));
     process.exit(0); // Exit after server closes
   });
 };

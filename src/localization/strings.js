@@ -33,6 +33,7 @@ const strings = {
     errorUnexpectedResponse: 'Unexpected response format from server.',
     errorUserIDRequired: 'User ID is required. Please log in.',
     errorExamProgressNotFound: 'Exam progress not found.',
+    noPracticeExamsAvailable: 'No practice exams available for this learning path yet.',
   
       // ModuleDetailScreen specific
     loadingModule: 'Loading...',

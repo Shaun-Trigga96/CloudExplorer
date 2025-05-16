@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Button, ActivityIndicator } from 'react-native-paper';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack'; // Removed NativeStackScreenProps as it's not used
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import axios from 'axios';
 import { REACT_APP_BASE_URL } from '@env';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -57,6 +57,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [showPathSelector, setShowPathSelector] = useState<boolean>(!hasActivePath);
   const [pathStartError, setPathStartError] = useState<string | null>(null);
+  // Track which path was explicitly selected by the user
+  const [userSelectedPath, setUserSelectedPath] = useState<{providerId: string, pathId: string} | null>(null);
 
   // --- Fetch Available Providers and Paths ---
   const fetchOptions = useCallback(async () => {
@@ -121,13 +123,16 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     setSelectedProvider(providerId);
     setSelectedPath(null); // Reset path when provider changes
     setPathStartError(null); // Clear previous errors
-  }, [setSelectedProvider, setSelectedPath, setPathStartError]); // Dependencies: state setters
+    setUserSelectedPath(null); // Reset user selection when provider changes
+  }, [setSelectedProvider, setSelectedPath, setPathStartError, setUserSelectedPath]);
 
-  const handlePathSelect = useCallback((pathId: string) => {
-    console.log('[HomeScreen] Selected path:', pathId);
+  const handlePathSelect = useCallback((pathId: string, providerId: string) => {
+    console.log('[HomeScreen] Selected path:', pathId, 'for provider:', providerId);
     setSelectedPath(pathId);
     setPathStartError(null); // Clear previous errors
-  }, [setSelectedPath, setPathStartError]); // Dependencies: state setters
+    // Store the user's explicit selection
+    setUserSelectedPath({ providerId, pathId });
+  }, [setSelectedPath, setPathStartError, setUserSelectedPath]);
 
   const navigateToMainApp = useCallback((providerId: string, pathId: string) => {
     console.log(`[HomeScreen] Setting active path context: Provider=${providerId}, Path=${pathId}`);
@@ -135,15 +140,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
     console.log(`[HomeScreen] Navigating to MainApp with params:`, { provider: providerId, path: pathId });
 
-    // --- CORRECTED NAVIGATION CALL ---
-    // Navigate to 'MainApp' and pass the required parameters
+    // Navigate to 'MainApp' and pass the selected provider and path IDs
     navigation.navigate('MainApp', { provider: providerId, path: pathId });
-    // --- END CORRECTION ---
-  }, [navigation, setActivePath]); // Incorrectly navigating to DashboardScreen instead of MainApp
-    // --- END PROBLEM ---
+  }, [navigation, setActivePath]);
 
   const handleStartLearning = useCallback(async () => {
-    if (!selectedProvider || !selectedPath) {
+    // Use user's explicit selection if available, otherwise fallback to selected values
+    const pathToStart = userSelectedPath || 
+                      (selectedProvider && selectedPath ? 
+                       { providerId: selectedProvider, pathId: selectedPath } : 
+                       null);
+    
+    if (!pathToStart) {
       console.warn('[HomeScreen] Missing provider or path');
       setPathStartError('Please select both a provider and a learning path.');
       return;
@@ -151,21 +159,22 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
     setPathStartError(null); // Clear previous errors
     try {
-      const selectedPathInfo = availablePaths[selectedProvider]?.find(
-        path => path.id === selectedPath
+      const selectedPathInfo = availablePaths[pathToStart.providerId]?.find(
+        path => path.id === pathToStart.pathId
       );
       if (!selectedPathInfo) throw new Error('Selected path information not found');
 
       console.log('[HomeScreen] Starting new learning path via hook:', {
-        providerId: selectedProvider,
-        pathId: selectedPath,
+        providerId: pathToStart.providerId,
+        pathId: pathToStart.pathId,
         pathName: selectedPathInfo.name
       });
 
-      await startNewPath(selectedProvider, selectedPath);
+      await startNewPath(pathToStart.providerId, pathToStart.pathId);
 
       console.log('[HomeScreen] New path started, navigating to MainApp');
-      navigateToMainApp(selectedProvider, selectedPath);
+      // Use the explicit user selection
+      navigateToMainApp(pathToStart.providerId, pathToStart.pathId);
 
     } catch (err: any) {
       console.error('[HomeScreen] Error starting path:', {
@@ -175,12 +184,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       const errorMessage = handleError(err, setPathStartError) || 'Failed to start learning path.';
       setPathStartError(errorMessage);
     }
-  }, [selectedProvider, selectedPath, availablePaths, startNewPath, navigateToMainApp, setPathStartError]); // Dependencies
+  }, [userSelectedPath, selectedProvider, selectedPath, availablePaths, startNewPath, navigateToMainApp, setPathStartError]);
 
   const handleContinuePath = useCallback((providerId: string, pathId: string) => {
     console.log('[HomeScreen] Continuing existing path:', { providerId, pathId });
+    // Store the user's explicit selection
+    setUserSelectedPath({ providerId, pathId });
+    // Directly use the path the user clicked on, not the active path
     navigateToMainApp(providerId, pathId);
-  }, [navigateToMainApp]); // Dependency: navigateToMainApp
+  }, [navigateToMainApp, setUserSelectedPath]);
 
   const handleShowPathSelector = useCallback(() => {
     console.log('[HomeScreen] Showing path selector');
@@ -188,7 +200,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     setSelectedProvider(null); // Reset selections when showing selector
     setSelectedPath(null);
     setPathStartError(null);
-  }, [setShowPathSelector, setSelectedProvider, setSelectedPath, setPathStartError]); // Dependencies: state setters
+    setUserSelectedPath(null); // Reset user selection when showing selector
+  }, [setShowPathSelector, setSelectedProvider, setSelectedPath, setPathStartError, setUserSelectedPath]);
 
   const handleRetry = useCallback(() => {
     console.log('[HomeScreen] Retrying on error');
@@ -203,7 +216,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       console.log('[HomeScreen] Retrying: Fetching options');
       fetchOptions(); // Call the stable fetchOptions function
     }
-  }, [selectionsError, optionsError, refreshSelections, fetchOptions, setOptionsError, setPathStartError]); // Dependencies
+  }, [selectionsError, optionsError, refreshSelections, fetchOptions, setOptionsError, setPathStartError]);
 
   // --- Render Selection Card (Wrapped in useCallback) ---
   const renderSelectionCard = useCallback((
@@ -238,7 +251,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       )}
       <Text style={[homeStyles.cardText, { color: colors.text }]}>{item.name}</Text>
     </TouchableOpacity>
-  ), [colors, isDarkMode]); // Dependencies: colors, isDarkMode
+  ), [colors, isDarkMode]);
 
   // --- Loading View ---
   if (isLoading) {
@@ -313,7 +326,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                       borderWidth: isActive ? 2 : isDarkMode ? 1 : 0,
                     },
                   ]}
-                  onPress={() => handleContinuePath(path.providerId, path.pathId)} // Use handler
+                  onPress={() => handleContinuePath(path.providerId, path.pathId)} // Pass the specific path
                 >
                   <View style={homeStyles.pathCardContent}>
                     {provider.logoUrl && (
@@ -396,7 +409,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               renderSelectionCard(
                 provider,
                 selectedProvider === provider.id,
-                () => handleProviderSelect(provider.id) // Use handler
+                () => handleProviderSelect(provider.id)
               )
             )
           ) : (
@@ -412,8 +425,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               availablePaths[selectedProvider].map((path) =>
                 renderSelectionCard(
                   path,
+                  // Check against user's explicit selection if available, otherwise use selectedPath
+                  (userSelectedPath && 
+                   userSelectedPath.providerId === selectedProvider && 
+                   userSelectedPath.pathId === path.id) || 
                   selectedPath === path.id,
-                  () => handlePathSelect(path.id) // Use handler
+                  () => handlePathSelect(path.id, selectedProvider) // Pass both path and provider
                 )
               )
             ) : (
@@ -423,11 +440,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         )}
 
         {/* Start Button (Conditional) */}
-        {selectedPath && (
+        {(selectedPath || userSelectedPath) && (
           <Animated.View entering={FadeIn.duration(500).delay(600)} exiting={FadeOut.duration(200)}>
             <Button
               mode="contained"
-              onPress={handleStartLearning} // Use handler
+              onPress={handleStartLearning}
               style={[homeStyles.button, { backgroundColor: colors.primary }]}
               contentStyle={homeStyles.buttonContent}
               labelStyle={[homeStyles.buttonText, { color: colors.buttonText }]}
@@ -439,13 +456,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         )}
 
         {/* Cancel Button (Conditional) */}
-        {hasActivePath && showPathSelector && ( // Only show cancel if showing selector AND there's an active path to go back to
+        {hasActivePath && showPathSelector && (
           <Animated.View entering={FadeIn.duration(500).delay(700)}>
             <Button
               mode="text"
               onPress={() => {
                 console.log('[HomeScreen] Cancel path selector');
                 setShowPathSelector(false); // Go back to showing existing paths
+                setUserSelectedPath(null); // Reset user selection when canceling
               }}
               style={homeStyles.cancelButton}
               labelStyle={{ color: colors.textSecondary }}

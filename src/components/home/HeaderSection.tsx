@@ -1,7 +1,6 @@
 // src/components/home/HeaderSection.tsx
 import React from 'react';
-import { View, Image, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Image, StyleSheet } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useCustomTheme } from '../../context/ThemeContext';
 import { darkColors, lightColors } from '../../styles/colors';
@@ -20,9 +19,6 @@ const HeaderSection: React.FC = () => {
         style={styles.logo}
         resizeMode="contain"
       />
-      <Text variant="displayMedium" style={[styles.title, { color: colors.text }]}>
-        Cloud Explorer
-      </Text>
     </Animated.View>
   );
 };
@@ -30,10 +26,10 @@ const HeaderSection: React.FC = () => {
 const styles = StyleSheet.create({
   headerSection: {
     alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingVertical: 0,
+    paddingHorizontal: 10,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -41,15 +37,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   logo: {
-    width: 80,
-    height: 80,
+    width: 190,
+    height: 190,
     marginBottom: 12,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
-    fontFamily: 'System',
   },
 });
 

@@ -134,7 +134,7 @@ const ExamsScreen = () => {
       ) : (
         <View style={examsStyles.noExamsContainer}>
           <Text style={[examsStyles.noExamsText, { color: colors.textSecondary }]}>
-            No practice exams available for this learning path yet.
+          {strings.noPracticeExamsAvailable}
           </Text>
         </View>
       )}

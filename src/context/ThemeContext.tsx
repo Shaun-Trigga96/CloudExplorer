@@ -48,6 +48,7 @@ interface Theme {
     examRulesBackground: string;
     cardBackground: string;
     notificationBackground: string;
+    accent: string;
 
   };
   cardStyle: {
